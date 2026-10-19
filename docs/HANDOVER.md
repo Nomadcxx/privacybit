@@ -12,6 +12,11 @@ wrong, then continue development to completion.
 This document is self-contained. If you read nothing else, you can work from
 this file plus the seven design documents in `/home/nomadx/privacy-bit/docs/plans/`.
 
+**Read `/home/nomadx/privacy-bit/docs/CONTEXT.md` first.** It carries the
+origin, the owner's original request, the decisions made in dialogue that never
+reached a design document, and the open tension between what the owner wants
+next and what D5 currently specifies.
+
 ---
 
 ## 0. How to use this document
