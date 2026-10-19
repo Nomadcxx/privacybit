@@ -1,0 +1,192 @@
+category:
+  id: addons
+  name: Browser addons
+  summary: >-
+    Content blockers and trackers-be-gone extensions. A hardened browser
+    without a content blocker is not hardened, and an ad blocker does more for
+    day-to-day privacy than any single browser choice.
+  expectations:
+    - id: addon.blocker
+      any_of: [ublock-origin, adblock-plus, adguard, clearurls, trackerblock]
+      severity: medium
+      why: >-
+        Nothing is filtering trackers or ads at the point where they are
+        actually collected, which is inside the page rather than on the
+        network.
+    - id: addon.tracker-removal
+      any_of: [privacy-badger, clearurls, libredirect, single-file]
+      severity: low
+      why: >-
+        Nothing is learning which trackers follow you between sites, so none of
+        them can be stopped learning it.
+  entries:
+    - id: ublock-origin
+      name: uBlock Origin
+      grade: green
+      summary: >-
+        The reference content blocker. Effective, transparent, and entirely
+        local.
+      reasons:
+        - Filtering happens locally; no filter list is fetched from a tracking
+          vendor on every page view.
+        - Supports the filter modes that actually reduce load rather than the
+          cosmetic ones.
+        - Fully open source with no commercial owner.
+      caveats:
+        - >-
+          Aggressive filter modes break some sites. That is a broken page, not a
+          privacy failure, and it is fixable per-site.
+      alternatives:
+        - adblock-plus
+        - adguard
+      detects:
+        - {type: package, name: ublock-origin}
+        - {type: package, name: ublock-origin-legacy}
+      install:
+        package:
+          arch: ublock-origin
+          debian: ublock-origin
+          fedora: ublock-origin
+        upstream: https://github.com/gorhill/uBlock
+
+    - id: adblock-plus
+      name: Adblock Plus
+      grade: amber
+      summary: >-
+        Widely used and functional, with an EasyList that has had documented
+        conflicts of interest around its curation.
+      reasons:
+        - Mature and effective at blocking ads.
+        - The shared filter-list programme has had sponsors whose own tracking
+          is blocked by it.
+      caveats:
+        - The shared "EasyList" curation has at times accepted ads from parties
+          whose own trackers were being blocked by the very list carrying them.
+        - Prefer uBlock Origin where you can.
+      alternatives:
+        - ublock-origin
+      detects:
+        - {type: package, name: adblock-plus}
+        - {type: package, name: adblockplus}
+      install:
+        package:
+          arch: adblock-plus
+        upstream: https://adblockplus.org
+
+    - id: adguard
+      name: AdGuard Browser Extension
+      grade: amber
+      summary: >-
+        Effective blocker with a paid component that syncs filters through the
+        vendor's servers.
+      reasons:
+        - Strong default filtering.
+      caveats:
+        - The sync feature and some filter lists route through AdGuard's own
+          infrastructure, reintroducing the dependency it exists to remove.
+        - Free and open source versions exist and avoid this.
+      alternatives:
+        - ublock-origin
+      detects:
+        - {type: package, name: adguard-browser-extension}
+        - {type: package, name: adguard}
+      install:
+        package:
+          arch: adguard-browser-extension
+        upstream: https://adguard.com
+
+    - id: clearurls
+      name: ClearURLs
+      grade: green
+      summary: >-
+        Strips tracking parameters from URLs before the page loads, so the
+        tracker never sees the navigation at all.
+      reasons:
+        - Removes the query-string identifiers many trackers rely on.
+        - Local, open source, no vendor.
+      alternatives:
+        - libredirect
+      detects:
+        - {type: package, name: clearurls}
+        - {type: package, name: clearurls-extension}
+      install:
+        package:
+          arch: clearurls
+        upstream: https://github.com/ClearURLs
+
+    - id: trackerblock
+      name: TrackerBlock
+      grade: green
+      summary: >-
+        EFF-backed extension that strips known tracking parameters and
+        fingerprinting scripts.
+      reasons:
+        - Maintained by the Electronic Frontier Foundation.
+        - Combines URL cleaning with script fingerprinting defence.
+      alternatives:
+        - clearurls
+      detects:
+        - {type: package, name: trackerblock}
+        - {type: package, name: trackerblock-extension}
+      install:
+        package:
+          arch: trackerblock
+        upstream: https://github.com/EFForg/TrackerBlock
+
+    - id: privacy-badger
+      name: Privacy Badger
+      grade: green
+      summary: >-
+        Learns which third parties follow you across sites and blocks them once
+        identified.
+      reasons:
+        - Turns observation into enforcement, which no static list can do.
+        - Fully open source, EFF-run.
+      caveats:
+        - Only useful in a long-lived profile; it has nothing to learn on day
+          one.
+      alternatives:
+        - trackerblock
+      detects:
+        - {type: package, name: privacy-badger}
+        - {type: package, name: privacybadger}
+      install:
+        package:
+          arch: privacy-badger
+        upstream: https://github.com/EFForg/privacy-badger
+
+    - id: libredirect
+      name: LibRedirect
+      grade: green
+      summary: >-
+        Redirects known tracking and redirection URLs to their non-tracking
+        equivalents at navigation time.
+      reasons:
+        - Neutralises link shorteners and tracking redirects before they fire.
+        - Local and open source.
+      alternatives:
+        - clearurls
+      detects:
+        - {type: package, name: libredirect}
+        - {type: package, name: libredirect-extension}
+      install:
+        package:
+          arch: libredirect
+        upstream: https://github.com/libredirect/libredirect
+
+    - id: single-file
+      name: SingleFile
+      grade: green
+      summary: >-
+        Saves a complete page to disk in one file, with the origin stripped, so
+        an archived copy cannot phone home when you reopen it.
+      reasons:
+        - Removes the origin server from the saved copy entirely.
+        - Removes the most common reason an "offline" bookmark still tracks you.
+      detects:
+        - {type: package, name: single-file}
+        - {type: package, name: singlefile}
+      install:
+        package:
+          arch: single-file
+        upstream: https://github.com/gildas-lormeau/SingleFile

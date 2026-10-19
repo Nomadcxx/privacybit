@@ -1,0 +1,164 @@
+category:
+  id: office
+  name: Office suite
+  summary: >-
+    Word processors, spreadsheets and presentations. The dividing line is
+    whether the suite saves in formats you can open later without the vendor,
+    and whether it phones home on open.
+  expectations:
+    - id: office.suite
+      severity: low
+      any_of:
+        - libreoffice-fresh
+        - libreoffice
+        - onlyoffice-bin
+        - onlyoffice-desktopeditors
+        - cryptpad
+        - etherpad
+      why: >-
+        Documents you cannot open without a vendor account are documents you do
+        not own.
+  entries:
+    - id: libreoffice
+      name: LibreOffice
+      grade: amber
+      family: tdf
+      summary: >-
+        The dominant FOSS suite. Mature and format-complete, but it ships
+        telemetry by default in recent releases and loads remote assets.
+      reasons:
+        - Open formats, no account, no vendor lock.
+        - Telemetry is opt-out rather than opt-in in current versions.
+        - Some components fetch templates and extensions over the network.
+      caveats:
+        - Disabling telemetry in settings and turning off remote document loading moves this to a green posture.
+        - Macro and remote-template features can reintroduce network access.
+      alternatives: [onlyoffice, cryptpad, etherpad]
+      detects:
+        - {type: package, name: libreoffice}
+        - {type: package, name: libreoffice-fresh}
+        - {type: binary, name: libreoffice}
+        - {type: binary, name: libreoffice-fresh}
+        - {type: flatpak, name: org.libreoffice.LibreOffice}
+      install:
+        package:
+          arch: libreoffice-fresh
+          debian: libreoffice
+          fedora: libreoffice
+          suse: libreoffice
+          alpine: libreoffice
+
+    - id: onlyoffice
+      name: ONLYOFFICE Desktop Editors
+      grade: red
+      family: ascensio
+      summary: >-
+        AGPL-licensed suite that is nonetheless graded red because its cloud
+        defaults phone home. This is the clearest case in the catalogue where a
+        licence and a privacy grade disagree.
+      reasons:
+        - Licence says free software; behaviour says otherwise.
+        - Connects to the vendor's cloud for collaboration and template features by default.
+        - Ties document handling to a vendor account for anything collaborative.
+      caveats:
+        - The desktop editors can be configured to avoid the cloud entirely, at the cost of the collaboration features that justify the product.
+      alternatives: [libreoffice, cryptpad]
+      detects:
+        - {type: package, name: onlyoffice-bin}
+        - {type: package, name: onlyoffice-desktopeditors}
+        - {type: binary, name: desktopeditors}
+      install:
+        upstream: https://www.onlyoffice.com/download-desktop.aspx
+
+    - id: wps-office
+      name: WPS Office
+      grade: red
+      family: wps
+      summary: Proprietary suite widely preinstalled on non-Linux hardware and available to sideload here.
+      reasons:
+        - Closed source and freeware-funded.
+        - Reports usage to the vendor.
+        - Historically flagged for embedded advertising and document telemetry.
+      caveats: []
+      alternatives: [libreoffice, onlyoffice]
+      detects:
+        - {type: package, name: wps-office}
+        - {type: package, name: wps-office-fonts}
+        - {type: binary, name: wps}
+        - {type: binary, name: et}
+        - {type: binary, name: wpp}
+      install:
+        upstream: https://linux.wps.com
+
+    - id: ms365
+      name: Microsoft 365
+      grade: red
+      family: microsoft
+      summary: Microsoft's hosted office suite.
+      reasons:
+        - Requires a Microsoft account.
+        - Documents live in Microsoft's storage unless opened locally.
+        - Telemetry is closed.
+      caveats: []
+      alternatives: [libreoffice, cryptpad]
+      detects:
+        - {type: package, name: ms-office}
+        - {type: package, name: m365-applications}
+      install:
+        upstream: https://www.microsoft.com/microsoft-365
+
+    - id: google-docs
+      name: Google Docs
+      grade: red
+      family: google
+      summary: Google's hosted office suite.
+      reasons:
+        - Requires a Google account.
+        - Documents live in Google's storage unless downloaded.
+        - Ad-supported free tier with account telemetry.
+      caveats: []
+      alternatives: [libreoffice, cryptpad]
+      detects:
+        - {type: package, name: google-docs}
+      install:
+        upstream: https://docs.google.com
+
+    - id: cryptpad
+      name: CryptPad
+      grade: green
+      family: cryptpad
+      summary: End-to-end encrypted collaborative editor, self-hostable.
+      reasons:
+        - End-to-end encrypted so the server cannot read the document.
+        - Self-hosting removes the third party entirely.
+      caveats:
+        - The public instance is operated by a third party, so self-hosting is what makes it green.
+      alternatives: [etherpad]
+      detects:
+        - {type: package, name: cryptpad}
+        - {type: binary, name: cryptpad}
+      install:
+        upstream: https://cryptpad.org
+
+    - id: etherpad
+      name: Etherpad
+      grade: green
+      family: etherpad
+      summary: Open source collaborative editor with a long history of self-hosting.
+      reasons:
+        - No vendor account required.
+        - Self-hostable with no third party in the path.
+      caveats:
+        - Encryption is not end-to-end by default, so a self-hosted server can read documents.
+        - Prefer CryptPad when the property matters.
+      alternatives: [cryptpad]
+      detects:
+        - {type: package, name: etherpad}
+        - {type: binary, name: etherpad}
+      install:
+        package:
+          arch: etherpad
+          debian: etherpad
+          fedora: etherpad
+          suse: etherpad
+          alpine: etherpad

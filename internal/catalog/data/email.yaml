@@ -1,0 +1,231 @@
+category:
+  id: email
+  name: Email
+  summary: >-
+    Desktop mail clients. The distinction that matters is whether the client
+    belongs to an email provider that reads your mail, or is a tool that talks
+    to whatever server you already trust.
+  expectations:
+    - id: email.client
+      severity: low
+      any_of:
+        - neomutt
+        - mutt
+        - kmail
+        - evolution
+        - thunderbird
+        - alpine
+        - mailspring
+        - geary
+      why: >-
+        A client is the narrowest place to read mail. Webmail and provider apps
+        render the same messages inside an account that can be analysed as a
+        whole.
+  entries:
+    - id: alpine
+      name: Alpine
+      grade: green
+      family: ikiwiki
+      summary: Terminal mail client from the ikiwiki project, written in Perl.
+      reasons:
+        - Reads from your existing IMAP or SMTP server and stores nothing itself.
+        - No account system, no telemetry, no vendor relationship.
+      caveats: []
+      alternatives: [neomutt, mutt]
+      detects:
+        - {type: package, name: alpine}
+        - {type: binary, name: alpine}
+      install:
+        package:
+          arch: alpine
+          debian: alpine
+          fedora: alpine
+          suse: alpine
+          alpine: alpine
+
+    - id: neomutt
+      name: NeoMutt
+      grade: green
+      family: mutt
+      summary: The maintained successor to Mutt, still text-first and still fast.
+      reasons:
+        - Terminal client speaking to your own mail server.
+        - No account telemetry, no embedded rendering engine, no background sync.
+      caveats: []
+      alternatives: [alpine]
+      detects:
+        - {type: package, name: neomutt}
+        - {type: binary, name: neomutt}
+      install:
+        package:
+          arch: neomutt
+          debian: neomutt
+          fedora: neomutt
+          suse: neomutt
+          alpine: neomutt
+
+    - id: mutt
+      name: Mutt
+      grade: green
+      family: mutt
+      summary: The original text mail client. Small, old, and still doing the job.
+      reasons:
+        - No vendor, no account system, no telemetry.
+        - Talks to your own IMAP or SMTP server and nothing else.
+      caveats:
+        - Development is slow and features lag NeoMutt.
+      alternatives: [neomutt, alpine]
+      detects:
+        - {type: package, name: mutt}
+        - {type: binary, name: mutt}
+      install:
+        package:
+          arch: mutt
+          debian: mutt
+          fedora: mutt
+          suse: mutt
+          alpine: mutt
+
+    - id: kmail
+      name: KMail
+      grade: green
+      family: kde
+      summary: KDE's mail client, talking to whatever accounts you configure.
+      reasons:
+        - Speaks IMAP and SMTP to servers you choose.
+        - No vendor account requirement.
+      caveats:
+        - Full KDE Platform dependencies, so a large install to read mail.
+      alternatives: [neomutt, evolution]
+      detects:
+        - {type: package, name: kmail}
+        - {type: package, name: kde-mail}
+        - {type: binary, name: kmail}
+      install:
+        package:
+          arch: kmail
+          debian: kmail
+          fedora: kmail
+          suse: kmail
+
+    - id: evolution
+      name: Evolution
+      grade: green
+      family: gnome
+      summary: GNOME's mail and calendar suite, provider-neutral by design.
+      reasons:
+        - Connects to arbitrary IMAP and SMTP servers.
+        - No account with any vendor required to use it.
+      caveats:
+        - Ships a contact server and web search integration that can be pointed at public services if enabled.
+      alternatives: [kmail, neomutt]
+      detects:
+        - {type: package, name: evolution}
+        - {type: binary, name: evolution}
+      install:
+        package:
+          arch: evolution
+          debian: evolution
+          fedora: evolution
+          suse: evolution
+          alpine: evolution
+
+    - id: mailspring
+      name: Mailspring
+      grade: red
+      family: mailspring
+      summary: Mail client that requires a Mailspring account to sync.
+      reasons:
+        - Free use is conditional on an account with the vendor, which is the trade.
+        - The vendor designs the account around being the mail access point.
+      caveats: []
+      alternatives: [evolution, thunderbird, neomutt]
+      detects:
+        - {type: package, name: mailspring}
+        - {type: binary, name: mailspring}
+      install:
+        package:
+          arch: mailspring
+          debian: mailspring
+        upstream: https://github.com/Foundry376/MailSpring
+
+    - id: thunderbird
+      name: Mozilla Thunderbird
+      grade: amber
+      family: mozilla
+      summary: >-
+        Capable FOSS mail client that is telemetry-capable by default and
+        prompts for an account during setup.
+      reasons:
+        - Sends telemetry including a client identifier and health data unless it is switched off.
+        - Setup walks toward a hosted account.
+      caveats:
+        - Telemetry can be disabled in settings; with it disabled the posture is close to green.
+        - A hardened configuration, with telemetry and remote content both off, is genuinely private.
+      alternatives: [evolution, neomutt, kmail]
+      detects:
+        - {type: package, name: thunderbird}
+        - {type: package, name: thunderbird-i18n-en-gb}
+        - {type: binary, name: thunderbird}
+        - {type: flatpak, name: org.mozilla.Thunderbird}
+      install:
+        package:
+          arch: thunderbird
+          debian: thunderbird
+          fedora: thunderbird
+          suse: thunderbird
+          alpine: thunderbird
+
+    - id: geary
+      name: Geary
+      grade: amber
+      family: gnome
+      summary: GNOME's newer mail client, conversation-focused.
+      reasons:
+        - Speaks to your own servers with no vendor account requirement.
+        - Younger project with a smaller ecosystem than Thunderbird.
+      caveats:
+        - Conversation grouping can pull remote images depending on configuration.
+      alternatives: [evolution, neomutt]
+      detects:
+        - {type: package, name: geary}
+        - {type: binary, name: geary}
+      install:
+        package:
+          arch: geary
+          debian: geary
+          fedora: geary
+          suse: geary
+
+    - id: thebat
+      name: The Bat!
+      grade: red
+      family: thebat
+      summary: Commercial mail client with proprietary licensing.
+      reasons:
+        - Closed source and paid.
+        - Optionally routes mail through the vendor's own servers for synchronisation.
+      caveats: []
+      alternatives: [evolution, neomutt, thunderbird]
+      detects:
+        - {type: package, name: thebat}
+        - {type: binary, name: thebat}
+      install:
+        package:
+          arch: thebat
+        upstream: https://www.bat.org
+
+    - id: outlook
+      name: Microsoft Outlook
+      grade: red
+      family: microsoft
+      summary: Microsoft's mail client, tied to a Microsoft account.
+      reasons:
+        - Requires a Microsoft account to function.
+        - Closed source and closed telemetry.
+      caveats: []
+      alternatives: [evolution, neomutt, thunderbird]
+      detects:
+        - {type: package, name: outlook}
+      install:
+        upstream: https://www.microsoft.com/microsoft-365

@@ -1,0 +1,454 @@
+# Browsers.
+#
+# The single most consequential category. A browser holds cookies, history,
+# autofill, and often every credential, and it is the one application where
+# configuration frequently beats choice: a hardened Firefox is a better privacy
+# posture than a stock green-rated fork.
+#
+# Grades here are about default behaviour and vendor relationship, not about
+# security. None of these will save you from a hostile page.
+category:
+  id: browser
+  name: Browser
+  summary: >-
+    What you browse with decides more about your privacy than every other
+    application combined. Configured correctly, a mainstream browser is
+    defensible; unconfigured, the most privacy-focused one is not.
+
+  expectations:
+    - id: browser.present
+      any_of: [firefox, chromium, brave, brave-origin, librewolf, mullvad-browser, tor-browser, waterfox, falkon, konqueror, zen-browser, floorp, ungoogled-chromium, vivaldi, opera, epiphany, epiphany-browser, midori, qutebrowser, surf, otter-browser, netfox, ghost, nimblecollect, cbird, icecat, google-chrome, google-chrome-stable, microsoft-edge-stable, chromium]
+      severity: high
+      why: Nothing on this machine appears to be a web browser.
+    - id: browser.adblocking
+      any_of: [ublock-origin, adblock-plus, adguard, trackerblock]
+      severity: medium
+      why: >-
+        No content blocker is installed. A content blocker removes whole
+        classes of request that no browser setting reliably stops.
+
+  entries:
+    # -- Red ------------------------------------------------------------------
+
+    - id: chrome
+      name: Google Chrome
+      grade: red
+      family: chromium
+      summary: >-
+        Google's browser, distributed by Google, tied to a Google account, and
+        operating under Google's privacy policy.
+      reasons:
+        - Ships Google web services into the build; the browser reports to Google infrastructure by design.
+        - Manifest V3 removes the ability for content blockers to operate as they once did.
+        - Any account use links browsing to an identity Google already holds.
+      caveats:
+        - Hardened and profile-managed deployments are a different proposition; this grades the default.
+      alternatives: [brave-origin, librewolf, mullvad-browser, firefox]
+      detects:
+        - {type: package, name: google-chrome}
+        - {type: package, name: google-chrome-stable}
+        - {type: package, name: google-chrome-beta}
+        - {type: package, name: google-chrome-dev}
+        - {type: package, name: chrome}
+        - {type: binary, name: google-chrome}
+        - {type: binary, name: google-chrome-stable}
+        - {type: desktop, name: google-chrome}
+      install:
+        upstream: https://www.google.com/chrome/
+        package:
+          arch: google-chrome
+          debian: google-chrome-stable
+          fedora: google-chrome-stable
+
+    - id: chromium
+      name: Chromium
+      grade: amber
+      family: chromium
+      summary: >-
+        The open-source browser engine without Google's services, but also
+        without the tracking protections Google added on top of it.
+      reasons:
+        - No Google web services in the build, which is the improvement over Chrome.
+        - No built-in tracking protection, so it is worse than a hardened browser out of the box.
+      caveats:
+        - Distribution matters. Ungoogled Chromium and its forks remove considerably more.
+      alternatives: [ungoogled-chromium, brave-origin, librewolf]
+      detects:
+        - {type: package, name: chromium}
+        - {type: binary, name: chromium}
+        - {type: binary, name: chromium-browser}
+        - {type: desktop, name: chromium}
+        - {type: desktop, name: chromium-browser}
+      install:
+        upstream: https://www.chromium.org/
+        package:
+          arch: chromium
+          debian: chromium
+          fedora: chromium
+
+    - id: edge
+      name: Microsoft Edge
+      grade: red
+      family: chromium
+      summary: >-
+        Chromium with Microsoft telemetry, and an economic incentive to keep it
+        that way.
+      reasons:
+        - Ships Microsoft tracking components, separate from Google's.
+        - Microsoft accounts and services tie the browser to an identity.
+      alternatives: [firefox, librewolf, brave-origin]
+      detects:
+        - {type: package, name: microsoft-edge-stable}
+        - {type: package, name: microsoft-edge}
+        - {type: binary, name: microsoft-edge}
+        - {type: binary, name: microsoft-edge-stable}
+        - {type: desktop, name: microsoft-edge}
+      install:
+        upstream: https://www.microsoft.com/edge
+        package:
+          arch: microsoft-edge-stable
+          debian: microsoft-edge-stable
+          fedora: microsoft-edge-stable
+
+    - id: opera
+      name: Opera
+      grade: red
+      family: chromium
+      summary: >-
+        Chromium with additional vendor components, owned by an investor group
+        with a history of privacy-hostile monetisation.
+      reasons:
+        - Carries an explicit advertising and affiliate business model.
+        - Adds tracking components on top of the Chromium base.
+      alternatives: [librewolf, falkon, firefox]
+      detects:
+        - {type: package, name: opera}
+        - {type: binary, name: opera}
+        - {type: desktop, name: opera}
+      install:
+        upstream: https://www.opera.com/
+        package:
+          arch: opera
+          debian: opera-stable
+          fedora: opera
+
+    - id: vivaldi
+      name: Vivaldi
+      grade: amber
+      family: chromium
+      summary: >-
+        Chromium with a strong user-facing privacy story, but which still
+        reports some diagnostics to its vendor by default.
+      reasons:
+        - Chromium base with no Google services in the build.
+        - Sends diagnostics that can be disabled, but are enabled by default.
+      caveats:
+        - Turning off the diagnostics is a single settings change, and the settings are honest about it.
+      alternatives: [brave-origin, ungoogled-chromium, librewolf]
+      detects:
+        - {type: package, name: vivaldi}
+        - {type: binary, name: vivaldi}
+        - {type: binary, name: vivaldi-stable}
+        - {type: desktop, name: vivaldi-stable}
+      install:
+        upstream: https://vivaldi.com/
+        package:
+          arch: vivaldi
+          debian: vivaldi
+          fedora: vivaldi
+
+    - id: tor-browser
+      name: Tor Browser
+      grade: green
+      family: firefox
+      summary: >-
+        Firefox hardened against fingerprinting and routed through Tor. The
+        reference point for anti-fingerprinting, not for speed or convenience.
+      reasons:
+        - Fingerprinting resistance is the default, not an add-on.
+        - Network-level anonymity when routed through Tor.
+      caveats:
+        - Anonymity is not the same as privacy, and Tor is not a faster browser.
+        - Outside Tor it is simply a very well hardened Firefox.
+      alternatives: [mullvad-browser]
+      detects:
+        - {type: package, name: tor-browser}
+        - {type: binary, name: tor-browser}
+        - {type: desktop, name: tor-browser}
+      install:
+        upstream: https://www.torproject.org/download/
+        package:
+          arch: tor-browser
+          debian: torbrowser-launcher
+          fedora: torbrowser-launcher
+
+    # -- Amber ----------------------------------------------------------------
+
+    - id: brave
+      name: Brave
+      grade: amber
+      family: brave
+      summary: >-
+        Strong blocking and fingerprinting resistance, wrapped around a
+        business that depends on user data staying valuable.
+      reasons:
+        - Brave Accounts and Brave Rewards are services that require identifying you.
+        - Historically routed anonymised browsing data to an advertising partner.
+      caveats:
+        - Removing the Brave account and disabling Rewards closes most of this gap.
+        - The blocking is genuinely good and is not the problem.
+      alternatives: [brave-origin, librewolf, mullvad-browser]
+      detects:
+        - {type: package, name: brave}
+        - {type: package, name: brave-bin}
+        - {type: package, name: brave-browser}
+        - {type: binary, name: brave}
+        - {type: binary, name: brave-browser}
+        - {type: flatpak, name: com.brave.Browser}
+        - {type: desktop, name: brave-browser}
+      install:
+        upstream: https://brave.com/
+        package:
+          arch: brave-bin
+          debian: brave-browser
+          fedora: brave-browser
+
+    - id: firefox
+      name: Mozilla Firefox
+      grade: amber
+      family: firefox
+      summary: >-
+        Open source, no vendor advertising business, and excellent once
+        configured. Unconfigured, it still phones home and still leaks a
+        great deal.
+      reasons:
+        - No advertising business; Mozilla's funding does not depend on tracking you.
+        - Sends telemetry by default, including in some builds on by default.
+      caveats:
+        - This grade assumes default settings. A hardened profile is a green posture.
+        - A content blocker changes the picture substantially.
+      alternatives: [librewolf, mullvad-browser, zen-browser]
+      detects:
+        - {type: package, name: firefox}
+        - {type: package, name: firefox-esr}
+        - {type: package, name: mozilla-firefox}
+        - {type: binary, name: firefox}
+        - {type: binary, name: firefox-esr}
+        - {type: flatpak, name: org.mozilla.firefox}
+        - {type: desktop, name: firefox}
+        - {type: desktop, name: firefox-esr}
+      install:
+        upstream: https://www.mozilla.org/firefox/
+        package:
+          arch: firefox
+          debian: firefox-esr
+          fedora: firefox
+
+    - id: konqueror
+      name: Konqueror
+      grade: amber
+      family: kde
+      summary: >-
+        The KDE browser. Unobtrusive and tracker-free on its own terms, but
+        narrow in what it supports.
+      reasons:
+        - No built-in tracking or telemetry of its own.
+        - WebKit-based, so protections are only as good as WebKit's.
+      alternatives: [falkon, firefox, librewolf]
+      detects:
+        - {type: package, name: konqueror}
+        - {type: binary, name: konqueror}
+        - {type: desktop, name: konqueror}
+      install:
+        upstream: https://apps.kde.org/konqueror/
+        package:
+          arch: konqueror
+          debian: konqueror
+          fedora: konqueror
+
+    # -- Green ----------------------------------------------------------------
+
+    - id: brave-origin
+      name: Brave Origin
+      grade: green
+      family: brave
+      summary: >-
+        Brave compiled without Brave cloud services, Rewards, or the
+        ad-partner components. The reason Brave is amber and this is not.
+      reasons:
+        - No Brave account integration in the build.
+        - No ad-partner components, so the business model that concerns us is absent.
+      caveats:
+        - Only available from Arch-family repositories; other distributions get the upstream Brave build.
+      alternatives: [librewolf, mullvad-browser]
+      detects:
+        - {type: package, name: brave-origin}
+        - {type: binary, name: brave-origin}
+        - {type: flatpak, name: com.brave.Browser.origin}
+        - {type: desktop, name: brave-origin}
+      install:
+        upstream: https://github.com/brave/brave-browser/releases
+        package:
+          arch: brave-origin
+
+    - id: librewolf
+      name: LibreWolf
+      grade: green
+      family: firefox
+      summary: >-
+        Firefox with telemetry removed at build time and privacy defaults
+        applied, rather than left to the user.
+      reasons:
+        - Telemetry endpoints removed from the source rather than merely disabled.
+        - Anti-fingerprinting and hardened defaults, including resistance to fingerprinting.
+      alternatives: [mullvad-browser, zen-browser, floorp]
+      detects:
+        - {type: package, name: librewolf}
+        - {type: binary, name: librewolf}
+        - {type: flatpak, name: io.gitlab.librewolf-community}
+        - {type: desktop, name: librewolf}
+      install:
+        upstream: https://librewolf-community.org/
+        package:
+          arch: librewolf-bin
+          debian: librewolf
+          fedora: librewolf
+
+    - id: mullvad-browser
+      name: Mullvad Browser
+      grade: green
+      family: firefox
+      summary: >-
+        Tor Browser's hardening applied to Firefox, without the routing. The
+        reference point for anti-fingerprinting outside the Tor network.
+      reasons:
+        - Inherits Tor Browser's fingerprinting resistance and resistance to linkability.
+        - No telemetry, no vendor account, no advertising business.
+      alternatives: [librewolf, tor-browser, zen-browser]
+      detects:
+        - {type: package, name: mullvad-browser}
+        - {type: binary, name: mullvad-browser}
+        - {type: flatpak, name: net.mullvad.browser}
+        - {type: desktop, name: mullvad-browser}
+      install:
+        upstream: https://mullvad.net/en/browser
+        package:
+          arch: mullvad-browser-bin
+          debian: mullvad-browser
+          fedora: mullvad-browser
+
+    - id: zen-browser
+      name: Zen Browser
+      grade: green
+      family: firefox
+      summary: >-
+        Firefox with tracking protection and privacy features on by default
+        rather than off by default.
+      reasons:
+        - Shields and tracker blocking enabled out of the box.
+        - No vendor advertising business.
+      alternatives: [librewolf, mullvad-browser]
+      detects:
+        - {type: package, name: zen-browser}
+        - {type: binary, name: zen-browser}
+        - {type: flatpak, name: app.zen_browser.zen}
+        - {type: desktop, name: zen-browser}
+      install:
+        upstream: https://zen-browser.app/
+        package:
+          arch: zen-browser-bin
+          fedora: zen-browser
+
+    - id: floorp
+      name: Floorp
+      grade: green
+      family: firefox
+      summary: >-
+        A Firefox fork with telemetry disabled and the configuration awkward
+        corners removed.
+      reasons:
+        - Telemetry disabled rather than merely configurable.
+        - No vendor business model to reconcile with.
+      caveats:
+        - Smaller project, so review it with the scepticism its size deserves.
+      alternatives: [librewolf, mullvad-browser]
+      detects:
+        - {type: package, name: floorp}
+        - {type: binary, name: floorp}
+        - {type: flatpak, name: one.foot4.Cat_Browser}
+        - {type: desktop, name: floorp}
+      install:
+        upstream: https://floorp.app/
+        package:
+          arch: floorp-bin
+          debian: floorp
+
+    - id: ungoogled-chromium
+      name: Ungoogled Chromium
+      grade: green
+      family: chromium
+      summary: >-
+        Chromium with the Google web services integration removed. The reference
+        point when Chromium compatibility is required.
+      reasons:
+        - Google web services, sync, and related network calls removed from the build.
+        - Keeps Chromium's site compatibility, which most privacy forks cannot.
+      alternatives: [brave-origin, vivaldi]
+      detects:
+        - {type: package, name: ungoogled-chromium}
+        - {type: binary, name: ungoogled-chromium}
+        - {type: binary, name: ungoogled-chromium-browser}
+        - {type: flatpak, name: com.github.ungoogled_software.ungoogled_chromium}
+        - {type: desktop, name: ungoogled-chromium}
+      install:
+        upstream: https://github.com/ungoogled-software/ungoogled-chromium
+        package:
+          arch: ungoogled-chromium-bin
+          debian: ungoogled-chromium
+          fedora: ungoogled-chromium
+
+    - id: waterfox
+      name: Waterfox
+      grade: green
+      family: firefox
+      summary: >-
+        A Firefox fork emphasising configurability and limiting its own
+        telemetry.
+      reasons:
+        - Telemetry limited relative to upstream Firefox.
+        - Independent of a company whose revenue depends on tracking.
+      caveats:
+        - Verify the claims against the build you actually run; fork telemetry claims age badly.
+      alternatives: [librewolf, zen-browser]
+      detects:
+        - {type: package, name: waterfox}
+        - {type: binary, name: waterfox}
+        - {type: flatpak, name: net.waterfox.waterfox}
+        - {type: desktop, name: waterfox}
+      install:
+        upstream: https://www.waterfox.net/
+        package:
+          arch: waterfox
+          debian: waterfox
+          fedora: waterfox
+
+    - id: falkon
+      name: Falkon
+      grade: green
+      family: kde
+      summary: >-
+        A light KDE browser with no tracking components of its own.
+      reasons:
+        - No telemetry, no account, no advertising.
+        - QtWebEngine base without vendor extensions.
+      alternatives: [konqueror, firefox]
+      detects:
+        - {type: package, name: falkon}
+        - {type: binary, name: falkon}
+        - {type: desktop, name: falkon}
+      install:
+        upstream: https://apps.kde.org/falkon/
+        package:
+          arch: falkon
+          debian: falkon
+          fedora: falkon

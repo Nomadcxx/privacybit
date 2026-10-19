@@ -1,0 +1,235 @@
+category:
+  id: media
+  name: Media player
+  summary: >-
+    Video players, music players and the downloaders that feed them. The
+    recurring issue here is telemetry in players that are otherwise entirely
+    local.
+  expectations:
+    - id: media.player
+      severity: low
+      any_of:
+        - mpv
+        - vlc
+        - celluloid
+        - haruna
+        - smplayer
+        - rhythmbox
+        - audacious
+        - cmus
+      why: >-
+        Players are one of the few applications with a direct line to a video
+        service's recommendation and telemetry endpoints.
+  entries:
+    - id: mpv
+      name: mpv
+      grade: green
+      family: mpv
+      summary: Minimal, scriptable, and silent.
+      reasons:
+        - No telemetry, no account, no update service.
+        - Scripting is local and user-controlled.
+      caveats:
+        - User-installed scripts can phone home if written to.
+      alternatives: [vlc]
+      detects:
+        - {type: package, name: mpv}
+        - {type: binary, name: mpv}
+      install:
+        package:
+          arch: mpv
+          debian: mpv
+          fedora: mpv
+          suse: mpv
+          alpine: mpv
+
+    - id: vlc
+      name: VLC
+      grade: amber
+      family: videolan
+      summary: Enormously capable and widely preinstalled, with telemetry that is on by default.
+      reasons:
+        - Ships an update check and usage statistics to VideoLAN unless both are disabled.
+        - Recent versions enable the telemetry by default rather than opt-in.
+      caveats:
+        - Disabling "Allow metadata network access" in preferences moves this toward green.
+        - The same setting also stops album art and cover art being fetched.
+      alternatives: [mpv, jellyfin, audacious]
+      detects:
+        - {type: package, name: vlc}
+        - {type: binary, name: vlc}
+        - {type: flatpak, name: org.videolan.VLC}
+      install:
+        package:
+          arch: vlc
+          debian: vlc
+          fedora: vlc
+          suse: vlc
+          alpine: vlc
+
+    - id: freetube
+      name: FreeTube
+      grade: green
+      family: freetube
+      summary: Ad-blocked YouTube client that never contacts Google.
+      reasons:
+        - Talks to a local proxy rather than to Google directly.
+        - No account required and no telemetry.
+      caveats:
+        - Breakage tracking is on by default and contacts the project's own server.
+      alternatives: [mpv, yt-dlp]
+      detects:
+        - {type: package, name: freetube}
+        - {type: package, name: freetube-bin}
+        - {type: binary, name: freetube}
+        - {type: flatpak, name: org.freetube.FreeTube}
+      install:
+        package:
+          arch: freetube-bin
+        upstream: https://freetube.app
+
+    - id: yt-dlp
+      name: yt-dlp
+      grade: green
+      family: yt-dlp
+      summary: Command-line media downloader with no telemetry.
+      reasons:
+        - Pure CLI, no update service, no account, no analytics.
+      caveats:
+        - As a downloader it is often paired with a player; the pair is fine.
+      alternatives: [mpv, freetube]
+      detects:
+        - {type: package, name: yt-dlp}
+        - {type: binary, name: yt-dlp}
+        - {type: binary, name: youtube-dl}
+      install:
+        package:
+          arch: yt-dlp
+          debian: yt-dlp
+          fedora: yt-dlp
+          suse: yt-dlp
+          alpine: yt-dlp
+
+    - id: rhythmbox
+      name: Rhythmbox
+      grade: green
+      family: gnome
+      summary: GNOME's local music player.
+      reasons:
+        - Plays local files without an account or telemetry.
+      caveats:
+        - Cover art lookup sends the file's metadata to a public service unless disabled.
+      alternatives: [audacious, cmus]
+      detects:
+        - {type: package, name: rhythmbox}
+        - {type: binary, name: rhythmbox}
+      install:
+        package:
+          arch: rhythmbox
+          debian: rhythmbox
+          fedora: rhythmbox
+          suse: rhythmbox
+          alpine: rhythmbox
+
+    - id: audacious
+      name: Audacious
+      grade: green
+      family: audacious
+      summary: Lightweight GTK music player.
+      reasons:
+        - Local playback with no telemetry.
+      caveats:
+        - Album-art lookup can be pointed at a public service if enabled.
+      alternatives: [rhythmbox, cmus]
+      detects:
+        - {type: package, name: audacious}
+        - {type: binary, name: audacious}
+      install:
+        package:
+          arch: audacious
+          debian: audacious
+          fedora: audacious
+          suse: audacious
+          alpine: audacious
+
+    - id: cmus
+      name: cmus
+      grade: green
+      family: cmus
+      summary: Console music player.
+      reasons:
+        - Terminal application with no network features at all.
+      caveats:
+        - Learning curve for new users.
+      alternatives: [mpv, audacious]
+      detects:
+        - {type: package, name: cmus}
+        - {type: binary, name: cmus}
+      install:
+        package:
+          arch: cmus
+          debian: cmus
+          fedora: cmus
+          suse: cmus
+          alpine: cmus
+
+    - id: spotify
+      name: Spotify
+      grade: red
+      family: spotify
+      summary: Streaming client built around a vendor account and an advertising business.
+      reasons:
+        - Requires a Spotify account and phones home constantly to stream.
+        - Free-tier listening is ad-supported and the client is closed.
+      caveats:
+        - The desktop client is a wrapper around a closed streaming protocol.
+      alternatives: [cmus, audacious, yt-dlp]
+      detects:
+        - {type: package, name: spotify}
+        - {type: package, name: spotifyd}
+        - {type: binary, name: spotify}
+        - {type: flatpak, name: com.spotify.Client}
+      install:
+        package:
+          arch: spotify
+          debian: spotify-client
+        upstream: https://spotify.com/download
+
+    - id: plex
+      name: Plex
+      grade: red
+      family: plex
+      summary: Media server that requires a vendor account for remote access.
+      reasons:
+        - Remote playback and most discovery features require a Plex account.
+        - Telemetry and account coupling are structural.
+      caveats:
+        - Local-only use avoids the account entirely.
+      alternatives: [jellyfin]
+      detects:
+        - {type: package, name: plex-media-server}
+        - {type: binary, name: plexmediaserver}
+      install:
+        upstream: https://www.plex.tv/media-server-downloads/
+
+    - id: jellyfin
+      name: Jellyfin
+      grade: green
+      family: jellyfin
+      summary: Open source media server with no vendor account.
+      reasons:
+        - Fully self-hosted; no account required.
+        - No vendor telemetry.
+      caveats:
+        - Remote clients must be secured by the user.
+      alternatives: []
+      detects:
+        - {type: package, name: jellyfin}
+        - {type: binary, name: jellyfin}
+      install:
+        package:
+          arch: jellyfin
+          debian: jellyfin
+          fedora: jellyfin
+          suse: jellyfin
+          alpine: jellyfin

@@ -1,0 +1,467 @@
+category:
+  id: chat
+  name: Chat and messaging
+  summary: >-
+    Chat clients are among the highest-leak software on a desktop. A single
+    proprietary chat client can read your contacts, report your presence, phone
+    home on every keystroke of read receipts, and hold every message in a cloud
+    account you do not control.
+  expectations:
+    - id: chat.encrypted
+      any_of: [signal, simplex-chat, deltachat, tox, hexchat, weechat, irssi, pidgin, gajim, dino, element, matrix-apps-for-desktop]
+      severity: medium
+      why: >-
+        Nothing is carrying your conversations over an encrypted channel you
+        control rather than one you merely log in to.
+    - id: chat.nonproprietary
+      any_of: [hexchat, weechat, irssi, pidgin, gajim, dino, deltachat, tox, simplex-chat, element, matrix-apps-for-desktop]
+      severity: low
+      why: >-
+        Every conversation you have is routed through a service whose operator
+        can read it and whose logs are not yours to inspect.
+  entries:
+    # --- red ---------------------------------------------------------------
+    - id: slack
+      name: Slack
+      grade: red
+      family: slack
+      summary: >-
+        Employer-operated chat. Your employer reads every message, and the
+        desktop client reports usage back to the vendor.
+      reasons:
+        - Message content is available to the workspace owner by design.
+        - The desktop client sends presence, notification and search telemetry
+          to the vendor on a continuous basis.
+        - The client holds an OAuth token with broad account scope.
+      caveats:
+        - 'Slack enterprise offers "EKM"-style retention controls, but they are
+          configured for the employer, not for you.'
+      alternatives:
+        - matrix-apps-for-desktop
+        - gajim
+        - hexchat
+      detects:
+        - {type: package, name: slack}
+        - {type: package, name: slack-desktop}
+        - {type: flatpak, name: com.slack.Slack}
+      install:
+        package:
+          arch: slack
+        upstream: https://slack.com/downloads
+
+    - id: discord
+      name: Discord
+      grade: red
+      summary: >-
+        Proprietary chat and voice platform with a persistent authenticated
+        connection, which makes its server-side view of your activity close to
+        continuous.
+      reasons:
+        - The client maintains a websocket open at all times, reporting which
+          servers and channels you are in.
+        - Voice and video servers see the connection itself, not only the audio.
+        - Account creation requires an email or phone number.
+      alternatives:
+        - hexchat
+        - deltachat
+        - matrix-apps-for-desktop
+      detects:
+        - {type: package, name: discord}
+        - {type: binary, name: discord}
+        - {type: flatpak, name: com.discordapp.Discord}
+      install:
+        package:
+          arch: discord
+          debian: discord
+        upstream: https://discord.com/download
+
+    - id: teams
+      name: Microsoft Teams
+      grade: red
+      summary: >-
+        Enterprise chat with Microsoft account telemetry, sharing the same
+        telemetry infrastructure as the rest of Microsoft's desktop software.
+      reasons:
+        - Same telemetry collection as the wider Microsoft client stack.
+        - Messages are retained by the organisation and searchable by
+          compliance tooling.
+      alternatives:
+        - matrix-apps-for-desktop
+        - gajim
+      detects:
+        - {type: package, name: teams-for-linux}
+        - {type: flatpak, name: com.github.IsmaelMartinez.teams-for-linux}
+      install:
+        upstream: https://github.com/IsmaelMartinez/teams-for-linux
+
+    - id: zoom
+      name: Zoom
+      grade: red
+      summary: >-
+        Proprietary videoconferencing. The desktop client phones home on launch
+        for update checks and account status regardless of whether you ever
+        join a call.
+      reasons:
+        - Update checks and telemetry on every launch.
+        - Meeting traffic is routed through vendor infrastructure.
+      alternatives:
+        - deltachat
+        - matrix-apps-for-desktop
+      detects:
+        - {type: package, name: zoom}
+        - {type: flatpak, name: us.zoom.Zoom}
+      install:
+        package:
+          arch: zoom
+        upstream: https://zoom.us/download
+
+    - id: telegram
+      name: Telegram
+      grade: red
+      summary: >-
+        Cloud-hosted by default. Desktop chats sync through Telegram's servers,
+        and the client sends read receipts and typing notifications.
+      reasons:
+        - Non-secret chats are stored server-side and sync across your devices
+          through the vendor.
+        - Read receipts and typing status are transmitted without being asked.
+        - A phone number is required, linking the account to you permanently.
+      caveats:
+        - Secret chats are end-to-end encrypted, but are per-pair and not the
+          default.
+      alternatives:
+        - deltachat
+        - signal
+        - simplex-chat
+      detects:
+        - {type: package, name: telegram-desktop}
+        - {type: binary, name: telegram-desktop}
+        - {type: flatpak, name: org.telegram.desktop}
+      install:
+        package:
+          arch: telegram-desktop
+        upstream: https://telegram.org/desktop
+
+    - id: whatsapp
+      name: WhatsApp
+      grade: red
+      summary: >-
+        Proprietary, phone-number-bound, and metadata-heavy.
+      reasons:
+        - Registration is tied to a phone number, so the account is
+          permanently linked to you.
+        - Contact discovery uploads address books.
+        - Client telemetry and read receipts are transmitted by default.
+      alternatives:
+        - signal
+        - simplex-chat
+        - deltachat
+      detects:
+        - {type: package, name: whatsapp-for-linux}
+        - {type: flatpak, name: com.whatsapp_for_linux.WhatsAppForLinux}
+      install:
+        upstream: https://github.com/dusan-ekavlie/whatsapp-for-linux
+
+    # --- amber -------------------------------------------------------------
+    - id: signal
+      name: Signal
+      grade: amber
+      family: signal
+      summary: >-
+        Excellent privacy, and not anonymous. Messages are end-to-end encrypted
+        and the client is open source, but registration requires a phone
+        number.
+      reasons:
+        - End-to-end encrypted by default, with the protocol and clients
+          published for audit.
+        - Metadata is minimised to the point that a server cannot read message
+          content or the social graph.
+      caveats:
+        - Registration by phone number makes the account linkable to you. That
+          is a loss of anonymity, not of privacy.
+        - Requires a trusted device; a lost phone is a real loss.
+      alternatives:
+        - simplex-chat
+        - deltachat
+      detects:
+        - {type: package, name: signal-desktop}
+        - {type: binary, name: signal-desktop}
+        - {type: flatpak, name: org.signal.Signal}
+      install:
+        package:
+          arch: signal-desktop
+        upstream: https://signal.org/download
+
+    - id: element
+      name: Element
+      grade: amber
+      family: matrix
+      summary: >-
+        Matrix client. The protocol is good; the default homeserver is not, and
+        federation means the server you use is only one participant.
+      reasons:
+        - Matrix supports end-to-end encryption and federated homeservers, so
+          you can choose who holds the conversation history.
+        - Fully open source.
+      caveats:
+        - Encryption between participants only holds if both clients enable it,
+          and it is not on for all rooms by default.
+        - The public matrix.org homeserver knows your IP address and your device
+          list.
+      alternatives:
+        - matrix-apps-for-desktop
+        - gajim
+        - dino
+      detects:
+        - {type: package, name: element-desktop}
+        - {type: flatpak, name: im.riot.Riot}
+      install:
+        package:
+          arch: element-desktop
+        upstream: https://element.io/download
+
+    # --- green -------------------------------------------------------------
+    - id: simplex-chat
+      name: SimpleX Chat
+      grade: green
+      summary: >-
+        No phone number, no user identifier, and no central user directory.
+        Profile identifiers are per-contact and rotatable.
+      reasons:
+        - No user identifier exists, so there is nothing stable to correlate
+          across sessions.
+        - Servers do not see the social graph or contact lists.
+        - Open protocol and open clients.
+      caveats:
+        - A much smaller user base than Signal or Matrix, so reaching people is
+          harder.
+        - Also a loss of recoverability — nobody can reset your account.
+      alternatives:
+        - signal
+      detects:
+        - {type: package, name: simplex-chat}
+        - {type: binary, name: simplex-chat}
+        - {type: flatpak, name: chat.simplex.simplex-chat}
+      install:
+        package:
+          arch: simplex-chat
+        upstream: https://simplex.chat
+
+    - id: deltachat
+      name: Delta Chat
+      grade: green
+      summary: >-
+        Chat over ordinary email, so it reaches people on any platform without
+        asking either of you to install anything.
+      reasons:
+        - End-to-end encrypted with OpenPGP or a self-managed key.
+        - Messages are stored as local email, so there is no separate cloud
+          account to trust.
+        - Reads contacts directly rather than uploading them.
+      caveats:
+        - Slower than a purpose-built protocol, because every message is an
+          email round trip.
+        - Needs correct email credentials to be usable.
+      alternatives:
+        - simplex-chat
+        - pidgin
+      detects:
+        - {type: package, name: deltachat}
+        - {type: flatpak, name: chat.delta.DeltaChat}
+      install:
+        package:
+          arch: deltachat
+          debian: deltachat
+        upstream: https://delta.chat
+
+    - id: tox
+      name: Tox
+      grade: green
+      summary: >-
+        Distributed peer-to-peer chat with no central account store.
+      reasons:
+        - No central server holds your contact list or message history.
+        - Open source with a published protocol.
+      caveats:
+        - The user base is small and mostly technical.
+        - DHT bootstrap nodes still see connection metadata.
+      alternatives:
+        - deltachat
+      detects:
+        - {type: package, name: tox}
+      install:
+        package:
+          arch: tox
+          debian: tox
+        upstream: https://tox.chat
+
+    - id: hexchat
+      name: HexChat
+      grade: green
+      family: irc
+      summary: >-
+        IRC client. Messages go peer to peer on a public protocol you can read
+        the implementation of.
+      reasons:
+        - No account store, no vendor, no profile. You are a nickname on a
+          server you chose.
+        - Local logs are plain text files you own outright.
+        - Nothing phones home; the client connects only to the networks you add.
+      caveats:
+        - IRC servers are public and unmoderated by default. Privacy from the
+          server does not mean privacy from the other participants.
+      alternatives:
+        - weechat
+        - irssi
+      detects:
+        - {type: package, name: hexchat}
+        - {type: binary, name: hexchat}
+        - {type: flatpak, name: io.github.Hexchat}
+      install:
+        package:
+          arch: hexchat
+          debian: hexchat
+        upstream: https://hexchat.github.io
+
+    - id: weechat
+      name: WeeChat
+      grade: green
+      family: irc
+      summary: >-
+        Terminal IRC client. Same privacy properties as any IRC client, with a
+        much smaller attack surface because it renders no web content.
+      reasons:
+        - Terminal client, so there is no browser engine to instrument.
+        - No telemetry path exists in the design.
+        - Highly scriptable, so automation never needs a vendor API.
+      caveats:
+        - Scripting plugins are arbitrary code from wherever you fetched them.
+      alternatives:
+        - hexchat
+        - irssi
+      detects:
+        - {type: package, name: weechat}
+        - {type: binary, name: weechat}
+      install:
+        package:
+          arch: weechat
+          debian: weechat
+          fedora: weechat
+        upstream: https://weechat.org
+
+    - id: irssi
+      name: Irssi
+      grade: green
+      family: irc
+      summary: >-
+        Small terminal IRC client with a very long history and no background
+        activity of any kind.
+      reasons:
+        - Terminal client with no browser engine and no update phoning home.
+        - Configuration is plain text you can read and diff.
+      alternatives:
+        - weechat
+        - hexchat
+      detects:
+        - {type: package, name: irssi}
+        - {type: binary, name: irssi}
+      install:
+        package:
+          arch: irssi
+          debian: irssi
+        upstream: https://irssi.org
+
+    - id: pidgin
+      name: Pidgin
+      grade: green
+      summary: >-
+        Multi-protocol chat client covering AIM, XMPP, IRC and others, holding
+        nothing off-machine.
+      reasons:
+        - All conversation history is local.
+        - No account telemetry; you connect to the services you configured.
+        - Open source with a long history of security attention.
+      caveats:
+        - Several supported protocols have since been discontinued by their
+          owners, so the useful protocol list has narrowed.
+      alternatives:
+        - gajim
+        - deltachat
+      detects:
+        - {type: package, name: pidgin}
+        - {type: package, name: purple-fox}
+      install:
+        package:
+          arch: pidgin
+          debian: pidgin
+          fedora: pidgin
+        upstream: https://pidgin.im
+
+    - id: gajim
+      name: Gajim
+      grade: green
+      summary: >-
+        XMPP client. Federated, direct-to-friend rather than centralised, with
+        local-only message history.
+      reasons:
+        - XMPP connects you to your own server or to no server at all; there is
+          no mandatory central service.
+        - History is local unless you explicitly configure otherwise.
+        - Supports OMEMO end-to-end encryption.
+      alternatives:
+        - dino
+        - pidgin
+      detects:
+        - {type: package, name: gajim}
+        - {type: binary, name: gajim}
+      install:
+        package:
+          arch: gajim
+          debian: gajim
+        upstream: https://gajim.org
+
+    - id: dino
+      name: Dino
+      grade: green
+      summary: >-
+        Small, modern XMPP client focused on OMEMO encryption.
+      reasons:
+        - OMEMO enabled by default rather than as an opt-in.
+        - No analytics, no update check on launch.
+        - Flatpak available, so the sandbox is inspectable.
+      caveats:
+        - Fewer users and fewer servers than Gajim.
+      alternatives:
+        - gajim
+      detects:
+        - {type: package, name: dino}
+        - {type: flatpak, name: im.dino.Dino}
+      install:
+        package:
+          arch: dino
+        upstream: https://dino.im
+
+    - id: matrix-apps-for-desktop
+      name: Matrix apps for Desktop
+      grade: green
+      family: matrix
+      summary: >-
+        Minimal Matrix client. Fewer features means fewer surfaces, and it is
+        available as a Flatpak with a documented sandbox.
+      reasons:
+        - Deliberately small feature set, so fewer things can collect data.
+        - Sandboxed when installed from Flathub, and the sandbox is readable.
+        - No analytics endpoint in the codebase.
+      caveats:
+        - Fewer conveniences than Element — no calls in some builds, limited
+          notification handling.
+      alternatives:
+        - element
+        - gajim
+      detects:
+        - {type: package, name: matrix-apps-for-desktop}
+        - {type: flatpak, name: im.matrix.MatrixElement}
+      install:
+        package:
+          arch: matrix-apps-for-desktop
+        upstream: https://github.com/matrix-org/matrix-apps-for-desktop

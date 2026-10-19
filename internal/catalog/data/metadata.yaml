@@ -1,0 +1,108 @@
+category:
+  id: metadata
+  name: Metadata
+  summary: >-
+    Files keep information about who made them, where they were, and what
+    device captured them. Every other category here is about the network; this
+    one is about what a file carries after it has been shared.
+  expectations:
+    - id: metadata.removal
+      severity: medium
+      any_of:
+        - mat2
+        - metadata-cleaner
+      why: >-
+        Photos and documents retain device serial numbers, GPS coordinates and
+        authoring software by default. Sharing a file shares that with it.
+  entries:
+    - id: mat2
+      name: MAT2
+      grade: green
+      family: mat2
+      summary: Command-line metadata remover for images, documents, audio and video.
+      reasons:
+        - Strips EXIF, XMP and document metadata before a file leaves the machine.
+        - Works from Nautilus via the file manager integration.
+        - No telemetry and no network access.
+      caveats:
+        - Must be run deliberately; it does not scrub files automatically.
+      alternatives: [metadata-cleaner]
+      detects:
+        - {type: package, name: mat2}
+        - {type: package, name: mat2-webui}
+        - {type: binary, name: mat2}
+        - {type: flatpak, name: mat2}
+      install:
+        package:
+          arch: mat2
+          debian: mat2
+          fedora: mat2
+          suse: mat2
+          alpine: mat2
+
+    - id: metadata-cleaner
+      name: Metadata Cleaner
+      grade: green
+      family: mat2
+      summary: GTK front end for MAT2, aimed at people who would not use the command line.
+      reasons:
+        - Same removal capability as MAT2, with a file manager integration.
+        - No telemetry and no network access.
+      caveats:
+        - Built on MAT2, so it inherits the same removal limits.
+      alternatives: [mat2]
+      detects:
+        - {type: package, name: metadata-cleaner}
+        - {type: binary, name: metadata-cleaner}
+      install:
+        package:
+          arch: metadata-cleaner
+          debian: metadata-cleaner
+          fedora: metadata-cleaner
+          suse: metadata-cleaner
+          alpine: metadata-cleaner
+
+    - id: exiftool
+      name: exiftool
+      grade: amber
+      family: exiftool
+      summary: Reads and writes metadata across many formats.
+      reasons:
+        - Powerful enough to inspect exactly what a file carries, which is its real use.
+      caveats:
+        - Primarily a diagnostic tool; it can also write metadata, so it is not a scrubbing tool by default.
+        - Most invocations shown in its own documentation add rather than remove.
+      alternatives: [mat2]
+      detects:
+        - {type: package, name: libimage-exiftool-perl}
+        - {type: package, name: perl-image-exiftool}
+        - {type: binary, name: exiftool}
+      install:
+        package:
+          arch: perl-image-exiftool
+          debian: libimage-exiftool-perl
+          fedora: perl-image-exiftool
+          suse: perl-image-exiftool
+          alpine: perl-image-exiftool
+
+    - id: exiv2
+      name: Exiv2
+      grade: amber
+      family: exiv2
+      summary: Image metadata library and command line tool.
+      reasons:
+        - Can read and clear image metadata, and is used by many photo tools.
+      caveats:
+        - Metadata handling is a library capability used by other applications; its presence does not mean anything is being uploaded.
+        - Reading and writing are both available, so it is a tool rather than a privacy control.
+      alternatives: [mat2]
+      detects:
+        - {type: package, name: exiv2}
+        - {type: binary, name: exiv2}
+      install:
+        package:
+          arch: exiv2
+          debian: exiv2
+          fedora: exiv2
+          suse: exiv2
+          alpine: exiv2

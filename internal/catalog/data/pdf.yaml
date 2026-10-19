@@ -1,0 +1,215 @@
+category:
+  id: pdf
+  name: PDF reader
+  summary: >-
+    PDF viewers carry a specific risk that other applications do not. The
+    format was designed to run embedded JavaScript, and several viewers also
+    open external links without asking.
+  expectations:
+    - id: pdf.reader
+      severity: low
+      any_of:
+        - zathura
+        - mupdf
+        - evince
+        - atril
+        - qpdfview
+        - papers
+        - okular
+      why: >-
+        Every PDF you open executes code chosen by whoever wrote the document.
+        A viewer that does not execute it is meaningfully safer than one that
+        does.
+  entries:
+    - id: zathura
+      name: Zathura
+      grade: green
+      family: zathura
+      summary: Minimal PDF viewer built on poppler, keyboard-driven.
+      reasons:
+        - No embedded JavaScript execution.
+        - No telemetry, no update service phoning home.
+      caveats:
+        - poppler tracks which annotations you use for its "reopen recent" feature, which is local only.
+      alternatives: [mupdf, papers, qpdfview]
+      detects:
+        - {type: package, name: zathura}
+        - {type: binary, name: zathura}
+        - {type: flatpak, name: org.pwmt.zathura}
+      install:
+        package:
+          arch: zathura
+          debian: zathura
+          fedora: zathura
+          suse: zathura
+          alpine: zathura
+
+    - id: mupdf
+      name: MuPDF
+      grade: green
+      family: mupdf
+      summary: Small, fast, and hostile to scripting by design.
+      reasons:
+        - Deliberately does not execute embedded JavaScript.
+        - No scripting engine and no telemetry.
+      caveats:
+        - Very sparse interface; annotations are limited compared with Okular.
+      alternatives: [zathura, qpdfview]
+      detects:
+        - {type: package, name: mupdf}
+        - {type: binary, name: mutool}
+      install:
+        package:
+          arch: mupdf
+          debian: mupdf
+          fedora: mupdf
+          suse: mupdf
+          alpine: mupdf
+
+    - id: qpdfview
+      name: qpdfview
+      grade: green
+      family: qpdf
+      summary: Qt PDF viewer that does not run embedded JavaScript.
+      reasons:
+        - JavaScript execution is disabled by default and can be left off.
+        - No telemetry and no vendor account.
+      caveats:
+        - Some JavaScript-dependent forms will render incompletely with scripting off.
+      alternatives: [zathura, mupdf]
+      detects:
+        - {type: package, name: qpdfview}
+        - {type: package, name: qpdfview-qt5}
+        - {type: binary, name: qpdfview}
+      install:
+        package:
+          arch: qpdfview
+          debian: qpdfview
+          fedora: qpdfview
+          suse: qpdfview
+          alpine: qpdfview
+
+    - id: papers
+      name: Papers
+      grade: green
+      family: papers
+      summary: GNOME's newer document viewer, replacing Evince.
+      reasons:
+        - No JavaScript execution.
+        - No telemetry or vendor account.
+      caveats:
+        - Relatively young; some forms render less completely than older viewers.
+      alternatives: [zathura, mupdf]
+      detects:
+        - {type: package, name: papers}
+        - {type: binary, name: papers}
+      install:
+        package:
+          arch: papers
+          debian: papers
+          fedora: papers
+          suse: papers
+          alpine: papers
+
+    - id: evince
+      name: Evince
+      grade: green
+      family: gnome
+      summary: GNOME's older PDF viewer, now superseded by Papers.
+      reasons:
+        - No JavaScript execution.
+        - No telemetry or vendor account.
+      caveats:
+        - In maintenance mode; new installs should prefer Papers.
+      alternatives: [papers, zathura]
+      detects:
+        - {type: package, name: evince}
+        - {type: binary, name: evince}
+      install:
+        package:
+          arch: evince
+          debian: evince
+          fedora: evince
+          suse: evince
+          alpine: evince
+
+    - id: atril
+      name: Atril
+      grade: green
+      family: kde
+      summary: KDE's document viewer.
+      reasons:
+        - No JavaScript execution by default.
+        - No telemetry or vendor account.
+      caveats:
+        - Full KDE Platform dependencies.
+      alternatives: [papers, zathura]
+      detects:
+        - {type: package, name: atril}
+        - {type: binary, name: atril}
+      install:
+        package:
+          arch: atril
+          debian: atril
+          fedora: atril
+          suse: atril
+
+    - id: okular
+      name: Okular
+      grade: amber
+      family: kde
+      summary: >-
+        KDE's most capable PDF viewer, and the only common one that will run
+        embedded JavaScript. That capability is what makes it capable.
+      reasons:
+        - Executes embedded JavaScript when a document asks for it.
+        - Can open external links and remote resources without confirmation.
+      caveats:
+        - JavaScript can be disabled in preferences, which moves this toward a green posture.
+        - The script console and external link handling are the two settings that matter.
+      alternatives: [zathura, papers, atril]
+      detects:
+        - {type: package, name: okular}
+        - {type: binary, name: okular}
+        - {type: flatpak, name: org.kde.okular}
+      install:
+        package:
+          arch: okular
+          debian: okular
+          fedora: okular
+          suse: okular
+          alpine: okular
+
+    - id: foxit
+      name: Foxit Reader
+      grade: red
+      family: foxit
+      summary: Proprietary PDF reader distributed free of charge.
+      reasons:
+        - Closed source.
+        - Ships a browser-extension installer, update service and account-linked features.
+      caveats: []
+      alternatives: [zathura, mupdf, okular]
+      detects:
+        - {type: package, name: foxit-reader}
+        - {type: binary, name: FoxitReader}
+      install:
+        upstream: https://www.foxit.com/foxit-reader
+
+    - id: acrobat
+      name: Adobe Acrobat Reader
+      grade: red
+      family: adobe
+      summary: Adobe's PDF reader.
+      reasons:
+        - Closed source with a documented history of bundled components.
+        - Adobe's update and document services are closed.
+      caveats: []
+      alternatives: [zathura, mupdf, papers]
+      detects:
+        - {type: package, name: acroreader}
+        - {type: binary, name: acroreader}
+      install:
+        package:
+          arch: acroreader
+        upstream: https://get.adobe.com/reader/

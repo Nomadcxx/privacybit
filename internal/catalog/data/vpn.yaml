@@ -1,0 +1,302 @@
+category:
+  id: vpn
+  name: VPN and network
+  summary: >-
+    A VPN is a trust transfer, not an anonymity guarantee. You are moving your
+    trust from your internet provider to whoever operates the tunnel, and the
+    useful question is whether that operator can read what passes through it,
+    not whether the words "no logs" appear on a website.
+  expectations:
+    - id: vpn.installed
+      any_of: [mullvad-vpn, ivpn, proton-vpn, windscribe, amnezia-vpn]
+      severity: low
+      why: >-
+        No VPN client is installed, so any public network you join exposes the
+        connection to the network operator.
+    - id: vpn.open-source-client
+      any_of: [mullvad-vpn, ivpn, proton-vpn, windscribe, amnezia-vpn]
+      severity: medium
+      why: >-
+        Every VPN client you can actually verify is open source. A closed-source
+        client is a blind spot at exactly the point where you have handed over
+        all of your traffic.
+  entries:
+    # --- red: closed-source clients ----------------------------------------
+    - id: expressvpn
+      name: ExpressVPN
+      grade: red
+      summary: >-
+        Closed-source client. Whatever it does with your traffic, nobody outside
+        the company can check.
+      reasons:
+        - Closed-source client, so the tunnel cannot be audited.
+        - Operates in a jurisdiction with a history of responding to data
+          requests.
+        - The client is closed source on every platform, including Linux.
+      alternatives:
+        - mullvad-vpn
+        - ivpn
+        - proton-vpn
+      detects:
+        - {type: package, name: expressvpn}
+        - {type: flatpak, name: com.expressvpn.expressvpn}
+      install:
+        upstream: https://www.expressvpn.com
+
+    - id: nordvpn
+      name: NordVPN
+      grade: red
+      summary: >-
+        Closed-source client with a large marketing presence and no verifiable
+        client.
+      reasons:
+        - Closed-source client on all platforms.
+        - No published independent audit of the client itself.
+      alternatives:
+        - mullvad-vpn
+        - ivpn
+        - proton-vpn
+      detects:
+        - {type: package, name: nordvpn}
+        - {type: flatpak, name: com.nordvpn.nordvpn}
+      install:
+        upstream: https://nordvpn.com/download
+
+    - id: surfshark
+      name: Surfshark
+      grade: red
+      summary: >-
+        Closed-source client. Large promotional discounts are the usual reason
+        people end up here.
+      reasons:
+        - Closed-source client, unverifiable behaviour.
+        - Heavy discount marketing model, which tends to attract users who have
+          not compared on privacy grounds.
+      alternatives:
+        - mullvad-vpn
+        - ivpn
+        - proton-vpn
+      detects:
+        - {type: package, name: surfshark}
+        - {type: flatpak, name: com.surfshark.surfshark}
+      install:
+        upstream: https://surfshark.com/download
+
+    - id: warpsocks
+      name: Warp+
+      grade: red
+      summary: >-
+        Cloudflare WARP. Closed source, and it is a routing optimisation
+        product that happens to tunnel, not a privacy tool.
+      reasons:
+        - Closed-source client.
+        - Optimised for latency and network routing, not for hiding traffic from
+          anyone.
+        - No independent statement of what is logged.
+      alternatives:
+        - mullvad-vpn
+        - ivpn
+      detects:
+        - {type: package, name: cloudflare-warp}
+        - {type: binary, name: warp-cli}
+      install:
+        upstream: https://one.one.one.one/
+
+    - id: openvpn-client
+      name: OpenVPN client
+      grade: amber
+      summary: >-
+        Plumbing, not a provider. It is exactly as private as whoever wrote the
+        configuration file, so it needs to be graded alongside that.
+      reasons:
+        - Open source and well audited as software.
+      caveats:
+        - Installing a client means nothing about whether you have a VPN. It is
+          a tunnel toolkit. A configuration for a workplace gateway is not a
+          privacy tool.
+        - Do not read a green grade here as "you are protected".
+      alternatives:
+        - wireguard-tools
+        - mullvad-vpn
+      detects:
+        - {type: package, name: openvpn}
+        - {type: binary, name: openvpn}
+      install:
+        package:
+          arch: openvpn
+          debian: openvpn
+          fedora: openvpn
+          suse: openvpn
+          alpine: openvpn
+        upstream: https://openvpn.net
+
+    - id: wireguard-tools
+      name: WireGuard tools
+      grade: amber
+      summary: >-
+        Plumbing, not a provider. Installing wireguard-tools does not give you
+        a VPN any more than installing curl gives you a website.
+      reasons:
+        - Minimal, fast, and auditable, and the protocol is simple enough to
+          read in an afternoon.
+      caveats:
+        - It is a tunnel implementation with no accounts, no servers and no
+          provider. There is nothing to connect to until you configure one.
+        - A wireguard-tools package alone must never read as "you have a VPN".
+      alternatives:
+        - mullvad-vpn
+        - amnezia-vpn
+      detects:
+        - {type: package, name: wireguard-tools}
+        - {type: binary, name: wg}
+        - {type: binary, name: wg-quick}
+      install:
+        package:
+          arch: wireguard-tools
+          debian: wireguard-tools
+          fedora: wireguard-tools
+          suse: wireguard-tools
+          alpine: wireguard-tools
+        upstream: https://www.wireguard.com
+
+    # --- amber -------------------------------------------------------------
+    - id: proton-vpn
+      name: Proton VPN
+      grade: amber
+      family: proton
+      summary: >-
+        Open-source, audited, Swiss, with a genuinely usable free tier. Amber
+        because an account is required and because it is still a commercial
+        operator you are trusting.
+      reasons:
+        - Clients are open source and have been independently audited.
+        - Operates under Swiss jurisdiction.
+        - Free tier does not require a card.
+      caveats:
+        - Requires an account, and Proton knows which account that is. They
+          cannot see traffic content, but they know you use the service.
+        - A commercial entity, so the trust is in their policy as much as in
+          their crypto.
+      alternatives:
+        - mullvad-vpn
+        - ivpn
+      detects:
+        - {type: package, name: proton-vpn}
+        - {type: binary, name: protonvpn}
+        - {type: binary, name: protonvpn-cli}
+        - {type: flatpak, name: com.protonvpn.www}
+      install:
+        package:
+          arch: proton-vpn
+          debian: protonvpn
+          fedora: proton-vpn
+        upstream: https://protonvpn.com/download
+
+    - id: windscribe
+      name: Windscribe
+      grade: amber
+      summary: >-
+        Open-source client with a usable free tier. Amber because the free tier
+        is data-capped, which pushes people toward the paid tier.
+      reasons:
+        - Open-source client and published protocol.
+      caveats:
+        - The free tier's data cap makes the privacy case a paid-product case in
+          practice.
+        - Commercial operator, so the same trust question as any other.
+      alternatives:
+        - mullvad-vpn
+        - ivpn
+        - proton-vpn
+      detects:
+        - {type: package, name: windscribe}
+        - {type: flatpak, name: com.windscribe.Windscribe}
+      install:
+        package:
+          arch: windscribe
+        upstream: https://windscribe.com/download
+
+    # --- green -------------------------------------------------------------
+    - id: mullvad-vpn
+      name: Mullvad VPN
+      grade: green
+      family: mullvad
+      summary: >-
+        Open-source clients, numbered accounts with no email or name, and
+        payment that does not create a billing identity.
+      reasons:
+        - Clients are open source on every platform, including Linux.
+        - Account is a number. No email address, no name, no phone number.
+        - Accepts cash and cryptocurrency, so even the payment does not tie the
+          account to a billing identity.
+        - Publishes the server software and has been independently audited.
+      caveats:
+        - Payment in cash or crypto has real friction; the card option works and
+          is less private.
+        - As a widely recommended provider it is a more interesting target than
+          most, though the protocol means that mostly affects metadata, not
+          content.
+      alternatives:
+        - ivpn
+        - proton-vpn
+      detects:
+        - {type: package, name: mullvad-vpn}
+        - {type: binary, name: mullvad-daemon}
+        - {type: flatpak, name: net.mullvad.MullvadBrowser}
+      install:
+        package:
+          arch: mullvad-vpn
+          debian: mullvad-vpn
+          fedora: mullvad-vpn
+          suse: mullvad-vpn
+        upstream: https://mullvad.net/download
+
+    - id: ivpn
+      name: IVPN
+      grade: green
+      summary: >-
+        Open-source clients, no-email signup, cash and crypto payment, and an
+        audited codebase.
+      reasons:
+        - Open-source clients on every platform.
+        - Signup does not require an email address.
+        - Accepts cash and cryptocurrency.
+        - Has published and commissioned independent audits.
+      caveats:
+        - Smaller network than the largest providers, so fewer choices of exit
+          location.
+      alternatives:
+        - mullvad-vpn
+        - proton-vpn
+      detects:
+        - {type: package, name: ivpn}
+        - {type: binary, name: ivpn-cli}
+        - {type: flatpak, name: com.ivpn.ivpn}
+      install:
+        package:
+          arch: ivpn
+        upstream: https://www.ivpn.net/download
+
+    - id: amnezia-vpn
+      name: Amnezia VPN
+      grade: green
+      summary: >-
+        Self-hosted. You run the server, so there is no third party to trust at
+        all.
+      reasons:
+        - Self-hosted, so the operator is you. There is no VPN company to
+          trust, because there is no VPN company.
+        - Open source, GPL-3.0, and the protocol has been audited.
+        - Traffic-obfuscation features to frustrate deep packet inspection.
+      caveats:
+        - You must run and secure a server yourself. That is a real
+          responsibility, not a toggle.
+        - Wrong configuration, and you have an expensive third-party server
+          bill and no protection at all.
+      alternatives:
+        - mullvad-vpn
+        - wireguard-tools
+      detects:
+        - {type: package, name: amnezia-vpn}
+      install:
+        upstream: https://amnezia.org
