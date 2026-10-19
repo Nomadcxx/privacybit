@@ -1,0 +1,57 @@
+# Build output
+/privacybit
+/privacybit-helper
+/bin/
+/dist/
+/build/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Test and coverage
+coverage.txt
+coverage.html
+*.coverprofile
+profile.cov
+
+# Dependencies
+/vendor/
+
+# Editors and IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.\#*
+\#*\#
+
+# OS cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local runtime state and audit output.
+# Audit reports fingerprint what a user runs; they never belong in git.
+/out/
+/reports/
+*.audit.json
+*.report.json
+latest.json
+
+# Local catalogue overrides. The shipped catalogue in catalog/ IS tracked;
+# user additions under this path are not.
+/catalog.local/
+/catalog.d/
+
+# Go workspace files
+go.work
+go.work.sum
+
+# Scratch
+/tmp/
+/scratch/
