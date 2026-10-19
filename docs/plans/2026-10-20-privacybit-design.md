@@ -340,24 +340,34 @@ to uninstall things — they can dismiss, and still get the suggestion.
 
 ### 6.1 Sources
 
-All optional. Missing tools degrade coverage, never break the run.
+Superseded by
+[`2026-10-20-privacybit-sources-design.md`](2026-10-20-privacybit-sources-design.md),
+which replaces this table with a backend interface and a capability matrix. The
+original list was Arch-shaped: it named four package managers by command and
+omitted dnf, zypper, apk, xbps and nix entirely, and it had no way to express
+"this backend cannot tell me the licence".
 
-| Source | Command / path | Notes |
-|---|---|---|
-| pacman | `-Qq`, then `-Qi` on matches only | `-Qq` fast (~100 ms, 2882 pkgs here); `-Qi` is slow, so query only matched packages |
-| flatpak | `list --app`, `info --show-permissions` | permissions feed the sandbox signal |
-| dpkg | `-W -f='${Package}\t${Status}\t${Section}\n'` | Debian |
-| desktop files | `/usr/share/applications`, `/usr/local/share/applications`, `~/.local/share/applications`, flatpak export dirs | 412 + 85 files here; catches AppImage and user installs |
-| binaries | `PATH`, `/opt`, `/usr/local/bin`, `~/.local/bin` | |
-| processes | `/proc/<pid>/exe` | identity, not just presence |
+What survives from the original table:
 
-`snap` and `appimagectl` are **not** implemented. Neither is installed here, and
-both would need their own probing path. Recorded as future work, not silently
-absent.
+| Source | Notes |
+|---|---|
+| desktop files | `/usr/share/applications`, `/usr/local/share/applications`, `~/.local/share/applications`, flatpak export dirs. 412 + 85 files here; catches AppImage and user installs. Universal — no native backend needed. |
+| binaries | `PATH`, `/opt`, `/usr/local/bin`, `~/.local/bin`. Universal. |
+| processes | `/proc/<pid>/exe`. Identity, not just presence. |
+| flatpak | Its own section, §6.4. |
 
-Flatpak is implemented but deliberately **not** reduced to a single row in the
-table above — it has enough distinct structure that flattening it would hide
-real findings. It gets §6.4.
+What D6 adds:
+
+- A `Source` interface with an explicit capability matrix, so an unsupported
+  fact is *unavailable* rather than silently absent.
+- **The invariant that unavailable never reads as clean** — the general form of
+  the rule §6.4 already needed for flatpak network visibility.
+- Per-distribution install-command rendering, which §9.3's `pacman -S` example
+  assumed and should not have.
+
+`/etc/os-release` selects backends; presence of a binary alone does not.
+`dpkg-query` is installed on this Arch machine and manages nothing, which is
+precisely why availability is `Ready | Empty | Unavailable` rather than a boolean.
 
 ### 6.2 Cadence
 
@@ -763,16 +773,27 @@ Each phase ends with something runnable.
 |---|---|
 | 0 | Repo, this document, README |
 | 1 | Entry model, catalogue format, loader, validator, `list`, `explain` |
-| 2 | Detection sources: pacman, flatpak, dpkg, desktop files, binaries |
-| 3 | Matching and grading → **first useful audit output** |
-| 4 | Findings and actions, tiers 0–3 |
+| 2 | Detection: D6 source interface, pacman backend, universal sources, coverage reporting → **first useful audit output** |
+| 3 | Matching and grading |
+| 4 | Findings and actions, tiers 0–3, D6 §8 command rendering |
 | 5 | Network and VPN checks |
 | 6 | CLI: `audit`, `--json`, exit codes |
-| 7 | TUI |
-| 8 | Root helper, tier 4 |
-| 9 | Scheduler and history (drives the score's only meaningful use) |
+| 7 | TUI (D3) |
+| 8 | Root helper (D4), tier 4 |
+| 9 | Scheduler, daemon, event watcher (D7) |
 | 10 | sysc-plugins `plugins/privacy` |
 | 11 | sysc-shell host wiring + `warning` tone |
+
+Phase 2 was reordered ahead of phase 3 deliberately. Grading cannot be tested
+without something to grade, and D6 §3.2's three-state invariant needs the
+capability matrix in place before the first grade is ever computed — retrofitting
+it means auditing every signal already emitted.
+
+**Remaining backends are not a phase gate.** D6 §4's dnf, zypper, apk and xbps
+backends land after the first useful audit, each one a small additive change
+behind an interface that already exists. §12 defers nix and snap with reasons.
+An unsupported distribution still audits through D6 §5's universal sources with
+coverage reported honestly.
 
 Phases 1–3 are the smallest thing that answers the original question and should
 be built first. Nothing in phase 4 onward blocks it.
