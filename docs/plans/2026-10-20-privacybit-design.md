@@ -582,17 +582,22 @@ This is enforced by test, not by convention.
 ### 11.1 CLI
 
 ```
-privacybit audit [--json] [--categories ...] [--no-network] [--fast]
+privacybit audit [--json|--snapshot] [--categories ...] [--no-network] [--fresh]
 privacybit explain <entry-id>          # why this grade, with sources
 privacybit watch                        # live fast poll
 privacybit tui                          # full TUI
 privacybit list [--category ...]        # catalogue contents
 privacybit catalog validate             # load + validate user fragments
-privacybit serve --addr ...             # snapshot over HTTP, for panels
 ```
 
-`--json` emits the snapshot verbatim. It is the contract the panel consumes and
-the contract tests assert against.
+`--json` emits an NDJSON event stream whose terminal `done` event carries the
+snapshot document. `--snapshot` emits that document alone. See
+[D2](2026-10-20-privacybit-cli-design.md) for the full contract.
+
+**No IPC in this design.** There is no `serve` and no `panel` command. Every
+current consumer — CLI, TUI, and the sysc-shell plugin — reaches the engine
+directly, so a socket would have no reason to exist. It is reintroduced with
+the scheduler in phase 9, as a Unix domain socket and never as HTTP.
 
 ### 11.2 Snapshot schema
 
@@ -652,6 +657,20 @@ present stale data as current.
   page.
 - Panel actions route through `activateControlCentre` as new verbs
   (`privacybit:refresh`, `privacybit:run-action`).
+
+Because the plugin holds a library reference rather than spawning the CLI,
+**no IPC and no privileged transport are involved in reading**. moonbit needs
+`sudo moonbit panel` because cleaning needs root; an audit does not, and
+requiring a password merely to render a panel would be a defect.
+
+### 11.4 Remediation must bind to a reviewed audit
+
+A remediation records the `generated_at` of the audit the user acted on, and
+refuses to run if the current machine state has moved past it. moonbit enforces
+this with `ScannedAt` for exactly the same reason: a scheduled scan can replace
+the cache between review and action, and without the binding the operation acts
+on state the user never saw. The same hazard applies to a privacy audit whose
+findings have since changed.
 
 ## 12. Host changes required in sysc-shell
 
