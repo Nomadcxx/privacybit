@@ -501,10 +501,27 @@ carries **three redundant channels**:
 
 ### 8.1 Host gap this exposes
 
-plugin/v1 text tones are `normal`, `error`, `subtle`, `accent`. **There is no
-amber/warning tone.** The host change adding it is part of this work and is
-listed in §12 — it is not an optional extra, because without it the amber grade
-has no honest rendering in the panel.
+> **Corrected 2026-10-20.** The claim below was wrong. `internal/ui` already
+> defines `ToneActivity` ("a reading past its activity threshold but short of
+> critical"), it paints the theme's Tertiary role, and it is in live use in the
+> monitor and process panels. Tertiary exists on every palette, so the *visual*
+> layer was already done and needs no theme work.
+>
+> What is missing is only the **wire**: `plugin/v1` defines just
+> `normal`/`error`/`subtle`/`accent` and validates against `knownTones`, so a
+> plugin emitting `"activity"` is currently rejected. Two edits close it — a
+> `ToneActivity` constant, a `knownTones` entry, and one conversion case. See
+> [`2026-10-20-privacybit-plugin-design.md`](2026-10-20-privacybit-plugin-design.md) §3.
+>
+> Worth noting the host arrived at the same threshold progression independently:
+> `monitorscale_test.go` asserts normal → activity → error per metric, which is
+> exactly the shape a privacy grade wants.
+
+plugin/v1 text tones are `normal`, `error`, `subtle`, `accent`, and the plugin
+protocol needs one more so an amber grade has an honest rendering. The host
+renderer supplying it is not an optional extra, because without it the amber
+grade collapses into either "normal" or "error", and the amber band is the
+entire point of a three-grade scale.
 
 ## 9. Actions
 
@@ -708,8 +725,10 @@ findings have since changed.
    card, driven by the snapshot. The existing capture panel is untouched.
 2. **Snapshot reader.** `ccPrivacySnapshotFor(r *Registry)` mirroring
    `ccCalendarSnapshotFor`.
-3. **New text tone `warning`.** Added to plugin/v1 and the host renderer, so
-   amber is honestly renderable (§8.1).
+3. **New plugin tone `activity`.** Added to `plugin/v1` only — the host
+   renderer already has `ToneActivity` and no theme change is needed (§8.1).
+   In `internal/ui` the constant is an iota and already exists; any future tone
+   must be **appended**, never inserted, or every later value shifts.
 4. **Action verbs** in `activateControlCentre`.
 5. **Optional:** the bar widget badge could reflect overall grade. Deferred —
    the widget currently reports capture state, and overloading it risks
