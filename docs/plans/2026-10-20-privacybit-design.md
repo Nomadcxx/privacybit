@@ -355,6 +355,10 @@ All optional. Missing tools degrade coverage, never break the run.
 both would need their own probing path. Recorded as future work, not silently
 absent.
 
+Flatpak is implemented but deliberately **not** reduced to a single row in the
+table above — it has enough distinct structure that flattening it would hide
+real findings. It gets §6.4.
+
 ### 6.2 Cadence
 
 Two tiers, because the costs differ by three orders of magnitude.
@@ -381,7 +385,69 @@ For browsers specifically, **configuration beats choice**: a hardened Firefox
 outscores stock LibreWolf. The audit reads the actual profile preferences where
 it can and reports the *effective* posture, not the nominal one.
 
-## 7. VPN and network checks
+### 6.4 Flatpak
+
+Flatpak is not just another package source. It carries its own trust model, and
+an audit that flattens it to "is the app installed?" throws away most of what is
+worth knowing. Five things are checked.
+
+**Effective permissions, not declared ones.** `flatpak info --show-permissions`
+reports what the app's *metadata* declares. `flatpak override` mutates what
+actually happens, and overrides persist invisibly — nothing in the app listing
+shows them. There is no "list all overrides" command, so the audit enumerates
+known application ids and reads `flatpak override --show` for each. Reading
+declared permissions and reporting them as effective would be a false negative.
+
+**Installation scope, and duplicates across it.** `system` installations are
+root-owned; `user` installations are not, and for the owning user the `user`
+copy shadows the `system` one. The same app id at both scopes means two copies
+at different privilege levels and dead weight, and which one runs depends on
+resolution order. Observed on the development machine: one application
+installed at both `system` and `user` scope. This is a finding.
+
+**Remote trust.** Each remote carries its own origin. Flathub is the default
+and treated as neutral; any third-party remote is a supply-chain finding and
+feeds maturity, never the privacy grade. A remote configured identically at both
+`--system` and `--user` scope is worth noting, because updates resolve against
+whichever applies and they can silently diverge.
+
+**Sandbox posture is a separate axis from vendor reputation.** A well-regarded
+app in a sandbox with `devices=all`, `filesystems=host` and `shared=network` has
+lost most of the containment that made it safe to run. Both facts are reported:
+the app grade and the sandbox grade, and neither is allowed to launder the
+other. A `green` app in a broken sandbox is not a green machine.
+
+**Network visibility is degraded inside flatpak, and that must be stated.** This
+is the important one. An app that unshares its network namespace has its
+connections in a namespace the host's `ss` will not attribute cleanly; an app
+that shares the host namespace inherits whatever the host can see. Either way
+PID→exe attribution through `bwrap` is unreliable. **The consequence is that
+"no telemetry connections observed" for a flatpak app is not evidence of
+clean.** Reporting it as a pass would be exactly the under-grade that §0 rules
+out. Flatpak apps with unverified network visibility report `unknown` for that
+signal, never `green`.
+
+### 6.5 Runtimes and the shared stack
+
+The runtime layer is shared by every flatpak app, so it deserves a check of its
+own rather than being treated as plumbing.
+
+- **Proprietary components in the runtime stack.** The development machine has
+  `org.freedesktop.Platform.openh264` and `org.freedesktop.Platform.codecs-extra`
+  installed. An open-source desktop running a proprietary codec runtime is a
+  legitimate thing to surface, and it affects every flatpak app on the machine
+  rather than one.
+- **Branch age.** Multiple `org.freedesktop.Platform` branches at different
+  versions were present. An end-of-life branch is a maintenance and security
+  matter; it is reported as maturity, not as a privacy grade, and the two are
+  not conflated.
+
+### 6.6 Snap and AppImage
+
+Deferred, not ignored. Neither tool is installed on the development machine, so
+both would need their own probing path and neither can be designed against real
+output yet. The `.desktop` scan in §6.1 already catches AppImage-based apps that
+register a launcher, so the practical gap is narrower than it looks.
 
 This is the hardest part of the audit, and the easiest to get wrong in a way
 that actively misleads.
@@ -622,7 +688,14 @@ small card.
 
 Recorded so they are decisions rather than surprises:
 
-- **No `snap` or AppImage index scanning.** `snap` is not installed here.
+- **No `snap` or AppImage index scanning.** Neither tool is installed here, so
+  neither could be designed against real output. Partially mitigated by the
+  `.desktop` scan (§6.6).
+- **Network visibility inside flatpak is degraded** and is reported as `unknown`
+  rather than graded (§6.4). This is a permanent limitation, not a bug to be
+  fixed later.
+- **Flatpak override enumeration is O(applications)** because flatpak offers no
+  bulk listing command.
 - **Locale and translated metadata** are not parsed.
 - **Single-user scope.** Other users' processes and per-user installs are not
   audited. A `--all-users` mode would need root and is out of scope.
