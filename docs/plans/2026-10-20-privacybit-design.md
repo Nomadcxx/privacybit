@@ -365,7 +365,7 @@ Two tiers, because the costs differ by three orders of magnitude.
 
 - **Slow scan** — package inventory, catalogue matching. On install, on demand,
   or hourly at most. Result cached.
-- **Fast poll** — network connections, VPN state, disk encryption. On demand, or
+- **Fast poll** — network connections, VPN state, sandbox posture. On demand, or
   ~2 s while a view is open. This is what makes the panel feel live.
 
 The 500 ms PipeWire cadence used by the existing capture panel is deliberately
@@ -537,14 +537,34 @@ the catalogue.
 ```go
 // Accepted. Catalogue ids only.
 {"op": "apply-entry",        "entry": "brave",           "state": "off"}
-{"op": "install-entry",      "entry": "brave-origin"}
 {"op": "set-unit",           "unit":  "fwupd.service",  "state": "disabled"}
-{"op": "purge-entry",        "entry": "google-chrome-stable"}
+{"op": "plan-purge",         "entry": "google-chrome-stable"}
+{"op": "purge-entry",        "entry": "google-chrome-stable", "token": "…"}
 
 // Rejected before sudo is ever reached.
-{"op": "install-entry", "entry": "../../etc/cron.d/x"}     // unknown id
-{"op": "set-unit",      "unit":  "anything-at-all"}       // not in allowlist
+{"op": "purge-entry",  "entry": "../../etc/cron.d/x"}    // unknown id
+{"op": "set-unit",     "unit":  "anything-at-all"}       // not in allowlist
+{"op": "install-entry","entry": "brave-origin"}          // verb does not exist
 ```
+
+Two rules are visible in that list before any of the machinery is explained.
+
+**The helper never installs.** There is no install verb, because installing
+introduces new code that will later execute — potentially as root, through a
+unit the package ships — and that is the one direction a review step cannot
+bound. Removal and unit toggling operate on what is already present and can be
+bounded ahead of time. moonbit draws the same line and has drawn it for a long
+time; its privileged verbs are scan, clean, orphan removal, docker prune and
+schedule, with no `pacman -S` anywhere in the codebase. Installing an
+alternative is therefore tier 3: the tool prints the exact command.
+
+**The helper never touches disk encryption.** A bug during root encryption
+produces an unbootable machine, and disk encryption is a security property
+rather than a privacy one — which §1.1 already excludes from the audit's remit.
+
+Full treatment, including the closed verb set, the token design and the sudo
+invocation, is in
+[`2026-10-20-privacybit-helper-design.md`](2026-10-20-privacybit-helper-design.md).
 
 Two reasons this matters:
 
@@ -726,8 +746,14 @@ Recorded so they are decisions rather than surprises:
   reasoning shown per entry and `explain` available for any grade.
 - **False negatives on renamed packages** are expected and acceptable under
   §0's priority ordering.
+- **Disk encryption is deliberately out of scope, in both directions.** Not
+  audited (it is a security property, and §1.1 separates the two) and never
+  acted on (a botched root encryption bricks the machine, and D4 §3.4 removes
+  it from the helper verb set). Recorded here because "should my audit tell me
+  about disk encryption" is an obvious question, and the answer is a decision
+  rather than an oversight.
 - **No remediation of the operating system itself** — kernel, bootloader,
-  initramfs. Out of scope; noted because "full disk encryption" touches it.
+  initramfs.
 
 ## 15. Delivery phases
 

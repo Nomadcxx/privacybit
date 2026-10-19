@@ -49,7 +49,6 @@ and resolves it against its own embedded catalogue.**
 
 ```jsonc
 // accepted — catalogue ids and closed-set enums only
-{"op": "install-entry", "entry": "brave-origin"}
 {"op": "set-unit",      "unit": "fwupd.service", "state": "disabled"}
 {"op": "plan-purge",    "entry": "google-chrome-stable"}
 {"op": "purge-entry",   "entry": "google-chrome-stable", "token": "…"}
@@ -57,10 +56,11 @@ and resolves it against its own embedded catalogue.**
 
 ```jsonc
 // rejected before any side effect, and before sudo would need to exist
-{"op": "install-entry", "entry": "../../etc/cron.d/x"}   // not a catalogue id
-{"op": "set-unit",      "unit": "anything-at-all"}     // not in the allowlist
-{"op": "install-entry", "package": "evil"}              // field does not exist
-{"op": "run",           "argv": ["sh", "-c", "…"]}     // verb does not exist
+{"op": "purge-entry",   "entry": "../../etc/cron.d/x"}   // not a catalogue id
+{"op": "set-unit",      "unit": "anything-at-all"}      // not in the allowlist
+{"op": "purge-entry",   "package": "evil"}              // field does not exist
+{"op": "run",           "argv": ["sh", "-c", "…"]}      // verb does not exist
+{"op": "install-entry", "entry": "brave-origin"}        // verb does not exist
 ```
 
 ### 3.1 Why resolution must be internal
@@ -82,12 +82,13 @@ alongside the rest of the source.
 | `ping` | no | Liveness. The `ready` handshake. |
 | `status` | no | Helper build, embedded catalogue revision. |
 | `apply-entry` | no | Flip a preference-backed entry. Tier 2. |
-| `report-root` | yes | Audit with root visibility (§3.4). |
-| `install-entry` | yes | Install an alternative resolved from the catalogue. |
+| `report-root` | yes | Audit with root visibility (§3.5). |
 | `set-unit` | yes | Enable/disable an allowlisted systemd unit. |
 | `plan-purge` | yes | Compute a removal plan and issue a review token. Read-only. |
 | `purge-entry` | yes | Execute a removal, given a valid token. |
-| `configure-fde` | yes | Guided full-disk-encryption setup. |
+
+Note what is *not* in that table. There is no install verb and no disk
+encryption verb. See §3.4.
 
 ### 3.3 Unit allowlist
 
@@ -103,7 +104,50 @@ These are the three that phone home from a default Arch install, which is the
 population privacybit starts with. Growing the list is a source change and a
 review, never a caller decision.
 
-### 3.4 `report-root`
+### 3.4 The direction rule
+
+**The privileged path removes and configures. It never introduces.**
+
+This is not an aesthetic preference. The risk of an operation is not symmetric in
+the direction it moves:
+
+- **Removal** operates on software already present. Its blast radius is
+  knowable before it runs — that is exactly what `plan-purge` computes — and it
+  can be reviewed.
+- **Unit toggling** is bounded by a shipped allowlist of names that were chosen
+  because they are the ones that phone home on a default install.
+- **Installation** introduces new code that will execute later, and potentially
+  as root, through a unit the package ships. It creates a future privilege
+  boundary crossing rather than closing one, and that future crossing is not
+  something the review step can bound.
+
+moonbit draws the same line and has drawn it for a long time: its privileged
+verbs are scan, clean, orphan removal, docker prune and schedule. There is no
+`pacman -S` anywhere in the codebase, and none is added by this design.
+
+So installing an alternative is a **tier 3** action, not a tier 4 one. The
+helper emits the exact command and the user runs it:
+
+```console
+$ privacybit apply --entry google-chrome-stable
+google-chrome-stable is graded red. A greener alternative is brave-origin.
+
+  pacman -S brave-origin
+
+This tool will not install it for you. Installing needs root, and introducing
+new software under root is the one direction this helper will not move.
+```
+
+One copy-paste, and the largest privileged surface in the design disappears.
+
+**The same reasoning removes disk encryption entirely.** Encrypting a root
+partition is irreversible-ish in the worst case: a helper bug can produce an
+unbootable machine, and no review dialog recovers it. It is also a *security*
+property rather than a privacy one, so D1 §1.1 already places it outside the
+audit's remit. Removing it costs the design nothing real, because privacybit
+never claimed to cover it.
+
+### 3.5 `report-root`
 
 Running the audit as root sees other users' processes and other users'
 `/proc` entries. That directly contradicts D1 §14, which scoped the audit to
@@ -116,17 +160,17 @@ something a per-user audit does not.
 
 **Default: off.** A machine with one user gains nothing from it.
 
-## 4. User fragments cannot define install specs
+## 4. User fragments cannot define root operations
 
 D1 §7 lets `~/.config/privacybit/catalog.d/` override grades. That stays.
 
-**User fragments may never define an install spec, a unit name, or a removal
-plan.** Those come only from the shipped catalogue.
+**User fragments may never define a removal plan, a unit name, or any operation
+the helper performs.** Those come only from the shipped catalogue.
 
 A grade override is safe: it changes a label the user reads, and D1 §5.1
-already requires the catalogue grade to be shown alongside it. An install spec
-is not safe: it is an argv template, and a user-writable argv template handed
-to root is the escalation this document exists to prevent.
+already requires the catalogue grade to be shown alongside it. A root operation
+is not safe: it resolves to an argv template, and a user-writable argv template
+handed to root is the escalation this document exists to prevent.
 
 The helper therefore embeds the shipped catalogue and ignores
 `catalog.d` entirely. This is a deliberate divergence from the CLI, and the
@@ -152,7 +196,7 @@ provably had no effect, which is what makes the audit log honest and the tests
 meaningful.
 
 **Strict JSON, not permissive.** The default `encoding/json` silently drops
-unknown fields, so `{"op":"install-entry","entry":"brave-origin","argv":["…"]}`
+unknown fields, so `{"op":"purge-entry","entry":"google-chrome-stable","argv":["…"]}`
 would parse cleanly and look like it worked. Disallow unknown fields outright,
 and let the extra field be the thing that fails.
 
@@ -266,6 +310,24 @@ and that path skips the TUI entirely.
 So the helper independently refuses a `purge-entry` without a valid token.
 The UI's confirm is a courtesy; the helper's check is the control.
 
+### 7.3 Why orphans would be different
+
+moonbit *does* run unattended `pacman -Rns`, on `-Qtdq` output. That is not a
+counterexample to this section — it is the boundary of it.
+
+`pacman -Qtdq` lists packages that are neither required by anything nor
+explicitly installed. Removing such a package cannot cascade, because by
+definition nothing depends on it. The removal set is safe **by construction**
+rather than safe because it was reviewed.
+
+The distinction the token enforces is therefore exactly: **review is required
+when the user chose the target, and not required when the removal set is
+computed to be safe.** A user-chosen purge can cascade into a desktop
+environment they still want. An orphan cannot.
+
+Should privacybit ever gain a `purge-orphans`, the token comes off. It has no
+place here in the meantime — that is a cleaner job, and moonbit already has it.
+
 ## 8. Audit logging
 
 moonbit logs every panel operation with its arguments and result. privacybit
@@ -282,7 +344,7 @@ the audit `generated_at` the action was bound to.
 | Never uploaded | D1 §10: no network calls, anywhere, ever. |
 | Never committed | `.gitignore` already excludes it, with the rationale inline. |
 
-`install-entry` and `purge-entry` are recorded in full. `ping` is not recorded.
+`purge-entry` and `set-unit` are recorded in full. `ping` is not recorded.
 
 ## 9. What the helper must never do
 
@@ -292,6 +354,8 @@ Stated negatively so it is testable:
 - accept an argument vector, or any field named `argv`, `cmd`, `args`, `shell`
 - accept a unit name outside the shipped allowlist
 - perform a removal without a matching, unexpired review token
+- **install software** (§3.4 — the direction rule)
+- **touch disk encryption in any way** (§3.4)
 - read or write outside its declared scope
 - make a network call
 - read `catalog.d` or any other user-writable configuration
@@ -323,7 +387,9 @@ and removing its lock file is how two package managers corrupt each other.
 |---|---|
 | Rejection has no effect | Table of ~30 invalid requests. A spy filesystem and a spy exec assert **zero** calls. |
 | Unknown fields rejected | A request with a valid op and one extra field must fail. |
-| User fragments cannot widen power | An `install-entry` spec injected via `catalog.d` is ignored by the helper. |
+| User fragments cannot widen power | A `purge-entry` spec injected via `catalog.d` is ignored by the helper. |
+| No install verb exists | `install-entry` is rejected as an unknown verb, with zero side effects. |
+| No encryption surface | No request can reach a disk, a crypttab, or an initramfs. Asserted by spy filesystem. |
 | Password handling | Fake sudo: prompt once (success), prompt twice (`ErrWrongPassword`), and "not in the sudoers file". |
 | No orphan on cancel | Cancel mid-run; assert no surviving process in the group, and that sudo's cleanup ran. |
 | Review token binding | Wrong entry, stale plan, expired token, and mismatched `generated_at` each rejected. |
@@ -335,16 +401,43 @@ and removing its lock file is how two package managers corrupt each other.
 The fake sudo is moonbit's approach and it works: a stand-in script that mimics
 the prompt, the re-prompt, and sudo's own refusals.
 
-## 12. Open questions
+## 12. Resolved decisions
 
-1. **Should `install-entry` delegate to the system package manager at all?** An
-   alternative framing is to print the exact command and let the user run it
-   themselves. That removes the whole privileged surface for the most-used
-   action, at the cost of one copy-paste. Worth a deliberate decision rather
-   than drifting into it.
-2. **Review token transport.** Passed on stdin in the request, or a file under
-   `$XDG_RUNTIME_DIR` with `0600`? The file survives a panel restart; stdin
-   does not.
-3. **`configure-fde` is a large surface.** Encrypting a root partition can make
-   a machine unbootable. It may deserve to be a separate documented flow rather
-   than a verb.
+The three questions this document originally closed with are settled.
+
+**1. `install-entry` does not exist.** Resolved against the direction rule
+(§3.4): installing is tier 3, and the helper prints the command. moonbit has
+never had a `pacman -S` in its codebase and adding one would have made it
+strictly less safe than the project this design is modelled on. Cost: one
+copy-paste. Benefit: the largest privileged surface in the design is gone.
+
+**2. Review tokens travel on stdin.** A file under `$XDG_RUNTIME_DIR` with `0600`
+would survive a panel restart, and that is exactly why it is the wrong answer.
+D1 §11.4 binds every remediation to the audit it was reviewed against; a token
+that outlives its audit is a capability granted against stale evidence. Dropping
+the token when the panel restarts is the correct behaviour, not a limitation —
+if the panel restarted, the audit moved on, and the plan needs recomputing.
+
+**3. `configure-fde` does not exist.** Removed on both grounds that matter. A
+helper bug during root encryption produces an unbootable machine, which no
+review dialog recovers from; and disk encryption is a security property, not a
+privacy one, so D1 §1.1 already excluded it from the audit's remit. Reaching for
+a root helper to change how data is *stored* is not something a privacy audit
+should be doing.
+
+## 13. Remaining open questions
+
+None blocking. Recorded for the implementation phase:
+
+1. **Is a root-visible audit worth `report-root` at all?** D1 §14 scopes the
+   audit to the current user. §3.5's argument is that widening it should be
+   explicit, but the honest case for it is thin on a single-user machine. Keep
+   it, or cut it and reduce the verb set to four.
+2. **Should `plan-purge` ever skip the token?** moonbit runs unattended
+   `pacman -Rns` on `-Qtdq` orphans, which is safe by construction — a package
+   with no reverse dependencies cannot cascade. A "remove orphans" verb would be
+   the one privileged action that needs no review token. It is also a cleaner
+   job than a privacy audit, so it is probably moonbit's and not ours.
+3. **Token expiry window.** Long enough that a user can read the plan, short
+   enough that a token left in a terminal transcript has little value. Guess:
+   fifteen minutes, and it is configurable rather than hard-coded.
