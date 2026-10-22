@@ -92,7 +92,7 @@ matters so much.
 
 | Absolute path | What it is | State |
 |---|---|---|
-| `/home/nomadx/privacy-bit` | **This project.** Branch `feat/privacybit-final-20261022`. | Delivery phases 0–9 and 12, installer follow-on, and Arch package preparation are committed here. |
+| `/home/nomadx/privacy-bit` | **This project.** Branch `feat/privacybit-final-20261022`; release tag `v0.1.0` points to `fae52ba`. | Delivery phases 0–9 and 12, installer follow-on, and Arch package preparation are committed. The unrelated untracked `.commandcode/` data is untouched. |
 | `/home/nomadx/privacy-bit/docs/plans/` | Seven design documents and implementation plans. | D1–D7 record the approved design. Phase 3, 4, 8, and 9 plans remain as audit history. |
 | `/home/nomadx/sysc-plugins/.worktrees/privacybit-plugin-20261022` | Plugin branch `feat/privacybit-plugin`, commit `a502f38`. | Phase 10 publisher and synthetic catalog screenshot are committed locally. `catalog.json` has no privacy entry yet, so the store cannot install it. |
 | `/home/nomadx/sysc-shell/.worktrees/sysc-1307-privacy-final-20261022` | Shell branch `feat/sysc-1307-privacy-final-20261022`, deployed revision `9f05fcc8`. | Phases 11–12 are committed; live Niri verification passed on 2026-10-22. The branch also preserves deployed launcher fix `c2d274e3`. |
@@ -520,6 +520,7 @@ verbatim `LICENSE` file at `/usr/share/licenses/privacybit/LICENSE`.
 ### 7.1 History
 
 ```
+fae52ba feat: deliver privacy audit tool
 9f85b95 docs: project handover
 4f6ab11 docs: handover for taking ownership of this project
 1dffbac feat(detect): observation sources with honest unavailability
@@ -636,7 +637,7 @@ two do not collide.)
 | Licence | `LICENSE`, README, `PKGBUILD`, and `.SRCINFO` use GPL-3.0-or-later. The full licence text matches `/usr/share/licenses/spdx/GPL-3.0-or-later.txt`. The checked sysc-shell tree remains BSD-3-Clause and sysc-plugins remains MIT; neither was changed. |
 | Panel scans and report actions | Implemented as the approved host-owned action in Phase 12. It runs the current user's `privacybit scan` and reads the bounded saved report; it does not invoke plugin actions or privileged operations. |
 | sysc-plugins store entry | Publisher and synthetic screenshot are committed locally, linked, enabled, and live-verified. `catalog.json` has no `org.sysc.privacy` entry or release assets, so users cannot install it from the store yet. |
-| Release and AUR package | `PKGBUILD` and `.SRCINFO` are prepared for `v0.1.0`; metadata matches. The local tag is not published, so the public source fetch and AUR publication remain. |
+| Release and AUR package | `PKGBUILD` and `.SRCINFO` are prepared for `v0.1.0`; metadata matches. Local tag `v0.1.0` points to `fae52ba` but is not published, so the public source fetch and AUR publication remain. |
 
 ### 10.2 Design corrections and open conflicts
 
