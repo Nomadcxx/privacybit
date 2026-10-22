@@ -107,6 +107,11 @@ impossible, not merely hard.
 `capabilities` is just `["state"]`. It does **not** need `panels`, `settings`,
 or `open-url`. The plugin opens no surface of its own.
 
+The privacy plugin's source and package use GPL-3.0-or-later. Its Go files
+carry SPDX headers, `plugins/privacy/LICENSE` ships with the package, and the
+catalog metadata publishes that license. The sysc-plugins repository license
+continues to apply to its other plugins.
+
 ### 5.2 What it does, once per tick
 
 ```go
@@ -204,13 +209,15 @@ The plugin must start anyway. A missing `requires.commands` entry means the
 host refuses to launch the plugin, and a plugin that refuses to launch cannot
 tell the user anything useful.
 
-So the plugin publishes an explicit unavailable snapshot:
+The plugin resolves `privacybit` from `PATH`, then `~/.local/bin/privacybit`,
+matching the user-local installer target. If neither location contains an
+executable, the plugin publishes an explicit unavailable snapshot:
 
 ```json
 {
   "schema": 1, "available": false,
-  "reason": "privacybit was not found on PATH",
-  "hint": "Install privacybit and make sure it is available on PATH.",
+  "reason": "privacybit was not found on PATH or as an executable at ~/.local/bin/privacybit",
+  "hint": "Install privacybit and make sure it is on PATH or in ~/.local/bin.",
   "generated_at": "2026-10-20T12:00:00Z",
   "overall": {"grade": "unknown"},
   "network": {"vpn": {"state": "unknown", "defects": []},
