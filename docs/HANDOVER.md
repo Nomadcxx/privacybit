@@ -509,9 +509,10 @@ builds and installs the CLI, root helper, and user-service installer under
 `/usr/bin`; it does not enable units or include the checkout-only TUI installer.
 `makepkg --printsrcinfo` passes, and `makepkg` built a local package from the
 current source with the source URL redirected to a local archive. The public
-recipe is tag-based and needs the release tag to exist upstream before AUR
-publication. The README declares GPL-3.0-or-later, and the package installs the
-verbatim `LICENSE` file at `/usr/share/licenses/privacybit/LICENSE`.
+recipe fetches the `v0.1.0` tag. The GitHub release page shows `v0.1.0`, and the
+AUR package page lists `privacybit 0.1.0-1`. The README declares
+GPL-3.0-or-later, and the package installs the verbatim `LICENSE` file at
+`/usr/share/licenses/privacybit/LICENSE`.
 
 ---
 
@@ -637,7 +638,7 @@ two do not collide.)
 | Licence | `LICENSE`, README, `PKGBUILD`, and `.SRCINFO` use GPL-3.0-or-later. The full licence text matches `/usr/share/licenses/spdx/GPL-3.0-or-later.txt`. The checked sysc-shell tree remains BSD-3-Clause and sysc-plugins remains MIT; neither was changed. |
 | Panel scans and report actions | Implemented as the approved host-owned action in Phase 12. It runs the current user's `privacybit scan` and reads the bounded saved report; it does not invoke plugin actions or privileged operations. |
 | sysc-plugins store entry | Publisher and synthetic screenshot are committed locally, linked, enabled, and live-verified. `catalog.json` has no `org.sysc.privacy` entry or release assets, so users cannot install it from the store yet. |
-| Release and AUR package | `PKGBUILD` and `.SRCINFO` are prepared for `v0.1.0`; metadata matches. Local tag `v0.1.0` points to `fae52ba` but is not published, so the public source fetch and AUR publication remain. |
+| Release and AUR package | GitHub release [`v0.1.0`](https://github.com/Nomadcxx/privacybit/releases/tag/v0.1.0) and AUR package [`privacybit 0.1.0-1`](https://aur.archlinux.org/packages/privacybit) are published. Tag `v0.1.0` points to `fae52ba`, one commit on top of `origin/main`; the release commit is not merged into `main`. |
 
 ### 10.2 Design corrections and open conflicts
 
