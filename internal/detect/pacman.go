@@ -92,7 +92,16 @@ func (p *Pacman) Inventory(ctx context.Context) ([]Observation, error) {
 				// One unqueryable package must not abandon the other 2,881.
 				// It stays in the inventory with its fast-tier facts and
 				// its unfilled ones marked unavailable.
-				continue
+				why := "pacman -Qi failed: " + err.Error()
+				o.Version = Unavailable[string](why)
+				o.Origin = Unavailable[Origin](why)
+				o.Facts = Facts{
+					Licence:     Unavailable[string](why),
+					Vendor:      Unavailable[string](why),
+					Explicit:    Unavailable[bool](why),
+					ReverseDeps: Unavailable[[]string](why),
+					Signed:      Unavailable[bool](why),
+				}
 			}
 		}
 		obs = append(obs, o)

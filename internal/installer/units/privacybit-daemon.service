@@ -1,0 +1,14 @@
+[Unit]
+Description=privacybit inventory event watcher
+Conflicts=privacybit-scan.service privacybit-scan.timer
+
+[Service]
+Type=simple
+ExecStart=@PRIVACYBIT@ daemon
+Restart=on-failure
+RestartSec=30s
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%S/privacybit

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/Nomadcxx/privacybit/internal/catalog"
+	"github.com/Nomadcxx/privacybit/internal/render"
 	"github.com/spf13/cobra"
 )
 
@@ -182,30 +183,15 @@ func installRoutes(e *catalog.Entry) []explainInstallJSON {
 
 	out := make([]explainInstallJSON, 0, len(distros))
 	for _, d := range distros {
+		instruction := render.Install(d, e)
 		out = append(out, explainInstallJSON{
 			Distro:   d,
-			Command:  installCommand(d, e.Install.Package[d]),
+			Command:  instruction.Command,
 			Upstream: e.Install.Upstream,
+			Note:     instruction.Reason,
 		})
 	}
 	return out
-}
-
-func installCommand(distro, pkg string) string {
-	switch distro {
-	case "arch":
-		return "pacman -S " + pkg
-	case "debian":
-		return "apt install " + pkg
-	case "fedora":
-		return "dnf install " + pkg
-	case "suse":
-		return "zypper install " + pkg
-	case "alpine":
-		return "apk add " + pkg
-	default:
-		return ""
-	}
 }
 
 func writeJSON(w io.Writer, v any) error {

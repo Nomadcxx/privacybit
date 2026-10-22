@@ -1,0 +1,12 @@
+[Unit]
+Description=privacybit read-only scheduled audit
+Conflicts=privacybit-daemon.service
+
+[Service]
+Type=oneshot
+ExecStart=@PRIVACYBIT@ scan
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%S/privacybit

@@ -46,19 +46,19 @@ root helper. It does not depend on sysc-shell.
 
 ```
                     privacybit (this repo)
-                    ├── CLI      privacybit audit|watch|explain|apply|serve
-                    ├── TUI      privacybit tui
-                    ├── scheduler    cron/systemd-timer friendly
-                    ├── scheduler → helper   privacybit-helper (root, closed verb set)
-                    └── library   importable Go package
+                    ├── CLI and TUI
+                    ├── user daemon and timer
+                    ├── privacybit-helper (root, closed verb set)
+                    └── internal audit engine
+                              ▲
+                              │ CLI and TUI call the engine directly
                               │
-                              │  Go module dependency (read path)
-                              ▼
-                      sysc-plugins/plugins/privacy
+                   sysc-plugins/plugins/privacy
+                     shells out to privacybit
                               │
-                              │  state.set "control_center"  (bounded JSON snapshot)
+                              │ state.set "control_center" (bounded JSON)
                               ▼
-                     sysc-shell Control Centre → privacy panel
+                    sysc-shell Control Centre → privacy panel
 ```
 
 ### 2.1 Build order
@@ -66,15 +66,14 @@ root helper. It does not depend on sysc-shell.
 The dependency edge runs one way, so the order is forced:
 
 1. **privacybit** — engine, CLI, catalogue, helper. Independently useful.
-2. **plugins/privacy** — a thin sysc-shell plugin that imports the library, runs
-   an audit on a tick, and publishes a snapshot.
+2. **plugins/privacy** — a thin sysc-shell plugin that runs the privacybit
+   binary on a tick and publishes its snapshot.
 3. **sysc-shell** — the host renders the snapshot in the existing Control Centre
    privacy panel.
 
-This is the "mix of standalone project and privacy-panel wiring" shape: the
-logic lives in a project that can stand alone, is testable without a shell, and
-can be consumed by the TUI, a cron job, or the panel. The panel is a *consumer*,
-not the owner.
+The logic lives in a project that can stand alone and can be tested without the
+shell. The CLI and TUI call the internal engine directly. The plugin shells out
+to the same CLI binary, following the existing moonbit plugin pattern.
 
 ### 2.2 Why not render the panel from the plugin
 
@@ -85,9 +84,8 @@ into its own state and the host renders it natively — the calendar plugin
 (`org.sysc.calendar` → state key `control_center`) is the existing precedent.
 
 So the panel section stays in the host, and the plugin's only job is to produce
-data. This is also why the engine must be a library: if the plugin could not
-import it, the plugin would have to shell out, and then the CLI and the panel
-would be running two different implementations of the same audit.
+data. The plugin runs the same privacybit binary as the CLI, so both surfaces
+use one audit implementation.
 
 ## 3. Rating model
 
@@ -155,6 +153,38 @@ A 0–100 score is emitted for the progress indicator people actually respond to
 It is explicitly **not** a quality measure and **not** comparable between
 machines. The only meaningful comparison is a user against their own past self,
 which is what the scheduler's history is for. The UI must say so.
+
+### 3.7 Category and overall grades
+
+Use the worst evidence at each level; do not average away a serious finding.
+An entry starts at its effective catalogue grade and measured signals may only
+push it toward more risk. A category takes the worst grade of its known
+installed entries and unmet expectations. A missing high-severity expectation
+is `red`; a missing medium- or low-severity expectation is at least `amber`, so
+an unmet expectation never reads as a pass. An expectation is met when any of
+its `any_of` names is present in the inventory, including an ungraded app name.
+
+The Phase 3 grader moves an entry one level worse when any measured signal is
+`Contradicted` (`green` → `amber`, `amber` → `red`; `red` stays `red`). A
+contradiction is evidence to review, but does not by itself establish a red
+privacy posture. Zero and `Unavailable` signals do not change the grade.
+
+An expectation that is not met can be graded only when every detect type on
+each catalogue entry named by `any_of` has a ready source. An ungraded `any_of`
+name is treated as a package name and requires package coverage. If a missing
+expectation cannot be judged because a source is unavailable, its category is
+`unknown`. Other incomplete source coverage is reported as a caveat and leaves
+the category grade unchanged.
+
+An `unknown` category grade propagates to the overall grade: the system has not
+been fully judged. Where categories can be judged, the overall grade is the
+worst category grade. Partial coverage that does not prevent a category
+judgement is shown as a caveat and does not improve or worsen its grade. An
+unmatched application remains `unknown` in the inventory; it does not acquire a
+category or alter a known entry's grade.
+
+This roll-up is deliberately conservative and simple. The score is a separate
+progress indicator; it does not determine the overall grade.
 
 ## 4. The identity model
 
@@ -238,14 +268,17 @@ Each entry carries `detects`, a list of match rules:
 | `flatpak` | flatpak application id |
 | `desktop` | `.desktop` basename stem, system and user scopes |
 
-Resolution: collect all matches across all sources, then select.
+Resolution: match each observation by exact detect type and name. The catalogue
+validator rejects duplicate keys, so one observation cannot select between two
+entries.
 
 1. Exact matches on any high-confidence source (`package`, `flatpak`) win.
 2. `binary` and `desktop` are corroboration, not primary evidence — a binary
    named `signal` is not necessarily Signal Desktop.
-3. Tie-break by entry specificity (an exact match beats a substring match).
-4. Two entries matching with equal confidence is a **catalogue defect**, not a
-   user problem. It is logged and the item is reported `unknown`.
+3. Detect rules do not support substring matching. A source-native name either
+   matches one exact catalogue key or stays unrated.
+4. If future matching evidence gives one observation conflicting identities,
+   report it as `unknown` and retain the conflicting evidence for diagnosis.
 
 This is deliberately conservative: corroboration exists so that a package whose
 name collides with another product cannot produce a confident wrong grade.
@@ -499,29 +532,22 @@ carries **three redundant channels**:
 2. **Glyph shape** — circle / triangle / square, distinguishable in greyscale.
 3. **Word** — "Good" / "Review" / "Risky".
 
-### 8.1 Host gap this exposes
+### 8.1 Host tone
 
-> **Corrected 2026-10-20.** The claim below was wrong. `internal/ui` already
-> defines `ToneActivity` ("a reading past its activity threshold but short of
-> critical"), it paints the theme's Tertiary role, and it is in live use in the
-> monitor and process panels. Tertiary exists on every palette, so the *visual*
-> layer was already done and needs no theme work.
+> **Corrected 2026-10-22.** `internal/ui` defines `ToneActivity`, which paints
+> the theme's Tertiary role. `plugin/v1` has accepted `ToneWarning` (`warning`)
+> since protocol minor 18, and `internal/plugin` maps that value to
+> `ui.ToneActivity`. The privacy panel uses this existing wire tone for amber.
+> The privacy plugin publishes state only, so its manifest keeps protocol minor
+> 8. It sends no view tone.
 >
-> What is missing is only the **wire**: `plugin/v1` defines just
-> `normal`/`error`/`subtle`/`accent` and validates against `knownTones`, so a
-> plugin emitting `"activity"` is currently rejected. Two edits close it — a
-> `ToneActivity` constant, a `knownTones` entry, and one conversion case. See
-> [`2026-10-20-privacybit-plugin-design.md`](2026-10-20-privacybit-plugin-design.md) §3.
->
-> Worth noting the host arrived at the same threshold progression independently:
-> `monitorscale_test.go` asserts normal → activity → error per metric, which is
-> exactly the shape a privacy grade wants.
+> D5's first draft proposed an `activity` wire value before the warning tone
+> landed in current sysc-shell `main`. The implementation reuses `warning` and
+> makes no protocol or renderer change. `monitorscale_test.go` already asserts
+> the host's normal → activity → error progression.
 
-plugin/v1 text tones are `normal`, `error`, `subtle`, `accent`, and the plugin
-protocol needs one more so an amber grade has an honest rendering. The host
-renderer supplying it is not an optional extra, because without it the amber
-grade collapses into either "normal" or "error", and the amber band is the
-entire point of a three-grade scale.
+The host renders amber with its existing warning tone. The grade word remains
+visible without colour, while the theme tone gives it a second visual channel.
 
 ## 9. Actions
 
@@ -543,17 +569,37 @@ deleted. A dismissed finding is stored with its reason and stops appearing, but
 remains in `explain` output. Dismissing does not change any grade; it changes
 what the user is shown.
 
+### 9.4 Inventory findings and available actions
+
+The Phase 4 builder emits findings for known installed entries graded amber or
+red and for judged, unmet expectations. Installed red entries map to high
+severity; installed amber entries map to medium severity. An unmet expectation
+keeps its authored severity, grade, and explanation. Unmatched software and
+unjudgeable expectations stay in inventory and coverage.
+
+Each finding carries a tier 0 information action. A catalogue alternative gets
+a tier 3 action only when D6 can render a package command or an HTTPS upstream
+URL for it. privacybit returns that instruction for the user to review; it does
+not run it. A known Flatpak installed at both system and user scope produces a
+low-severity informational finding without changing the app or category grade.
+
+The builder omits tier 1 until privacybit can store dismissals. It omits tier 2
+until the catalogue can name a specific reversible setting. Consumers must not
+show either tier as an available action until those handlers exist.
+
 ### 9.2 Tier 4: the root helper
 
 Modelled on `plugins/moonbit`, which is the existing in-repo precedent.
 
-- `sudo -S -k -p "[privacybit-panel-password]" privacybit-helper apply`
-- password written to **sudo's stdin only**, never to the helper's
-- `defer clear(password)` after the call
-- `-k` invalidates the sudo timestamp, so the password is asked every time
-- own process group (`Setpgid`), bounded cancel grace, kill wait that lets sudo
-  finish its cleanup before the kill lands
-- two-phase confirm state machine: `Idle → Scanning → Review → Confirm → Working → Done/Error`, with `Auth` for the pending root run and `Back` restoring the return phase
+- `privacybit purge <entry-id>` starts `sudo -k -- privacybit-helper`
+- sudo reads authentication on the controlling terminal; privacybit never reads
+  or retains the password
+- the helper's bounded JSONL protocol uses sudo's stdin, separate from the
+  controlling-terminal prompt
+- the CLI displays the removal plan and requires the exact entry id before it
+  sends the one-use purge request
+- the helper owns a private process group and uses bounded shutdown that lets
+  sudo finish its cleanup before the final kill
 
 ### 9.3 The closed verb set — the important property
 
@@ -657,7 +703,7 @@ without a defensive pass.
   "generated_at": "2026-10-20T12:00:00Z",
   "duration_ms": 412,
   "coverage": { "package_manager": "pacman", "flatpak": true, "network": true },
-  "overall": { "grade": "amber", "score": 62, "findings": 14, "high": 3 },
+  "overall": { "grade": "red", "score": 62, "findings": 14, "high": 3 },
   "network": {
     "vpn": {
       "state": "connected", "client": "mullvad",
@@ -697,18 +743,18 @@ present stale data as current.
 
 ### 11.3 Plugin and host contract
 
-- Plugin imports `github.com/Nomadcxx/privacybit`, runs `audit` on the slow
-  tick, publishes `state.set("control_center", <snapshot JSON>)`.
+- Plugin runs `privacybit audit --json` on the slow tick and publishes
+  `state.set("control_center", <snapshot JSON>)`.
 - Host reads it with the exact `ccCalendarSnapshotFor` pattern: absent plugin,
   absent key, or malformed JSON all mean "show what we have", never an error
   page.
 - Panel actions route through `activateControlCentre` as new verbs
   (`privacybit:refresh`, `privacybit:run-action`).
 
-Because the plugin holds a library reference rather than spawning the CLI,
-**no IPC and no privileged transport are involved in reading**. moonbit needs
-`sudo moonbit panel` because cleaning needs root; an audit does not, and
-requiring a password merely to render a panel would be a defect.
+Because the plugin runs the same unprivileged binary as the CLI, **no socket
+IPC or privileged transport is involved in reading**. moonbit needs `sudo
+moonbit panel` because cleaning needs root; an audit does not, and requiring a
+password merely to render a panel would be a defect.
 
 ### 11.4 Remediation must bind to a reviewed audit
 
@@ -725,10 +771,11 @@ findings have since changed.
    card, driven by the snapshot. The existing capture panel is untouched.
 2. **Snapshot reader.** `ccPrivacySnapshotFor(r *Registry)` mirroring
    `ccCalendarSnapshotFor`.
-3. **New plugin tone `activity`.** Added to `plugin/v1` only — the host
-   renderer already has `ToneActivity` and no theme change is needed (§8.1).
-   In `internal/ui` the constant is an iota and already exists; any future tone
-   must be **appended**, never inserted, or every later value shifts.
+3. **Reuse the existing warning tone.** `plugin/v1.ToneWarning` maps to the
+   host's `ui.ToneActivity` and has been available since protocol minor 18.
+   The privacy panel uses it for amber, so this integration needs no wire or
+   renderer change. `ui.Tone` is an iota enum; any future tone must be
+   **appended**, never inserted, or every later value shifts.
 4. **Action verbs** in `activateControlCentre`.
 5. **Optional:** the bar widget badge could reflect overall grade. Deferred —
    the widget currently reports capture state, and overloading it risks
@@ -801,7 +848,7 @@ Each phase ends with something runnable.
 | 8 | Root helper (D4), tier 4 |
 | 9 | Scheduler, daemon, event watcher (D7) |
 | 10 | sysc-plugins `plugins/privacy` |
-| 11 | sysc-shell host wiring + `warning` tone |
+| 11 | sysc-shell host wiring; amber reuses the existing warning tone |
 
 Phase 2 was reordered ahead of phase 3 deliberately. Grading cannot be tested
 without something to grade, and D6 §3.2's three-state invariant needs the

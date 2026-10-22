@@ -1,7 +1,7 @@
 # privacybit — D4: root helper
 
 **Date:** 2026-10-20
-**Status:** approved direction, pre-implementation
+**Status:** corrected implementation design
 **Depends on:** [D1](2026-10-20-privacybit-design.md) (§9 actions, §11.4 review binding), [D2](2026-10-20-privacybit-cli-design.md)
 **Reference:** `Nomadcxx/sysc-plugins/plugins/moonbit/runner.go` (288 lines, read in full)
 **Security-sensitive.** Review this document before writing any code in it.
@@ -10,9 +10,10 @@
 
 ## 1. Scope
 
-`privacybit-helper` is a headless, per-request privileged binary. It performs
+`privacybit-helper` is a headless, short-lived privileged session. It performs
 tier 4 actions and nothing else. It is not a daemon, it has no UI, and it
-never accepts a name it did not already know.
+never accepts a name it did not already know. A session serves a purge plan and
+its confirmation, then exits; its review token never reaches disk.
 
 **In:** verb set, validation order, sudo invocation, review binding, audit
 logging, failure modes.
@@ -34,12 +35,11 @@ privacybit gets the same pair:
 | Binary | Job |
 |---|---|
 | `privacybit-helper` | perform tier 4 actions on behalf of a caller |
-| `privacybit-installer` | install privacybit, its systemd user units, and its schedule |
+| `privacybit-installer` | install embedded user units and enable watcher or timer mode |
 
-Installing a privacy tool means installing a periodic audit, so the installer
-is a real deliverable rather than an afterthought. It is not part of D4's
-security surface: it runs interactively, from a checkout, with a human
-watching.
+The installer does not install the binaries. It writes the embedded user
+systemd units under the user's configuration directory and enables exactly one
+mode. It is not part of D4's privileged security surface.
 
 ## 3. The closed verb set
 
@@ -81,8 +81,7 @@ alongside the rest of the source.
 |---|---|---|
 | `ping` | no | Liveness. The `ready` handshake. |
 | `status` | no | Helper build, embedded catalogue revision. |
-| `apply-entry` | no | Flip a preference-backed entry. Tier 2. |
-| `report-root` | yes | Audit with root visibility (§3.5). |
+| `apply-entry` | — | Deferred until the catalogue models a concrete reversible setting. |
 | `set-unit` | yes | Enable/disable an allowlisted systemd unit. |
 | `plan-purge` | yes | Compute a removal plan and issue a review token. Read-only. |
 | `purge-entry` | yes | Execute a removal, given a valid token. |
@@ -90,19 +89,22 @@ alongside the rest of the source.
 Note what is *not* in that table. There is no install verb and no disk
 encryption verb. See §3.4.
 
+`apply-entry` is not an accepted v1 verb. The catalogue has no modeled
+preference-backed setting yet; a generic toggle would not be a closed set.
+
 ### 3.3 Unit allowlist
 
-`set-unit` accepts only units the helper ships. v1 allowlist, in full:
+`set-unit` accepts only units the helper ships. The v1 allowlist is:
 
 ```
-fwupd.service          fwupd-refresh.timer
-upower.service
-PackageKit.service
+fwupd-refresh.timer
 ```
 
-These are the three that phone home from a default Arch install, which is the
-population privacybit starts with. Growing the list is a source change and a
-review, never a caller decision.
+Disabling this timer stops metadata refresh while leaving manual firmware
+updates available. Disabling `fwupd.service` also stops firmware updates;
+`upower.service` and `PackageKit.service` have not been shown to be
+privacy-only switches. They stay out until their effects are reviewed. Growing
+the list is a source change and a review, never a caller decision.
 
 ### 3.4 The direction rule
 
@@ -147,18 +149,12 @@ property rather than a privacy one, so D1 §1.1 already places it outside the
 audit's remit. Removing it costs the design nothing real, because privacybit
 never claimed to cover it.
 
-### 3.5 `report-root`
+### 3.5 `report-root` — deferred
 
-Running the audit as root sees other users' processes and other users'
-`/proc` entries. That directly contradicts D1 §14, which scoped the audit to
-the current user.
-
-Rather than silently narrow the scope, this verb makes the wider scope an
-explicit, separate, opt-in request. Its output is labelled with the wider
-scope, because an audit covering every user on a shared machine discloses
-something a per-user audit does not.
-
-**Default: off.** A machine with one user gains nothing from it.
+Running the audit as root sees other users' processes and `/proc` entries. That
+conflicts with D1 §14, which scopes the audit to the current user. The helper
+does not expose `report-root` in v1. Any wider audit needs a separate owner
+decision and a design for disclosure across user accounts.
 
 ## 4. User fragments cannot define root operations
 
@@ -181,19 +177,22 @@ silent.
 
 Order is the whole point. Each step must complete before the next begins.
 
-1. **Read one line from stdin.** Refuse if more arrives before the line ends.
-2. **Parse strict JSON.** Unknown fields rejected, not ignored.
-3. **Check `op` against the closed verb set.** Unknown → reject.
-4. **Check every field against its closed set.** Unknown enum value → reject.
-5. **Resolve ids against the embedded catalogue.** Unresolved → reject.
-6. **Check any review token.** Invalid, expired, or mismatched → reject.
-7. **Check the audit binding.** `generated_at` still current → else reject.
-8. **Emit `ready`.**
-9. **Execute.**
+1. Load only the shipped embedded catalogue; never read user configuration.
+2. Emit `ready` with the protocol and catalogue revision. This is a transport
+   handshake, not approval of a request or evidence that an operation is valid.
+3. Read one bounded JSON object per line until EOF. Reject duplicate keys,
+   unknown fields, trailing JSON, and fields not allowed for that operation.
+4. Check `op` and every enum against their closed sets.
+5. Resolve entry ids and unit names against the embedded catalogue and compiled
+   allowlist.
+6. Check any review token against the active in-memory plan, expiry, entry,
+   plan hash, and session.
+7. Execute only after every check for that request passes. A malformed request
+   closes the session without affecting completed requests.
 
-Nothing before step 8 touches the system. A request that fails validation has
-provably had no effect, which is what makes the audit log honest and the tests
-meaningful.
+The caller must receive `ready` before it sends a request, so the helper cannot
+validate that request first. `ready` is therefore only a transport handshake.
+Nothing before request validation performs an operation.
 
 **Strict JSON, not permissive.** The default `encoding/json` silently drops
 unknown fields, so `{"op":"purge-entry","entry":"google-chrome-stable","argv":["…"]}`
@@ -205,46 +204,22 @@ and let the extra field be the thing that fails.
 Copied from `plugins/moonbit/runner.go` because every piece of it is load-bearing.
 
 ```
-sudo -S -k -p "[privacybit-panel-password]" privacybit-helper <verb>
+sudo -k -- privacybit-helper
 ```
 
 | Element | Why |
 |---|---|
-| `-S` | Password on stdin. Never on argv, never through the environment. |
 | `-k` | Invalidate the sudo timestamp. The password is asked **every time**. |
-| `-p "[privacybit-panel-password]"` | A marker string the stderr watcher can detect. |
+| no `-S` | sudo prompts through `/dev/tty`; privacybit never reads or retains the password. The helper's JSON protocol uses its stdin. |
 | `Setpgid: true` | Own process group, so the grace-kill can signal sudo's group without touching the caller. |
 
 ### 6.1 Password handling
 
-```go
-asked := false
-for {
-    select {
-    case <-prompts:
-        if asked {
-            kill()
-            return nil, ErrWrongPassword   // sudo asked twice: wrong password
-        }
-        asked = true
-        stdin.Write(append(password, '\n'))
-    case <-ready:
-        stdin.Write(append(line, '\n'))     // request sent only after ready
-        return op, nil
-    }
-}
-```
-
-Three properties, each with a reason:
-
-- **A wrong password is detected by sudo asking twice**, not by parsing sudo's
-  complaint. Prompt-counting is robust to every sudo localisation and every
-  failure message.
-- **The request is sent only after `ready`.** The request line is a capability;
-  handing it to a process that has not proved it is listening would leak it into
-  whatever inherited the pipe.
-- **`defer clear(password)`** in `Start`, before the error is returned. The
-  password does not survive the call.
+sudo owns password input on the controlling terminal. The TUI cedes the
+terminal while the action runs; the CLI does the same through `/dev/tty`. The
+helper request travels on a pipe attached to sudo's stdin, and no privacybit
+struct, buffer, log, or environment variable contains the password. The parent
+waits for `ready` before sending a request.
 
 ### 6.2 Shutdown
 
@@ -277,17 +252,21 @@ not an operation to wait on indefinitely.
 
 ## 7. Review before destroy
 
-`pacman -Rns` unattended deletes dependencies nobody asked it to delete. That
-is not a hypothetical: it is what the flag means.
+`pacman -Rns` can remove dependencies nobody asked it to delete. That is not a
+hypothetical: it is what the flag means.
 
 So `purge-entry` cannot be called directly. The sequence is:
 
-1. `plan-purge entry=<id>` → the helper resolves the entry, computes the exact
-   removal set, its reverse dependencies, and the disk reclaim, then issues a
-   **review token**.
+1. `plan-purge entry=<id>` → the helper resolves a package-only catalogue
+   entry, computes the removal set through pacman's supported read-only
+   `pacman -Rs --print` path, lists reverse dependencies and installed sizes,
+   then issues a **single-use in-memory review token**.
 2. The caller shows all of it to the user and gets a real confirmation.
-3. `purge-entry entry=<id> token=<t>` → re-resolves, re-computes, and refuses
-   unless the plan matches the token exactly.
+3. `purge-entry entry=<id> token=<t>` → re-resolves and re-computes, then
+   refuses unless the exact package set still matches. Execution uses
+   `pacman -Rn` with that explicit set, so it cannot expand into a new
+   dependency removal after review. Pacman still checks dependency integrity
+   and may refuse if package state changed.
 
 ### 7.1 The token binds four things
 
@@ -295,20 +274,25 @@ So `purge-entry` cannot be called directly. The sequence is:
 |---|---|
 | the entry id | applying a plan for a different entry |
 | the plan hash | the removal set changing between plan and execute |
-| the audit `generated_at` | acting on state the user never reviewed (D1 §11.4) |
-| an expiry | a plan sat on disk and ran a week later |
+| the helper session and plan timestamp | replaying a token in another process |
+| an expiry | a plan sat around after the user reviewed it |
+
+The caller's audit `generated_at` is displayed as context, but is not trusted
+as proof of freshness: a root helper cannot verify a timestamp supplied by an
+unprivileged caller. It re-computes package state immediately before executing.
+The token lives only in the helper process for five minutes and is consumed
+once.
 
 ### 7.2 The confirm is enforced at the privileged boundary
 
 This is the part that is easy to get wrong.
 
-The TUI (D3) will have a proper two-phase confirm. If that is the only place a
-confirmation is required, then the **panel's button becomes a backdoor around
-it** — D5 wires a `privacybit:run-action` verb into `activateControlCentre`,
-and that path skips the TUI entirely.
-
-So the helper independently refuses a `purge-entry` without a valid token.
-The UI's confirm is a courtesy; the helper's check is the control.
+The CLI displays the plan and requires the exact entry id on the controlling
+terminal before it sends `purge-entry`. The panel has no tier 4 verb in v1.
+Regardless of the caller, the helper independently refuses a `purge-entry`
+without a valid in-memory plan token and a matching recomputed package set.
+The helper's check is the privileged boundary; the CLI prompt is the user's
+attended review step.
 
 ### 7.3 Why orphans would be different
 
@@ -334,8 +318,9 @@ moonbit logs every panel operation with its arguments and result. privacybit
 logs more, because its operations change the user's privacy posture and that
 record is itself sensitive.
 
-Each entry: timestamp, op, resolved entry or unit, args, result, error, and
-the audit `generated_at` the action was bound to.
+Each entry: timestamp, op, resolved entry or unit, exact package set, result,
+and error. The audit timestamp is contextual data supplied by the caller, not
+an authorization claim.
 
 | Property | Reason |
 |---|---|
@@ -369,8 +354,8 @@ verb must be safe to run twice.
 
 | Failure | Behaviour | Side effects |
 |---|---|---|
-| Wrong password | `ErrWrongPassword`, kill, report | none — validation precedes privilege |
-| Not in sudoers | `startError` maps "not in the sudoers" to a readable message | none |
+| sudo authentication fails | sudo exits and the client reports its status | none — validation precedes the operation |
+| Not in sudoers | sudo exits and the client reports that authorization failed | none |
 | Helper never readies | `readyTimeout`, kill | none |
 | Helper crashes mid-op | terminal `error` event; op must be idempotent | partial, convergent |
 | Malformed request | strict JSON rejection | none |
@@ -389,10 +374,11 @@ and removing its lock file is how two package managers corrupt each other.
 | Unknown fields rejected | A request with a valid op and one extra field must fail. |
 | User fragments cannot widen power | A `purge-entry` spec injected via `catalog.d` is ignored by the helper. |
 | No install verb exists | `install-entry` is rejected as an unknown verb, with zero side effects. |
+| Audit scope stays per-user | `report-root` is rejected as an unknown verb, with zero side effects. |
 | No encryption surface | No request can reach a disk, a crypttab, or an initramfs. Asserted by spy filesystem. |
-| Password handling | Fake sudo: prompt once (success), prompt twice (`ErrWrongPassword`), and "not in the sudoers file". |
+| Password handling | The privacybit process never receives password bytes; test command setup and helper protocol independently. |
 | No orphan on cancel | Cancel mid-run; assert no surviving process in the group, and that sudo's cleanup ran. |
-| Review token binding | Wrong entry, stale plan, expired token, and mismatched `generated_at` each rejected. |
+| Review token binding | Wrong entry, changed plan, expired token, replay in another process, and consumed token are rejected. |
 | Confirm not bypassable | A `purge-entry` with no token is refused even when presented as a panel request. |
 | Idempotency | Every verb run twice; second run is a no-op, not an error. |
 | Own-group guard | Simulated `pgid == own` must result in `pgid = 0`. |
@@ -411,12 +397,10 @@ never had a `pacman -S` in its codebase and adding one would have made it
 strictly less safe than the project this design is modelled on. Cost: one
 copy-paste. Benefit: the largest privileged surface in the design is gone.
 
-**2. Review tokens travel on stdin.** A file under `$XDG_RUNTIME_DIR` with `0600`
-would survive a panel restart, and that is exactly why it is the wrong answer.
-D1 §11.4 binds every remediation to the audit it was reviewed against; a token
-that outlives its audit is a capability granted against stale evidence. Dropping
-the token when the panel restarts is the correct behaviour, not a limitation —
-if the panel restarted, the audit moved on, and the plan needs recomputing.
+**2. Review tokens live only in the helper session.** The original one-request
+process could not retain a token for a second invocation, while a token file
+would survive the process and outlive its reviewed plan. A short-lived session
+keeps the capability in memory and recomputes the package plan before execution.
 
 **3. `configure-fde` does not exist.** Removed on both grounds that matter. A
 helper bug during root encryption produces an unbootable machine, which no
@@ -427,17 +411,17 @@ should be doing.
 
 ## 13. Remaining open questions
 
-None blocking. Recorded for the implementation phase:
+No open scope decision blocks the v1 helper. `report-root` and `apply-entry`
+are deferred. The implementation uses a fixed five-minute expiry and the
+supported read-only pacman simulation path. Package removals on non-pacman
+distributions remain unsupported in v1.
 
-1. **Is a root-visible audit worth `report-root` at all?** D1 §14 scopes the
-   audit to the current user. §3.5's argument is that widening it should be
-   explicit, but the honest case for it is thin on a single-user machine. Keep
-   it, or cut it and reduce the verb set to four.
-2. **Should `plan-purge` ever skip the token?** moonbit runs unattended
+The earlier design asked:
+
+1. **Should `plan-purge` ever skip the token?** moonbit runs unattended
    `pacman -Rns` on `-Qtdq` orphans, which is safe by construction — a package
    with no reverse dependencies cannot cascade. A "remove orphans" verb would be
    the one privileged action that needs no review token. It is also a cleaner
    job than a privacy audit, so it is probably moonbit's and not ours.
-3. **Token expiry window.** Long enough that a user can read the plan, short
-   enough that a token left in a terminal transcript has little value. Guess:
-   fifteen minutes, and it is configurable rather than hard-coded.
+2. **Token expiry window.** Resolved to five minutes because the TUI's review
+   is expected to be immediate; it is fixed rather than user-configurable.

@@ -37,10 +37,29 @@ func TestSignalStatesAreDistinct(t *testing.T) {
 	if Unavailable[string]("no licence metadata").IsObserved() {
 		t.Fatal("Unavailable must not report itself observed")
 	}
-	// ValueOr must never surface the value of a signal that was not observed,
-	// or a caller that skipped the IsObserved check still gets the fallback.
+	// ValueOr must never surface the value of a signal that was not measured,
+	// or a caller that skipped the state check still gets the fallback.
 	if got := Unavailable[string]("nothing").ValueOr("fallback"); got != "fallback" {
 		t.Fatalf("Unavailable.ValueOr returned %q, want the fallback", got)
+	}
+}
+
+func TestContradictedSignalIsMeasuredEvidence(t *testing.T) {
+	if !Observed("expected value").IsMeasured() {
+		t.Fatal("an observed signal must count as measured evidence")
+	}
+	s := Contradicted("unknown license", "catalogue expects a FOSS license")
+	if !s.IsMeasured() {
+		t.Fatal("a contradicted signal contains a measured fact")
+	}
+	if s.IsObserved() {
+		t.Fatal("a contradicted signal must remain distinct from an ordinary observation")
+	}
+	if got := s.ValueOr("unavailable"); got != "unknown license" {
+		t.Fatalf("ValueOr returned %q, want the measured contradictory value", got)
+	}
+	if Unavailable[string]("not supported").IsMeasured() {
+		t.Fatal("an unavailable signal must not count as measured evidence")
 	}
 }
 
@@ -79,6 +98,24 @@ func TestAvailabilitySeparatesEmptyFromMissing(t *testing.T) {
 	}
 	if b.Reason == "" {
 		t.Fatal("a missing manager must say why")
+	}
+}
+
+func TestPacmanKeepsPackageWhenEnrichmentFails(t *testing.T) {
+	r := MapRunner{Output: map[string]string{"pacman -Qq": "brave\n"}}
+	p := NewPacman(r, func(name string) bool { return name == "brave" })
+	obs, err := p.Inventory(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(obs) != 1 || obs[0].Name != "brave" {
+		t.Fatalf("inventory = %+v, want brave retained after failed -Qi", obs)
+	}
+	if obs[0].Version.IsObserved() || obs[0].Facts.Licence.IsObserved() {
+		t.Fatal("failed enrichment must leave unavailable facts, not observed values")
+	}
+	if !strings.Contains(obs[0].Facts.Licence.Why, "pacman -Qi failed") {
+		t.Fatalf("unavailable licence reason = %q, want the failed detail query", obs[0].Facts.Licence.Why)
 	}
 }
 
@@ -131,6 +168,43 @@ func TestDpkgAvailabilityIsNotTheSameAsTheBinaryExisting(t *testing.T) {
 	b := NewDpkg(gone).Availability()
 	if b.Ready {
 		t.Fatal("a missing dpkg-query must not be Ready")
+	}
+}
+
+func TestFlatpakInventoryPreservesInstallationScope(t *testing.T) {
+	listing := "com.example.App\t1.0\tstable\tflathub\tsystem\n" +
+		"com.example.App\t1.0\tstable\tflathub\tuser\n"
+	r := MapRunner{Output: map[string]string{
+		"flatpak list --app --columns=application,version,branch,origin,installation": listing,
+	}}
+	obs, err := NewFlatpak(r).Inventory(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(obs) != 2 {
+		t.Fatalf("got %d observations, want both installation scopes", len(obs))
+	}
+	if obs[0].Name != obs[1].Name {
+		t.Fatalf("duplicate application ids were changed: %q, %q", obs[0].Name, obs[1].Name)
+	}
+	if obs[0].Scope != "system" || obs[1].Scope != "user" {
+		t.Fatalf("installation scopes = %q, %q, want system, user", obs[0].Scope, obs[1].Scope)
+	}
+}
+
+func TestFlatpakInventoryDoesNotResolveProduct(t *testing.T) {
+	r := MapRunner{Output: map[string]string{
+		"flatpak list --app --columns=application,version,branch,origin,installation": "com.example.App\t1.0\tstable\tflathub\tuser\n",
+	}}
+	obs, err := NewFlatpak(r).Inventory(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(obs) != 1 {
+		t.Fatalf("got %d observations, want 1", len(obs))
+	}
+	if obs[0].Product != "" {
+		t.Fatalf("flatpak source assigned catalogue Product %q; matching belongs to the audit", obs[0].Product)
 	}
 }
 

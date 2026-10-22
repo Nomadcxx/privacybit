@@ -1,6 +1,9 @@
 package catalog
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -53,6 +56,22 @@ func TestEveryDetectKeyBelongsToOneEntry(t *testing.T) {
 				seen[k] = e.ID
 			}
 		}
+	}
+}
+
+func TestMatchUsesExactDetectTypeAndName(t *testing.T) {
+	set, err := Load(LoadOptions{})
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if got := set.Match(DetectPackage, "BRAVE"); got == nil || got.ID != "brave" {
+		t.Fatalf("package:BRAVE matched %+v, want brave", got)
+	}
+	if got := set.Match(DetectFlatpak, "brave"); got != nil {
+		t.Fatalf("flatpak:brave matched %q, want no match", got.ID)
+	}
+	if got := set.Match(DetectPackage, "brave-browser-extra"); got != nil {
+		t.Fatalf("substring name matched %q, want no match", got.ID)
 	}
 }
 
@@ -116,5 +135,73 @@ func TestRedEntriesOfferAnAlternative(t *testing.T) {
 	}
 	if len(missing) > 0 {
 		t.Errorf("red entries with no alternative: %s", strings.Join(missing, ", "))
+	}
+}
+
+func TestParseRejectsMalformedTrailingDocument(t *testing.T) {
+	raw := []byte("category:\n  id: browser\n  name: Browser\n---\ncategory: [\n")
+	if _, err := parse(raw, "fragment.yaml"); err == nil {
+		t.Fatal("malformed trailing YAML must reject the whole fragment")
+	}
+}
+
+func TestUserOverrideRetainsShippedGrade(t *testing.T) {
+	dir := t.TempDir()
+	writeBraveOverride(t, dir, "custom summary")
+
+	base, err := Load(LoadOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := base.Entry("brave").Grade
+
+	overridden, err := Load(LoadOptions{UserFragments: true, Dir: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := overridden.Entry("brave")
+	if !got.Overridden {
+		t.Fatal("entry should be marked as overridden")
+	}
+	if got.CatalogueGrade != want {
+		t.Fatalf("shipped grade = %q, want %q", got.CatalogueGrade, want)
+	}
+}
+
+func TestUserOverrideRejectsUnknownExpectationSeverity(t *testing.T) {
+	dir := t.TempDir()
+	raw := "category:\n  id: media\n  name: Media\n  expectations:\n    - id: media.player\n      any_of: [mpv]\n      severity: critical\n      why: choose a player\n"
+	if err := os.WriteFile(filepath.Join(dir, "media.yaml"), []byte(raw), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(LoadOptions{UserFragments: true, Dir: dir}); err == nil || !strings.Contains(err.Error(), "invalid severity") {
+		t.Fatalf("Load error = %v, want invalid expectation severity", err)
+	}
+}
+
+func TestRevisionReflectsEffectiveCatalogueData(t *testing.T) {
+	firstDir := t.TempDir()
+	writeBraveOverride(t, firstDir, "first custom summary")
+	first, err := Load(LoadOptions{UserFragments: true, Dir: firstDir})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	secondDir := t.TempDir()
+	writeBraveOverride(t, secondDir, "second custom summary")
+	second, err := Load(LoadOptions{UserFragments: true, Dir: secondDir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Revision == second.Revision {
+		t.Fatalf("different effective catalogue data has the same revision %q", first.Revision)
+	}
+}
+
+func writeBraveOverride(t *testing.T, dir, summary string) {
+	t.Helper()
+	raw := fmt.Sprintf("category:\n  id: browser\n  name: Browser\n  entries:\n    - id: brave\n      name: Brave Custom\n      grade: green\n      summary: %q\n      detects:\n        - type: package\n          name: brave\n", summary)
+	if err := os.WriteFile(filepath.Join(dir, "browser.yaml"), []byte(raw), 0o600); err != nil {
+		t.Fatal(err)
 	}
 }

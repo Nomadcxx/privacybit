@@ -31,7 +31,7 @@ privacybit has no such consumer yet:
 |---|---|
 | CLI | Direct call |
 | TUI (D3) | Direct library import |
-| sysc-shell plugin (D5) | Direct library import |
+| sysc-shell plugin (D5) | Runs the `privacybit` binary and reads its JSON output |
 | Scripts | `--json` |
 
 Nothing needs IPC, so nothing gets IPC. `serve` and `panel` are reintroduced in
@@ -117,7 +117,7 @@ One JSON object per line on stdout. Every event carries `t`, its type.
 {"t":"progress","stage":"packages","pct":40}
 {"t":"category","id":"browser","grade":"red","installed":4}
 {"t":"finding","id":"vpn.dns-leak","severity":"high","title":"DNS queries are leaving the tunnel"}
-{"t":"done","grade":"amber","score":62,"snapshot":{ … }}
+{"t":"done","grade":"red","score":62,"snapshot":{ … }}
 ```
 
 ### 5.2 The rules

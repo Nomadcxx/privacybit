@@ -16,9 +16,8 @@ Two halves:
 
 - **Plugin** — `plugins/privacy` in sysc-plugins. Runs an audit on a tick and
   publishes a bounded JSON snapshot into its own state.
-- **Host** — five edits in sysc-shell that render that snapshot in the existing
-  Control Centre privacy panel, and one wire fix that was already needed
-  regardless of privacybit.
+- **Host** — renders the bounded snapshot on the existing Control Centre
+  privacy page and uses its existing warning tone for amber grades.
 
 Out of scope: any privileged operation from the panel (§4), any change to the
 capture panel that exists today, any plugin-provided UI (§2).
@@ -31,41 +30,16 @@ functions with no plugin branch. The plugin's only power is `CallStateSet`.
 
 The calendar plugin is the precedent, and D5 is a close copy of it.
 
-## 3. Correction: the host already has a warning tone
+## 3. Existing warning tone
 
-**D1 §8.1 is wrong.** It states that plugin/v1 tones are only
-`normal`/`error`/`subtle`/`accent` and that a warning tone must be added to the
-host. The host has had one for some time.
+sysc-shell `main` accepts `plugin/v1.ToneWarning` (`warning`) at protocol minor
+18. `internal/plugin/view.go` maps it to `ui.ToneActivity`, which paints the
+theme's Tertiary role and already appears in monitor and process panels. The
+privacy panel uses this wire value for amber grades. It needs no additional
+tone or protocol bump.
 
-`internal/ui/tree.go`:
-
-```go
-type Tone uint8
-const (
-	ToneNormal   Tone = iota
-	ToneError
-	ToneAccent
-	ToneSubtle
-	ToneActivity  // paints the theme's Tertiary role
-)
-```
-
-`ToneActivity` is documented as *"a reading past its activity threshold but
-short of critical"* and is already used in `controlcenter_monitor.go`,
-`popout_process.go`, and — in `monitorscale_test.go` — with exactly the
-normal → activity → error threshold progression privacybit's grades want.
-
-Its comment also explains why it exists: *"the theme has no warning token, and
-Tertiary exists on every palette."* So the visual layer is done and needs no
-theme work.
-
-**What is missing is only the wire.** plugin/v1 defines four tones and validates
-against `knownTones`, so `"activity"` is currently rejected. Two edits close it.
-
-**The trap:** `ui.Tone` is an iota enum. A new constant must be **appended**,
-never inserted, or every subsequent tone value shifts and anything persisting a
-numeric tone silently changes meaning. D1 §8.1 should be amended to record that
-the renderer already had the tone and only the plugin protocol lacked it.
+D5's earlier draft called the wire value `activity`. That name duplicated the
+host's existing `warning` value, so the integration now reuses `warning`.
 
 ## 4. Two revisions to earlier decisions
 
@@ -101,8 +75,8 @@ D4 §7.2 establishes that the helper enforces confirmation at the privileged
 boundary, because the panel bypasses the TUI. It does not follow that the
 panel should be *able* to take privileged actions.
 
-**In v1 the panel performs no privileged operation at all.** The panel is a
-viewer; the TUI is the operator.
+**The panel performs no privileged operation.** It may request a read-only scan
+as the current user. The TUI and helper handle state-changing actions.
 
 - A panel has no TTY, so every sudo action is a password prompt in a place
   designed for reading. moonbit does this because cleaning is its entire point.
@@ -112,9 +86,10 @@ viewer; the TUI is the operator.
 - Every finding already carries a tier 3 action that opens the TUI or prints
   the command. Nothing is lost.
 
-This can be revisited once the panel is proven, but it is the right default:
-**a control centre that can remove software with one click is a bad control
-centre**, and D4's token exists to make that impossible, not merely hard.
+The panel can show results and request a read-only scan. It cannot remove
+software or apply a finding. **A control centre that can remove software with
+one click is a bad control centre**, and D4's token exists to make that
+impossible, not merely hard.
 
 ## 5. The plugin
 
@@ -127,7 +102,7 @@ centre**, and D4's token exists to make that impossible, not merely hard.
 | `exec` | `bin/sysc-plugin-privacy` | |
 | `requires.commands` | `[]` | must not refuse to start — §5.4 |
 | `version` | `0.1.0` | |
-| `protocol` | `{major: 1, minor: 8}` | matches the calendar plugin |
+| `protocol` | `{major: 1, minor: 8}` | minimum minor for this state-only plugin; it emits no activity-tone view nodes |
 
 `capabilities` is just `["state"]`. It does **not** need `panels`, `settings`,
 or `open-url`. The plugin opens no surface of its own.
@@ -135,33 +110,27 @@ or `open-url`. The plugin opens no surface of its own.
 ### 5.2 What it does, once per tick
 
 ```go
-func (p *plugin) refresh(ctx context.Context) {
-    raw, err := p.runAudit(ctx)          // privacybit audit --json --no-progress
-    if err != nil {
-        p.publish(unavailableSnapshot(err))
-        return
-    }
-    snap, err := parseSnapshot(raw)      // bounded; rejects a newer schema major
-    if err != nil {
-        p.publish(unavailableSnapshot(err))
-        return
-    }
-    p.publish(snap)
+data, runErr := run("privacybit", "audit", "--snapshot")
+snapshot, parseErr := privacy.ParseAuditOutput(data)
+if parseErr != nil {
+    snapshot = privacy.UnavailableSnapshot(firstError(runErr, parseErr), time.Now())
 }
+publishWithStateSet(snapshot)
 ```
 
-- **`--json --no-progress`** so the NDJSON contract yields the document and not
-  an event stream (D2 §4).
-- **A newer `schema` major is rejected to no data** (D2 §6). Parsing a future
-  snapshot with today's struct reads zero for unknown fields and would report
-  *"no browsers found"* — the under-grade arriving through the back door.
-- **Publishing is best-effort and non-fatal** (D2 §9). A failed `CallStateSet`
-  is logged and retried on the next tick; it never takes the plugin down.
+- **`audit --snapshot`** emits one `done` event with the schema-1 snapshot.
+  A valid unknown snapshot is accepted even when the CLI exits with code 2
+  because every detection source was unavailable.
+- **Missing, malformed, oversized, or unsupported output** becomes an explicit
+  unavailable snapshot. A future schema is never decoded as today's data.
+- A rejected state write is logged and retried on the next tick. A broken
+  protocol transport ends the plugin process and is handled by its supervisor.
 
 ### 5.3 The projection
 
-The full snapshot carries every installed app, every finding, every telemetry
-connection. That is the right size for a terminal and far too large for a
+The full snapshot carries the installed-app inventory, findings, and coverage
+information. It does not contain live telemetry connections because endpoint
+attribution is not implemented. The full report is still too large for a
 596-pixel panel, so the plugin **projects** it — exactly as calendar does with
 `BuildControlCenterSnapshot`.
 
@@ -175,40 +144,59 @@ could quietly under-report, so it is stated in the wire contract:
   "available": true,
   "generated_at": "2026-10-20T12:00:00Z",
   "catalog_rev": "2026.10.1",
-  "overall": { "grade": "amber", "score": 62, "findings": 14, "high": 3 },
+  "overall": { "grade": "red", "score": 62, "findings": 1, "high": 1 },
   "network": {
-    "vpn": { "state": "connected", "client": "mullvad",
-             "default_route_via_tunnel": true,
-             "dns_contained": false, "ipv6_contained": false,
-             "defects": ["dns-leak"] },
-    "telemetry_now": 3
+    "vpn": { "state": "connected", "client": "Mullvad VPN",
+             "default_route_via_tunnel": true, "dns_contained": false,
+             "ipv6_contained": true,
+             "kill_switch_note": "Firewall rules were not verified.",
+             "defects": [{"id":"vpn.dns-leak",
+               "title":"DNS is outside the tunnel",
+               "detail":"The configured resolver is outside the tunnel."}],
+             "defects_shown": 1, "defects_total": 1,
+             "defects_truncated": false },
+    "telemetry_connections_unknown": true
   },
   "categories": [
     { "id": "browser", "name": "Browser", "grade": "red",
-      "installed": 4, "installed_shown": 3,
-      "installed_truncated": true, "installed_total": 4,
+      "installed": [{"id":"chrome", "name":"Google Chrome", "grade":"red"}],
+      "installed_shown": 1, "installed_total": 4,
+      "installed_truncated": true,
       "worst": { "id": "chrome", "name": "Google Chrome", "grade": "red" } }
   ],
+  "categories_shown": 1, "categories_total": 10,
+  "categories_truncated": true,
   "findings": [
     { "id": "vpn.dns-leak", "severity": "high", "grade": "red",
       "category": "network", "title": "DNS queries are leaving the tunnel",
       "summary": "Resolver 192.168.1.1 is outside the Mullvad tunnel.",
-      "action": { "kind": "launch", "label": "How to fix" } }
+      "actions": [{"tier":3,"kind":"launch","label":"Show the removal plan"}],
+      "actions_shown": 1, "actions_total": 1,
+      "actions_truncated": false }
   ],
+  "findings_shown": 1, "findings_total": 1,
+  "findings_truncated": false,
   "reduced": [
-    { "fact": "licence", "effect": "flatpak sandbox permissions could not be checked" }
+    { "fact": "network.telemetry",
+      "effect": "Live endpoint attribution is unavailable." }
   ],
-  "entry_point": "privacybit"
+  "reduced_shown": 1, "reduced_total": 1, "reduced_truncated": false
 }
 ```
 
 Per category: a grade, counts, a truncation pair, and the single worst entry.
-Not the whole list. The panel is a summary; `privacybit explain` is the detail,
-and every finding names its `id` so the TUI can jump straight there.
+Not the whole list. The panel is a summary; the CLI and TUI provide the detail.
+The plugin snapshot carries the action suggestions from the report, but the
+Control Centre does not execute them.
 
-`reduced` (D6 §10) is carried verbatim. A non-empty `reduced` puts a visible
-caveat on the overall grade, because the panel is the one surface where the
-user will *not* run `--json` and read the coverage section.
+Category grades use the worst known installed-entry grade and unmet
+expectations; the overall grade is the worst category grade. Unknown category
+grades propagate to the overall grade so incomplete judgement cannot appear as
+a pass. This follows D1 §3.7; the score is a separate progress indicator.
+
+`reduced` (D6 §10) is carried with total and truncation fields. The card always
+states that telemetry attribution is unavailable, then shows the reported
+coverage caveats. The panel does not imply that unmeasured telemetry is clean.
 
 ### 5.4 When privacybit is not installed
 
@@ -219,9 +207,21 @@ tell the user anything useful.
 So the plugin publishes an explicit unavailable snapshot:
 
 ```json
-{ "schema": 1, "available": false,
-  "reason": "the privacybit binary was not found on PATH",
-  "hint": "install it, or set the plugin's binary path" }
+{
+  "schema": 1, "available": false,
+  "reason": "privacybit was not found on PATH",
+  "hint": "Install privacybit and make sure it is available on PATH.",
+  "generated_at": "2026-10-20T12:00:00Z",
+  "overall": {"grade": "unknown"},
+  "network": {"vpn": {"state": "unknown", "defects": []},
+              "telemetry_connections_unknown": true},
+  "categories": [], "categories_shown": 0, "categories_total": 0,
+  "categories_truncated": false,
+  "findings": [], "findings_shown": 0, "findings_total": 0,
+  "findings_truncated": false,
+  "reduced": [], "reduced_shown": 0, "reduced_total": 0,
+  "reduced_truncated": false
+}
 ```
 
 The panel then renders *"Privacy audit unavailable — privacybit not found"* with
@@ -230,9 +230,10 @@ the hint, rather than an empty card. **An empty card is indistinguishable from
 
 ## 6. The host
 
-Five edits to `/home/nomadx/sysc-shell`, all additive.
+The host renders a bounded audit summary below the existing capture activity
+card and uses the existing warning tone for amber grades.
 
-### 6.1 `internal/ui` — append, do not insert
+### 6.1 `internal/ui` — existing tone
 
 ```go
 const (
@@ -244,30 +245,24 @@ const (
 )
 ```
 
-Nothing to change here. Recorded because the append rule is load-bearing for
-whoever adds the next tone.
+`ToneActivity` already exists as the final iota value in `ui.Tone` and paints
+the theme's tertiary role. Keep its position stable; this work does not change
+the renderer enum.
 
 ### 6.2 `plugin/v1` — the wire
 
-```go
-// node.go, alongside the existing tones
-ToneActivity Tone = "activity"
-
-// and
-var knownTones = map[Tone]bool{
-	ToneNormal: true, ToneError: true,
-	ToneSubtle: true, ToneAccent: true,
-	ToneActivity: true, // new
-}
-```
-
-Plus one case in the v1→ui tone conversion. The protocol minor version goes
-up, because a host that does not know `"activity"` must reject the node rather
-than silently render it unstyled.
+`plugin/v1.ToneWarning` (`warning`) already exists at protocol minor 18.
+`internal/plugin/view.go` maps it to `ui.ToneActivity`. The privacy panel uses
+that value for amber. The privacy plugin emits no view nodes, so its manifest
+keeps minimum protocol minor 8.
 
 ### 6.3 `controlcenter_pages.go` — the snapshot reader
 
-Mirrors `ccCalendarSnapshotFor` exactly, including its contract:
+Reads the running plugin's state through `stateValue`, following the calendar
+pattern. The privacy reader also caps the raw state at 128 KiB, accepts schema
+1 only, validates grades and bounded list totals, and requires telemetry to be
+explicitly unknown. Missing or invalid state becomes an unavailable card; it
+never becomes an empty result or a pass.
 
 ```go
 const (
@@ -275,29 +270,27 @@ const (
 	ccPrivacyStateKey = "control_center"
 )
 
-// ccPrivacySnapshotFor reads the privacy plugin's published snapshot from the
-// running plugin's in-memory store. No plugin, no key or malformed state
-// simply means "no audit"; it never breaks the page.
+// ccPrivacySnapshotFor reads the running privacy plugin's bounded state.
 func ccPrivacySnapshotFor(r *Registry) *ccPrivacySnapshot {
-	if r == nil {
+	if r == nil || r.plugins == nil {
 		return nil
 	}
 	raw, ok := r.plugins.stateValue(ccPrivacyPluginID, ccPrivacyStateKey)
 	if !ok {
 		return nil
 	}
-	var snapshot ccPrivacySnapshot
-	if json.Unmarshal(raw, &snapshot) != nil {
+	snapshot, err := parseCCPrivacySnapshot(raw)
+	if err != nil {
 		return nil
 	}
-	return &snapshot
+	return snapshot
 }
 ```
 
 ### 6.4 `ccPrivacy` — the second card
 
-Today: one `monitorCard` titled "Capture activity", height `ccPageH`, three
-rows. The audit becomes a second card below it, inside a `KindScroll`:
+The page uses its existing scroll viewport. The capture card keeps its three
+rows and uses its natural content height. The audit card follows it:
 
 ```
 ┌─ Capture activity ──────────────┐  unchanged
@@ -305,48 +298,57 @@ rows. The audit becomes a second card below it, inside a `KindScroll`:
 │ Camera          Not recording
 │ Screen sharing  Inactive
 └────────────────────────────────┘
-┌─ Privacy audit ── ▲ Review ────┐  new
-│ DNS is leaking outside your VPN
-│ Browser  Google Chrome    ■
-│ Password Bitwarden        ●
-│ ▸ 12 findings · 3 high   Run audit
+┌─ Privacy audit ────────────────┐  new
+│ Overall             Risky
+│ VPN                 Connected
+│ Default route       Outside tunnel
+│ Browser             Risky · 4 installed
+│ Findings            1 finding · 1 high
+│ Coverage limits     Telemetry attribution unavailable
 └────────────────────────────────┘
 ```
 
-The capture panel is untouched. It answers a different question — *is something
-recording right now* — and conflating it with *is your setup reasonable* would
-make both less useful.
+The capture readings retain their existing meaning and refresh path. The audit
+card shows the overall grade, VPN route/DNS/IPv6 checks, category grades,
+bounded findings, and coverage limits. A report older than 15 minutes or with a
+future timestamp is shown as `Unrated`; the last grade appears only as subdued
+historical text, and stale category/finding details are hidden.
 
-**Grade rendering uses all three channels** (D2 §9, D3 §5). Colour is mapped to
-the tone that already exists:
+Grade rendering uses a word and the existing theme tone:
 
-| Grade | Tone | Glyph | Word |
-|---|---|---|---|
-| `green` | `ToneNormal` | ● | Good |
-| `amber` | **`ToneActivity`** | ▲ | Review |
-| `red` | `ToneError` | ■ | Risky |
-| `unknown` | `ToneSubtle` | ? | Unrated |
+| Grade | Tone | Word |
+|---|---|---|
+| `green` | `ToneNormal` | Good |
+| `amber` | `ToneActivity` | Review |
+| `red` | `ToneError` | Risky |
+| `unknown` | `ToneSubtle` | Unrated |
 
-This is precisely the threshold progression `monitorscale_test.go` already
-asserts, which is reassuring rather than coincidental: the host's own monitor
-panel treats a mid-range reading as an attention state, and a grade is a
-mid-range reading.
+The grade word remains visible without colour, and the tone provides a second
+channel for colour-aware themes.
 
-The word always renders, so the glyph and colour are redundant rather than
-load-bearing — which is what makes D2's ASCII fallback cost nothing.
+### 6.5 Actions
 
-### 6.5 Action verbs
+The original Phase 11 viewer-only boundary was revised by the owner on
+2026-10-20. The native Control Centre now exposes one host-owned `Run scan`
+action. It invokes `privacybit scan` as the current user, outside the registry
+lock. It resolves the binary from `PATH`, then `~/.local/bin/privacybit`, which
+is the installer target.
 
-Two, both non-privileged (§4.2):
+The panel reads the private `$XDG_STATE_HOME/privacybit/report.json` file, or
+`~/.local/state/privacybit/report.json` when `XDG_STATE_HOME` is unset. The host
+validates the current user's ownership, private permissions, regular-file
+type, schema, grade and timestamp, and reads no more than 4 MiB. It reads this
+file when the user enters the Privacy page and after a manual scan. It does not
+mark the unread report as read. A report older than 15 minutes or dated in the
+future remains `Unrated`.
 
-| Verb | Effect |
-|---|---|
-| `privacybit:refresh` | drop the cached snapshot so the next read rescans |
-| `privacybit:explain <finding-id>` | open the TUI at that finding |
-
-Both route through `activateControlCentre` alongside the existing
-`panel:privacy`. Neither takes an argument that reaches a package name, a path,
-or a unit — the panel's power over the system ends at "show me more".
+The panel shows scan status, the saved report's grade, and its timestamp. The
+full report remains available through `privacybit report`. Manual scans,
+scheduled scans and TUI refreshes share an advisory lock in the per-user state
+directory from the start of scanning through the atomic report save. The panel
+does not use a daemon socket, change the plugin protocol, or run a privileged
+action. The plugin continues publishing its bounded audit summary on its
+five-minute tick.
 
 ## 7. Failure matrix
 
@@ -355,13 +357,13 @@ the thing that takes the desktop down.
 
 | Failure | Panel shows | Plugin state |
 |---|---|---|
-| Plugin not installed | audit card absent; capture panel normal | — |
-| privacybit binary missing | "Privacy audit unavailable" + hint | `available:false` |
-| Audit timed out | "Audit did not finish" + last grade, timestamped | `available:true`, stale |
-| Malformed snapshot | audit card absent | unchanged |
-| Snapshot from a future `schema` | audit card absent | unchanged |
-| Plugin crashed | audit card absent; capture panel unaffected | — |
-| All category sources unavailable | categories empty, `reduced` non-empty, overall `unknown` | published |
+| Plugin not installed or not running | audit card says the snapshot is unavailable; capture card remains | no running state |
+| privacybit binary missing | unavailable reason and install/PATH hint | `available:false`, grade `unknown` |
+| Audit timeout or invalid CLI output | explicit unavailable/unknown card | `available:false` |
+| Malformed, oversized, or unsupported snapshot | unavailable/unknown card | invalid state is ignored |
+| Last valid state is over 15 minutes old | `Unrated`, historical grade subdued, details hidden | age checked from `generated_at` |
+| Future `generated_at` | `Unrated` with clock-skew note | state is not treated as current |
+| All category sources unavailable | categories remain unknown, coverage is visible | `available:true`, overall `unknown` |
 
 The last row matters most. **An audit that could not see anything must not
 report good.** It reports `unknown`, and the panel says so in words.
@@ -370,37 +372,36 @@ report good.** It reports `unknown`, and the panel says so in words.
 
 | Property | Method |
 |---|---|
-| Tone accepted and converted | `plugin/v1` test that `"activity"` passes `knownTones` and converts to `ui.ToneActivity`; the existing unknown-tone test keeps rejecting typos. |
-| Enum stability | A test asserting `ToneActivity` is the highest `ui.Tone` value, so a future insertion fails CI. |
-| Nil-safe reader | `ccPrivacySnapshotFor` against nil registry, absent key, malformed JSON, and a valid snapshot. Mirrors the calendar test. |
-| Projection bounds | A synthetic 10,000-app snapshot asserting every list respects its cap **and** that `installed_truncated`/`installed_total` are correct. |
-| No privileged action | A table asserting every `privacybit:*` verb maps to a non-privileged operation, and that none accepts a package name, path, or unit. |
-| Missing binary | Plugin test with `PATH` stripped; asserts `available:false` is published, not a crash and not silence. |
-| Future schema | A fixture with `"schema": 2` must produce no snapshot, never a partial parse. |
-| Capture panel unaffected | The existing privacy panel tests pass unmodified. |
-| Rendering | `shelllint.Tree` against `panelTargetSize(PanelControlCentre)` so a tree that validates but refuses at render is caught in CI. |
+| Tone accepted and converted | Existing tests cover `plugin/v1.ToneWarning` mapping to `ui.ToneActivity`; privacy tests pin amber to the activity theme tone. |
+| Bounded plugin projection | `plugins/privacy` tests pin list caps, total/truncation fields, malformed/future-schema rejection, and telemetry remaining unknown. |
+| Safe snapshot reader | Shell tests cover absent state, malformed JSON, future schema, invalid grade/counts, oversized state, and available/unavailable snapshots. |
+| Currentness | Shell tests verify stale and future timestamps render unrated and hide stale details. |
+| Honest card | Shell tests check the capture rows, grade words/tones, VPN coverage, category/finding totals, caveats, and explicit unavailable state. |
+| Plugin protocol | Plugin tests prove `audit --snapshot` invocation and state publication over the JSON-lines protocol. |
 
 ## 9. Ordering and dependencies
 
 D5 is **phase 10** of D1 §15, after the CLI exists, because the plugin shells
 out to it.
 
-1. The plugin cannot be written meaningfully before `privacybit audit --json`
+1. The plugin cannot be written meaningfully before `privacybit audit --snapshot`
    produces the document it publishes.
-2. The host tone wire (`§6.2`) is **independent of privacybit entirely**. It is
-   a small fix the plugin protocol wanted regardless, and it can land first.
+2. The warning wire tone is independent of privacybit and already exists in
+   sysc-shell `main`.
 3. `ccPrivacySnapshotFor` plus the second card can land against a hand-written
    fixture snapshot, so the host work is not blocked on the plugin at all.
 
 That last point is worth taking: **the panel can be built and reviewed before
-the engine exists**, against a JSON file. It is the only part of this project
-where the user-visible outcome is testable today.
+the privacybit CLI snapshot exists**, against a JSON file. It is the only part
+of this project where the user-visible outcome is testable today.
 
 ## 10. What this closes
 
-With D5, the original request is answerable end to end: open the Control Centre,
-see whether a VPN is actually protecting you, see every installed application
-graded by category with a reason, and get a concrete next step for each finding.
+With D5, the Control Centre shows the current capture status separately from
+the latest privacy audit, including VPN checks, category grades, bounded
+findings, and coverage caveats. It can request a read-only scan and show the
+saved report's grade and timestamp. The CLI and TUI provide the full report and
+action detail.
 
 What is deliberately *not* delivered: one-click remediation from the panel
 (§4.2), and any enforcement. D1 §1.1's framing holds — this grades privacy and

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run a monthly privacybit audit
+Conflicts=privacybit-daemon.service
+
+[Timer]
+OnCalendar=monthly
+Persistent=true
+Unit=privacybit-scan.service
+
+[Install]
+WantedBy=timers.target

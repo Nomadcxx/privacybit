@@ -67,6 +67,8 @@ func (s *Set) ids() map[string]bool {
 //   - Expectation any_of must not be empty. An expectation with an empty
 //     any_of is satisfied vacuously, which would report the absence
 //     finding as met.
+//   - Expectation severity must be high, medium or low so a typo cannot change
+//     the grade the evaluator assigns to an unmet expectation.
 //   - No detect key claimed by two entries. Resolution would pick one silently,
 //     so a typo becomes a confidently wrong grade.
 //   - Family values are consistent, so display grouping cannot imply a
@@ -127,8 +129,10 @@ func (s *Set) validate() error {
 			// stays met or is missed) rather than inventing a deficiency. See
 			// TestAnyOfToleratesUngradedPackages.
 			_ = known
-			if ex.Severity == "" {
-				ps = append(ps, Problem{ep, "expectation has no severity"})
+			switch ex.Severity {
+			case "high", "medium", "low":
+			default:
+				ps = append(ps, Problem{ep, fmt.Sprintf("invalid severity %q (want high, medium or low)", ex.Severity)})
 			}
 			if ex.Why == "" {
 				ps = append(ps, Problem{ep, "expectation has no why, so the finding could not be explained"})

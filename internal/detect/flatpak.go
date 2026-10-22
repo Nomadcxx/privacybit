@@ -90,7 +90,7 @@ func (f *Flatpak) Inventory(ctx context.Context) ([]Observation, error) {
 		obs = append(obs, Observation{
 			Name:       id,
 			Kind:       KindFlatpak,
-			Product:    id,
+			Scope:      scope,
 			Version:    Observed(version),
 			Branch:     branch,
 			Origin:     Observed(Origin{Source: origin, Official: official}),
@@ -103,7 +103,6 @@ func (f *Flatpak) Inventory(ctx context.Context) ([]Observation, error) {
 				Signed:      Unavailable[bool]("flatpak records signature state per remote, not per application"),
 			},
 		})
-		_ = scope
 	}
 	return obs, nil
 }

@@ -19,12 +19,9 @@ reached a design document.
 Read this first. Read `HANDOVER.md` second. The seven design documents in
 `/home/nomadx/privacy-bit/docs/plans/` third.
 
-Three things in here will not be findable anywhere else:
-
-1. The original request, in the owner's own terms.
-2. Decisions that were made in dialogue and never written down.
-3. **An open tension between what the owner wants next and what D5 currently
-   specifies** (§6). Read that before building phase 10.
+This file records the owner's original request, approved grading rules, and
+the v1 panel boundary. The earlier disagreement about panel controls is
+resolved in §6 and D5.
 
 ---
 
@@ -114,13 +111,15 @@ writing to state key `control_center` is the existing, working precedent.
 So the split is:
 
 ```
-privacybit (library + CLI)  →  plugin publishes a JSON snapshot  →  host renders it
+privacybit (CLI/TUI + internal engine)  →  plugin shells out to privacybit
+                                              →  host renders its JSON snapshot
 ```
 
 This gives the plugin-only benefits (crash isolation, catalogue distribution,
-independent versioning) while keeping the UI where the user expects it. And it
-forces the engine to be a library rather than shell glue, which is what makes
-the CLI, the TUI and the panel run *one* implementation instead of three.
+independent versioning) while keeping the UI where the user expects it. The CLI
+and TUI call one internal engine. The plugin shells out to the same binary;
+Go's `internal/` import rule keeps the audit API from becoming a cross-module
+compatibility commitment.
 
 ---
 
@@ -142,11 +141,17 @@ The owner's reasoning was direct: **under-grading is the one unacceptable
 error.** Everything else in this project is recoverable; a false green is not
 detectable by the user and destroys trust in every other claim.
 
-Four derived signals were accepted as reliable enough to grade on: live network
-connections to known telemetry endpoints, packaging origin, sandbox posture,
-and catalogue/package metadata mismatch. Four were explicitly rejected as too
-noisy: licence string alone, grepping binaries for "telemetry", package
-descriptions, and "is it popular".
+Four evidence families were accepted for the design: live connections to known
+telemetry endpoints, packaging origin, sandbox posture, and catalogue/package
+metadata mismatch. Four signals were rejected as too noisy: licence string
+alone, grepping binaries for "telemetry", package descriptions, and popularity.
+
+The v1 implementation does not deliver every accepted family. D7 §5.2 defers
+live endpoint matching because there is no reviewed endpoint catalogue or
+reliable process attribution; the report says telemetry attribution is
+unknown. Effective Flatpak sandbox posture is also unmeasured. Origin facts are
+collected by some sources but are not currently exposed as grade evidence. The
+only measured facts that can worsen an entry today are contradictions.
 
 ### 3.2 Actions escalate to real privilege — and the owner insisted on it
 
@@ -206,7 +211,7 @@ evidence**, which is recorded here because the reasoning is reusable:
 
 | Capability | Outcome |
 |---|---|
-| Continuous disclosure detection (PID→exe→known endpoint) | **kept** |
+| Continuous disclosure detection (PID→exe→known endpoint) | Kept as a design direction; deferred from v1 by D7 §5.2 until endpoint data and attribution are reviewed. The report remains unknown. |
 | New-application alert with its grade | **kept** |
 | VPN leak **monitoring** | cut — *"complex and not something we want"* |
 | Per-application network history | cut — *"should be managed at the firewall level, not via a privacy daemon"* |
@@ -263,19 +268,13 @@ intent, different class, decided entirely by what else the switch turned off.
 unattended action on privacy posture means acting on stale knowledge. The
 timer therefore re-scans in the same run and never auto-fixes from a cache.
 
-### 3.7 A correction about the host: the amber tone already exists
+### 3.7 The host maps warning to activity
 
-Every design document originally claimed sysc-shell's plugin protocol had no
-amber/warning tone, and that adding one would require theme work. **That was
-wrong.** `internal/ui/tree.go` has defined `ToneActivity` for some time,
-painting the theme's **Tertiary** role, and it is already used by the monitor
-page — whose tests assert exactly the normal→activity→error progression
-privacybit grades want.
-
-Only the *wire* is missing: two edits in `plugin/v1/node.go`. No theme change
-is needed, because Tertiary exists on every palette. **Trap:** `ui.Tone` is an
-iota enum — a new tone must be **appended, never inserted**, or every later
-value shifts.
+sysc-shell `main` accepts `plugin/v1.ToneWarning` (`warning`) at protocol minor
+18 and maps it to `ui.ToneActivity`, which paints the theme's **Tertiary** role.
+The privacy panel reuses that wire value for amber. The integration needs no
+new tone or protocol bump. `ui.Tone` is an iota enum; any future tone must be
+**appended, never inserted**, or every later value shifts.
 
 ### 3.8 The repo owner forbids AI attribution in commits
 
@@ -285,90 +284,76 @@ without word boundaries, which matches inside **"Both"**. Four legitimate commit
 messages have been rejected this way, including one that documented this very
 trap. Reword; never weaken the hook. Full detail in `HANDOVER.md` §7.2.
 
----
+### 3.9 Phase 4 findings and actions
 
-## 4. What is built, in one paragraph
-
-Seven design documents, complete. Two implementation phases: the catalogue
-(entry model, loader, validator, ten categories of YAML) and the detection
-layer (pacman, dpkg, flatpak, `.desktop` binaries and desktop entries, each
-behind one interface with three-state availability). Build, vet, gofmt and tests
-are green. **The grader does not exist yet**, so privacybit today reads its
-catalogue and describes what it found, but does not yet assign grades. See
-`HANDOVER.md` §10.1.
+On 2026-10-20, the owner approved a conservative Phase 4 scope. Known installed
+entries graded red or amber and judged unmet expectations become findings.
+Red maps to high severity; amber maps to medium. Findings expose tier 0
+information and tier 3 alternative instructions. Tier 1 waits for dismissal
+storage, and tier 2 waits for modeled settings. The builder never runs a
+command. Unmatched entries and expectations blocked by coverage stay in their
+existing result fields.
 
 ---
 
-## 5. What comes next
+## 4. What is built
 
-The owner's stated direction, in order:
-
-1. **Finish privacybit** — grader, findings and actions, network checks, the
-   `audit` command.
-2. **Redesign the privacy panel inside the sysc-shell Control Centre.** It is
-   currently one small card showing three capture rows. The redesign adds the
-   audit: categories, grades, the achievable wins, coverage honesty.
-3. **Build a comprehensive sysc-shell plugin** that wires privacybit into that
-   panel and can **read and control** it.
-
-The panel has room: the Control Centre body resolves to roughly 596 × 480
-inside a scroll viewport, and the existing privacy page uses a single card
-with no scroll and no controls. Adding a second card is additive, not a
-restructure.
+Delivery phases 0–12 are implemented across privacybit, sysc-plugins, and
+sysc-shell. The clean shell branch was deployed and the live Niri check passed
+on 2026-10-22. The privacy plugin is locally linked and enabled; its synthetic
+catalog screenshot is committed, while the live screenshot remains local
+because it contains real machine inventory. See `HANDOVER.md` for revisions,
+verification, and the remaining publication gate.
 
 ---
 
-## 6. An open tension — resolve this before building phase 10
+## 5. Approved follow-on work
 
-The owner asks for a plugin that can **read and control** privacybit.
-
-**D5 §4.2 currently specifies the opposite**: that the panel performs *no*
-privileged operation, and only two verbs — `privacybit:refresh` and
-`privacybit:explain`. Its reasoning was recorded at the time:
-
-> *A control centre that can remove software with one click is a bad control
-> centre.*
-
-That reasoning still holds for **tier 4**. But the owner has since asked for
-control, so the next agent must not silently re-derive "read-only" from the
-design doc and assume it is settled. **Ask.**
-
-There is a coherent middle position, and it is probably what is wanted:
-
-| Capability | Tier | Root? | Reasonable in a panel? |
-|---|---|---|---|
-| Show grades, findings, coverage | read | no | Yes — the core |
-| Re-run the audit on demand | 0 | no | Yes |
-| Explain a finding in place | 0 | no | Yes |
-| Toggle a preference-backed entry | 2 | no | Yes, with an undo affordance |
-| Open the TUI, or print the command | 3 | no | Yes |
-| Trigger the scheduled scan now | 0 | no | Yes |
-| **Purge a package** | **4** | **yes** | **Not without a real confirm and D4's review token** |
-
-Everything above the line is achievable without root and without weakening
-invariant I4. Below it, D4's token is the control and the UI confirm is only a
-courtesy — and remember D5 wires `privacybit:run-action` into
-`activateControlCentre`, which bypasses the TUI entirely, so **the helper's
-check is the only thing standing between the panel and an unattended
-`pacman -Rns`**.
+The owner approved GPL-3.0-or-later for privacybit and a host-owned `Run scan`
+action; both are implemented. The panel runs `privacybit scan` as the current
+user and reads the private saved report; it does not call the plugin or daemon
+and does not apply findings. The live Niri check passed after a clean deploy.
+The AUR recipe still points to the upstream `v0.1.0` tag, and the plugin store
+catalog has no privacy release entry, so public installation remains gated on
+publishing the relevant release assets and catalog update.
 
 ---
 
-## 7. Open questions to put to the owner
+## 6. Panel control boundary
 
-1. **Does the panel control include tier 4?** See §6. If yes, the host needs a
-   second, privileged path — and D5's read-only assumption must be revised
-   explicitly rather than drifted past.
-2. **Are the point-in-time VPN checks still wanted?** Continuous VPN *monitoring*
-   was cut and per-app history was cut, but D1 §7's point-in-time checks — is
-   the default route actually going through the tunnel, is DNS leaking, is
-   IPv6 escaping — were their original request and appear never to have been
-   separately confirmed as cut. **Ask before building.**
-3. **What does "re-design the privacy panel" mean visually?** Whether the
-   capture card stays, shrinks, or becomes a summary row is unresolved and
-   affects the layout budget.
-4. **Monthly cadence confirmed?** The daemon design assumes one monthly scan.
-5. **Licence.** The repository has no licence file yet.
+The owner first approved a viewer after an audit found no route from the native
+Control Centre to the state-only privacy plugin. Protocol v1 supports
+`input.event` for plugin-owned views, but this plugin publishes no view and the
+native Control Centre does not forward its input to plugins. The owner later
+approved a native, read-only scan action that does not change that boundary.
+The Control Centre runs `privacybit scan` as the current user, outside the
+registry lock, then reads the private bounded report in XDG state. It refreshes
+that report when the Privacy page opens, so timer-created reports appear there.
+The plugin continues publishing its bounded audit snapshot on its five-minute
+tick.
+
+| Capability | Current implementation |
+|---|---|
+| Show grades, VPN checks, findings totals, and coverage | Implemented in the host-rendered audit card |
+| Run a read-only scan and show saved report status, grade, and timestamp | Native host action; reports over 15 minutes old or dated in the future remain unrated |
+| Refresh or explain through the plugin | Not implemented; the state-only plugin has no view or action route |
+| Run tier 4 actions | Stays in the TUI/helper; never exposed by the panel |
+
+---
+
+## 7. Remaining non-phase work
+
+- **Live Niri verification** passed on 2026-10-22; the screenshot containing
+  real inventory stays in the local cache.
+- **Public release and AUR fetch** remain gated on publishing the local
+  `v0.1.0` tag; privacybit's selected licence is GPL-3.0-or-later.
+- **Plugin store installation** remains unavailable until the privacy plugin's
+  release assets and `catalog.json` entry are published.
+- Additional package-manager backends and effective, scope-specific Flatpak
+  permission inspection remain explicit D6 follow-up work. Coverage stays
+  unknown or caveated where those capabilities are unavailable.
+- Live telemetry endpoint attribution remains deferred under D7 §5.2; v1
+  reports it as unknown rather than claiming no connections were found.
 
 ---
 

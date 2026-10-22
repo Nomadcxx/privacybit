@@ -263,6 +263,20 @@ func (s *Set) Entries() []*Entry {
 	return out
 }
 
+// Match returns the entry for an exact detect type and source-native name, or
+// nil when there is no match. Names use the same case-insensitive key as the
+// catalogue index; substring matching is never attempted.
+func (s *Set) Match(t DetectType, name string) *Entry {
+	if s == nil {
+		return nil
+	}
+	candidates := s.byDetect[detectKey(Detect{Type: t, Name: name})]
+	if len(candidates) == 0 {
+		return nil
+	}
+	return candidates[0]
+}
+
 // Candidates returns every entry that claims the given detect string, in
 // confidence order, highest first. More than one result is a catalogue defect
 // rather than a user problem; the validator rejects it at load time so it can

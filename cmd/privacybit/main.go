@@ -9,10 +9,14 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
 	"github.com/Nomadcxx/privacybit/internal/catalog"
+	"github.com/Nomadcxx/privacybit/internal/engine"
+	"github.com/Nomadcxx/privacybit/internal/report"
+	"github.com/Nomadcxx/privacybit/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -22,8 +26,24 @@ func main() {
 		// reaches the user. Cobra would otherwise print it, and a printed
 		// failure with no exit code is a failure that gets ignored.
 		fmt.Fprintln(os.Stderr, "privacybit: "+err.Error())
-		os.Exit(1)
+		os.Exit(exitCode(err))
 	}
+}
+
+type commandError struct {
+	code int
+	err  error
+}
+
+func (e commandError) Error() string { return e.err.Error() }
+func (e commandError) Unwrap() error { return e.err }
+
+func exitCode(err error) int {
+	var coded commandError
+	if errors.As(err, &coded) {
+		return coded.code
+	}
+	return 1
 }
 
 func newRootCommand() *cobra.Command {
@@ -36,9 +56,10 @@ func newRootCommand() *cobra.Command {
 		// under a message the user cannot act on. Usage errors still print it.
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		Long: "privacybit inspects what is installed, what is running, and what is\n" +
-			"actually going over the network, then reports a graded breakdown by\n" +
-			"category with a stated reason for every grade.\n\n" +
+		Long: "privacybit checks installed applications and, when a VPN tunnel can be\n" +
+			"verified, inspects its routing and resolver state using local system data.\n" +
+			"It reports a graded breakdown by category with a stated reason for each\n" +
+			"judgement.\n\n" +
 			"It grades privacy. Privacy, security and anonymity are different\n" +
 			"properties and are not interchangeable.",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -51,6 +72,12 @@ func newRootCommand() *cobra.Command {
 
 	root.AddCommand(newListCommand(&userFragments))
 	root.AddCommand(newExplainCommand(&userFragments))
+	root.AddCommand(newAuditCommand(&userFragments, engine.Run))
+	root.AddCommand(newTUICommand(&userFragments))
+	root.AddCommand(newDaemonCommand(&userFragments))
+	root.AddCommand(newScanCommand(&userFragments, engine.Run, report.UserStore))
+	root.AddCommand(newReportCommand(&userFragments, engine.Run, report.UserStore, tui.RunWithSnapshot))
+	root.AddCommand(newPurgeCommand(&userFragments))
 	root.AddCommand(newCatalogCommand(&userFragments))
 
 	return root
@@ -81,27 +108,12 @@ func loadCatalogue(userFragments *bool) (*catalog.Set, error) {
 // The glyph and word are what remain on a pipe, in a log, and for anyone the
 // colour channel fails.
 func gradeCell(g catalog.Grade) string {
+	style := report.GradeChannels(g)
 	if !useColour {
-		return fmt.Sprintf("%s %s", g.ASCII(), g.Word())
+		return fmt.Sprintf("%s %s", style.ASCII, style.Word)
 	}
-	return fmt.Sprintf("\x1b[%dm%s %s\x1b[0m", ansiFor(g), g.Glyph(), g.Word())
-}
-
-// ansiFor maps a grade to its colour escape.
-//
-// Unknown is deliberately given no colour of its own. An item nobody has graded
-// has no opinion to express, and a fourth hue would compete with the three that
-// carry meaning. It renders in the terminal's default text instead.
-func ansiFor(g catalog.Grade) int {
-	switch g {
-	case catalog.GradeGreen:
-		return 32
-	case catalog.GradeAmber:
-		// 33 is the amber family the shell host already paints for ToneActivity.
-		return 33
-	case catalog.GradeRed:
-		return 31
-	default:
-		return 0
+	if style.ANSI == 0 {
+		return fmt.Sprintf("%s %s", style.Glyph, style.Word)
 	}
+	return fmt.Sprintf("\x1b[%dm%s %s\x1b[0m", style.ANSI, style.Glyph, style.Word)
 }

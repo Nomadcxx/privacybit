@@ -74,15 +74,22 @@ func Contradicted[T any](v T, why string) Signal[T] {
 	return Signal[T]{State: StateContradicted, Value: v, Why: why}
 }
 
-// IsObserved reports whether the value may be used as evidence. Only an
-// observed signal may inform a grade; this is the accessor that enforces it,
-// so callers cannot reach for .Value on an unavailable fact by accident.
+// IsObserved reports whether the signal is an ordinary observation. A
+// contradicted signal is also measured evidence, with its risk direction
+// carried by its state.
 func (s Signal[T]) IsObserved() bool { return s.State == StateObserved }
 
-// ValueOr returns the observed value, or def when the signal is unavailable,
-// contradicted or unset.
+// IsMeasured reports whether the source observed a value, either ordinarily or
+// in contradiction with the catalogue. Unavailable and unset signals are not
+// evidence and cannot move a grade.
+func (s Signal[T]) IsMeasured() bool {
+	return s.State == StateObserved || s.State == StateContradicted
+}
+
+// ValueOr returns the measured value, or def when the signal is unavailable or
+// unset.
 func (s Signal[T]) ValueOr(def T) T {
-	if s.State == StateObserved {
+	if s.IsMeasured() {
 		return s.Value
 	}
 	return def
@@ -166,6 +173,10 @@ type Observation struct {
 	// Branch is the channel a packaged app came from: a flatpak branch, a
 	// desktop entry's type. Empty where the source has no such concept.
 	Branch string
+
+	// Scope is where an application is installed, such as system or user.
+	// Empty where the source has no installation scopes.
+	Scope string
 
 	// Permissive summarises an app's effective sandbox permissions, obtained
 	// separately because no bulk flatpak command lists overrides. Empty means

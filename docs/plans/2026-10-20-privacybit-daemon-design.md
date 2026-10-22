@@ -1,7 +1,7 @@
 # privacybit — scheduler and event watcher (D7)
 
 **Date:** 2026-10-20
-**Status:** approved in dialogue, pre-implementation
+**Status:** audited and amended for the v1 implementation
 **Depends on:** D1 (engine), D3 (TUI), D6 (sources)
 
 ---
@@ -32,13 +32,13 @@ The safety model. Each class is a different relationship to risk.
 |---|---|---|
 | **A — read** | Scan, report, coverage | Always |
 | **B — reversible toggle** | Preference toggles, user-scoped | **Yes, and only these** |
-| **C — destructive or stateful** | Purge, enable, disk encryption, act on a cached scan | **Never** |
+| **C — privileged or stateful** | Purge, machine-wide unit changes, disk encryption, act on a cached scan | **Never** |
 
 ### 2.1 The Class B admission test
 
 > **An auto-fix must be monotone toward privacy and reversible in one command.**
 
-Two conditions, both necessary.
+Three conditions, all necessary.
 
 **Monotone** means applying it can only *reduce* disclosure. It never has a
 side benefit that a user might later miss.
@@ -46,6 +46,10 @@ side benefit that a user might later miss.
 **Reversible in one command** means the user can undo it without reading a
 manual, and knows the command exists because we told them at the moment of
 application.
+
+**User-scoped** means the unattended action cannot change machine-wide state or
+affect another account. A system-wide operation stays attended even when it
+passes the other two conditions.
 
 Together they bound the worst case to: *privacybit made my machine slightly
 less convenient for a month, and told me how to undo it.* That is an acceptable
@@ -66,29 +70,30 @@ positive and only one is.
   **Fails** — not monotone (it trades one risk for another), and not reversible
   in one command without also re-enabling phone-home.
 - **Disabling `fwupd-refresh.timer`** — this timer only refreshes the *metadata
-  list* of available firmware. Disabling it stops the metadata phone-home
-  while leaving manual updates fully working. **Passes** — monotone (only
-  disclosure stops), reversible with `systemctl enable --now fwupd-refresh.timer`.
+  list* of available firmware. Disabling it stops the metadata phone-home while
+  leaving manual updates fully working, so it passes the monotone and
+  one-command reversibility checks. It is still machine-wide, so it is not
+  Class B and must never run unattended. It remains an attended action through
+  D4's root helper.
 
 Same software. Same vendor. Same intent. One is Class B and one is Class C, and
 the difference is entirely in what else the switch turned off. This is the
 discipline.
 
-## 3. What Class B contains, concretely
+## 3. Class B is empty in v1
 
-A closed set. Not a mechanism for arbitrary fixes — a specific list of specific
-toggles, each with a documented one-command revert.
+The admission rule stays, but the current catalogue does not model concrete
+preference keys, their effective values, or a reliable one-command revert.
+Firefox, Thunderbird and Flatpak settings are candidates for future work, not
+implemented actions.
 
-| Target | Change | Revert |
-|---|---|---|
-| Firefox prefs | telemetry / update-related keys | single `user.js` line removal |
-| Thunderbird prefs | telemetry-related keys | as above |
-| Flatpak overrides | tighten specific over-broad permissions on known apps | `flatpak override --reset <id>` |
-| `fwupd-refresh.timer` | disable the metadata timer only | `systemctl enable --now` |
-| `PackageKit.service` | disable if not in use | `systemctl enable --now` |
+There are therefore **no Class B actions in v1**. The monthly scan is read-only;
+it never changes preferences, Flatpak overrides, services, or packages. Add an
+action only after its setting is represented in the catalogue and its apply
+and revert paths have focused tests.
 
-Each is user-scoped (`~/.mozilla`, `~/.local/share/flatpak`) except the systemd
-units, which are machine-scoped but allowlisted (D4 §3.3).
+Machine-wide systemd unit changes such as `fwupd-refresh.timer` remain attended
+D4 helper actions; the user daemon never applies them.
 
 **No new toggles may be added by user configuration.** The Class B set is
 compiled in, for the same reason D4's verb set is: a user-writable toggle that
@@ -97,15 +102,13 @@ consequences.
 
 ## 4. The staleness problem
 
-D1 §11.4 bound every remediation to the `generated_at` of the audit it was
-reviewed against. **Unattended, that binding is vacuous** — nobody is reviewing
-anything at 3am. So the rule becomes structural rather than procedural:
+D1 §11.4 binds attended remediation to the `generated_at` of the audit it was
+reviewed against. V1 has no unattended remediation, so the scheduler has no
+cached action plan to apply.
 
-- **The timer re-scans in the same run.** It never auto-fixes from a cache.
-- The auto-fix plan is computed from the scan taken in *this* run.
-- A monthly timer with `Persistent=true` can fire weeks late after downtime;
-  the plan is still computed fresh, so a late run is merely stale-by-design and
-  bounded by re-scanning, not by the calendar.
+- The timer runs a new audit and stores that report in the same invocation.
+- A monthly timer with `Persistent=true` may run late after downtime; the report
+  records its actual generation time and performs no state changes.
 
 Cadence here is a **safety parameter, not a performance parameter.** Frequent
 unattended action on privacy posture means acting on stale knowledge. Monthly is
@@ -134,18 +137,23 @@ socket. Not now.
 
 ### 5.2 Continuous disclosure detection
 
-D1's PID→exe→endpoint catalogue matching, kept. The distinction that keeps it
-here and cut per-app history:
+D1's PID→exe→endpoint matching remains a future direction, but v1 has no
+reviewed endpoint data in the catalogue and does not inspect live telemetry
+connections. The report must keep this check explicitly unavailable; an empty
+connection list must never imply that no telemetry was found. Per-app history
+also remains out of scope.
+
+The distinction that keeps endpoint matching in the design and cuts per-app
+history is:
 
 > **A firewall logs destinations; it does not know `metrics.tiktok.com` is a
 > tracker.** You could log every byte and still not know. privacybit knows
 > because the catalogue says so.
 
-Logging is the firewall's job (nftables, and the user runs that). Judging
-against known-bad destinations is the catalogue's job. Per-app history was cut
-for exactly this reason — it is a firewall feature wearing a privacy hat. What
-stays is *detection of disclosure*, judgement against the catalogue, not
-accumulation of a log.
+When endpoint data and attribution are implemented, logging is the firewall's
+job (nftables, and the user runs that) and judging known-bad destinations is the
+catalogue's job. privacybit will report current evidence, not accumulate a
+per-app history.
 
 ### 5.3 Not a shield
 
@@ -181,18 +189,15 @@ root's empty home or reaches into someone else's. Neither is the audit the user
 ran interactively, and a privacy tool that quietly audits the wrong person is
 worse than one that audits nobody.
 
-**Capability argument.** Everything the unattended path does (Class A and B) is
-user-scoped: `~/.mozilla`, `~/.config`, `~/.local/share/flatpak`. The one
-moonbit thing that needs root at 3am is `pacman -Rns` — which is Class C here,
-so it never happens unattended. **privacybit's scheduled work needs no root,
-and therefore should not run as root.** This is the D4 direction rule applied to
-scheduling.
+**Capability argument.** V1 watches the invoking user's package and Flatpak
+inventory and writes only its own state and report. The scheduled audit is
+read-only and writes only its own report. **privacybit's scheduled work needs
+no root, and therefore should not run as root.** This is the D4 direction rule
+applied to scheduling.
 
-**Socket argument.** moonbit's panel socket is `0666`, so it must answer only
-`ping`/`status` as *policy*: "root reach without a password must not be one
-connect() away for every account." A **user** socket at `0600` in
-`$XDG_RUNTIME_DIR` makes privileged reach impossible **by construction** rather
-than by rule — the better of the two.
+The v1 watcher has no IPC client, so it has no socket. Systemd owns its
+lifecycle; `systemctl --user status privacybit-daemon.service` is the status
+surface. Add a socket only with a real client and a bounded protocol.
 
 ## 7. Units
 
@@ -201,50 +206,42 @@ the periodic timer, so only one mode runs at a time.
 
 ```
 privacybit-daemon.service   long-lived event watcher (user)
-privacybit-scan.service     oneshot: scan + Class-B fix (user)
+privacybit-scan.service     oneshot: read-only scan + report (user)
 privacybit-scan.timer       monthly
 ```
 
 `privacybit-daemon.service` and `privacybit-scan.service` `Conflicts=` each
-other. The daemon's socket is `0600`; the timer writes its report to
-`$XDG_STATE_HOME/privacybit/report.json`.
+other. The timer writes its report to
+`$XDG_STATE_HOME/privacybit/report.json` with user-only permissions and marks
+it unread until `privacybit report` opens it.
 
 Hardening carried over from moonbit's correct choices: `NoNewPrivileges=yes`,
-`PrivateTmp=yes`, `ProtectSystem=full`. User units get `ProtectHome=read-only`
-plus explicit write paths — Class B needs to write `~/.mozilla`, so `ProtectHome`
-is `false` for the scan service but the daemon (watcher only, no writes) keeps
-it.
+`PrivateTmp=yes`, `ProtectSystem=strict`, and `ProtectHome=read-only`, with an
+explicit write path for `$XDG_STATE_HOME/privacybit`. Neither unit writes
+browser preferences or any other user configuration.
 
 ## 8. Reporting
 
-The daemon writes a report and marks it unread. The user runs
-`privacybit report`, which opens the TUI report screen (D3).
+The timer writes the report and an unread marker. The user runs
+`privacybit report`, which opens the stored snapshot in the TUI (D3) and clears
+the marker. Pressing `r` runs a fresh audit and replaces the displayed report.
 
-A daemon **can** launch a terminal on a modern system — `systemd-run --user` a
-transient unit with `After=graphical-session.target` running e.g.
-`foot -e privacybit report` — verified live on this machine (`graphical-session.target`
-active, `CanGraphical=yes`, `notify-send` present). So the "you ran a monthly
-scan, here's what changed" flow is real.
-
-But it is a **convenience, not a guarantee.** The daemon must not *require* a
-TTY or a logged-in session; when there is no graphical session it writes the
-report and marks it unread, and the next `privacybit report` shows it. Launching
-a terminal is best-effort. The report is the durable artifact; the terminal is
-the presentation.
+The daemon does not launch a terminal. It sends a desktop notification only
+when a newly observed application matches a red catalogue entry. The timer
+writes the report and marks it unread whether or not a graphical session is
+running. `privacybit report` is the explicit presentation path.
 
 ## 9. Testing
 
 | Property | Method |
 |---|---|
-| Class B admission enforced | A `fwupd.service`-style toggle is rejected; `fwupd-refresh.timer` accepted. Test the rule, not the current list. |
-| No Class C unattended | Attempt to auto-purge / auto-enable from the timer path; must refuse. |
-| Never fix from cache | Timer with a stale `generated_at`; assert it re-scans before planning. |
+| Read-only scheduled scan | The timer entrypoint invokes the audit and report store only; no mutation runner is reachable. |
+| No Class C unattended | Purge and unit mutations are absent from the scheduled path. |
 | New-app detection | Install a fixture package set; assert a red addition notifies and a green one does not. |
 | Polling duty cycle | Bench the diff loop; assert the interval is honoured and the work is bounded. |
 | User-scoped only | Assert the units run as the user; no `User=` omitted (which would mean root). |
-| Socket perms | `0600`, in `$XDG_RUNTIME_DIR`; assert a second local account cannot connect. |
 | Report is durable | No graphical session; assert report exists and is marked unread. |
-| Terminal launch best-effort | With a graphical session, assert the transient unit is requested; failure is non-fatal. |
+| Explicit gaps | Snapshot and UI identify telemetry attribution as unavailable; no connection count is rendered as zero. |
 
 ## 10. Deliverable shape
 
@@ -252,6 +249,14 @@ Phases 7–9 of D1 §15, reordered by this design:
 
 | Phase | Deliverable |
 |---|---|
-| 7 (revised) | Event watcher: inventory diff, new-app alert, continuous disclosure detection |
-| 8 | Monthly timer + Class-B auto-fix + report |
+| 7 (revised) | Event watcher: package/Flatpak inventory diff and red catalogue-entry alerts; telemetry attribution remains unavailable |
+| 8 | Monthly read-only scan and durable report |
 | 9 | TUI report screen (D3), daemon/timer install helpers (a `privacybit-installer` analogue, out of D4's security scope) |
+
+### V1 scope amendment
+
+The original D7 plan described Class-B preference writes and endpoint matching
+without corresponding catalogue keys or reviewed endpoint data. V1 keeps the
+admission rule and event-watcher shape, but does not guess either input. The
+scheduled scan is read-only, and live telemetry attribution remains an explicit
+coverage gap until its evidence source and data are designed.

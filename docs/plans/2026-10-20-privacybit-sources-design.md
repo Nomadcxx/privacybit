@@ -87,7 +87,7 @@ a null value is the whole design.
 | Backend | List | Licence | Vendor | Explicit | Origin | Reverse deps | Signature |
 |---|---|---|---|---|---|---|---|
 | pacman | yes | yes | yes | yes | yes | yes | yes |
-| dpkg / apt | yes | — | yes¹ | partial | partial | — | — |
+| dpkg / apt | yes | — | —¹ | partial | partial | — | — |
 | dnf / yum | yes | yes | yes | yes | yes | yes | yes |
 | zypper | yes | yes | yes | yes | yes | yes | — |
 | apk | yes | partial² | — | — | partial | — | — |
@@ -95,8 +95,8 @@ a null value is the whole design.
 | nix | different shape — §12 | | | | | | |
 | flatpak | yes | — | — | — | yes | — | — |
 
-¹ `dpkg-query -f='${Maintainer}'` works; it is a maintainer string, not a vendor,
-and the catalogue must not treat it as more than that.
+¹ `dpkg-query -f='${Maintainer}'` returns a maintainer string. privacybit does
+not expose it as a vendor fact.
 ² `apk info -W` gives copyright text, not a licence identifier.
 
 Verified on this machine (Arch, 2,882 packages), pacman's field set is:
@@ -118,32 +118,35 @@ backends have no equivalent of.
 type Signal[T any] struct {
     State SignalState // Observed | Unavailable | Contradicted
     Value T
-    Why   string      // populated whenever State is Unavailable
+    Why   string      // explains Unavailable and Contradicted states
 }
 ```
 
 ### 3.2 The invariant
 
-> **An unavailable signal may not move a grade in either direction.**
+> **Unavailable or unset signals cannot move a grade. Contradicted evidence may
+> only worsen it.**
 
-It may only reduce reported coverage. This is D1 §3.3's monotone rule extended
-from *evidence that pushes toward risk* to *absence of evidence*, and it is the
-single most important line in this document.
+Unavailable signals only reduce reported coverage. Contradicted signals contain
+a measured fact that disagrees with the catalogue and may push the grade toward
+more risk. This is D1 §3.3's monotone rule applied to measured evidence, with
+absence of evidence kept out of the grade entirely.
 
 The failure it prevents is concrete and would have shipped on Debian: `dpkg`
 has no licence metadata, so a package whose catalogue entry says FOSS cannot be
-cross-checked. Read naively, "no contradiction found" reads as clean, and a
-Debian user sees a green browser because the backend had nothing to say. The
-same shape of bug is D1 §6.4's flatpak network-visibility rule — "no telemetry
-observed" is not evidence of clean — and it is now stated once, generally, for
-every source and every fact.
+cross-checked. "No contradiction found" is not evidence of agreement; the
+backend had nothing to say. The same shape of bug is D1 §6.4's flatpak
+network-visibility rule — "no telemetry observed" is not evidence of clean.
 
-Three rules follow:
+Four rules follow:
 
-1. **Only `Observed` may inform a grade.** Never `Unavailable`, never `Contradicted`.
-2. **Catalogue grade is always the floor.** Signals can push toward risk, never
+1. **`Observed` and `Contradicted` carry measured evidence.** Neither may
+   improve a grade; `Contradicted` may only worsen it.
+2. **`Unavailable` and the zero state cannot inform a grade in either
+   direction.** They reduce coverage only.
+3. **Catalogue grade is always the floor.** Signals can push toward risk, never
    lift it. This is D1 §3.3, unchanged.
-3. **Insufficient coverage to judge means `unknown`, not `green`.** Absence of
+4. **Insufficient coverage to judge means `unknown`, not `green`.** Absence of
    evidence is a reportable state, never a passing one.
 
 ### 3.3 Availability means data, not binary
@@ -351,7 +354,7 @@ thirteen-screen inventory.
 | Per-backend parsing | Golden fixtures per backend per distro. Recorded output, never live. |
 | Cross-distribution catalogue | Run the full catalogue against each distro's package set fixture; assert every entry with a known alias resolves. This is what catches the misspelled aliases §9 cannot. |
 | Monotone + unavailable | Property test: for every entry and every signal-state combination, an `Unavailable` signal cannot improve or worsen the grade. `Contradicted` may only worsen it. |
-| Availability ≠ binary | `dpkg-query` present with an empty database must yield `Empty`, not `Ready`. |
+| Availability ≠ binary | `dpkg-query` present with an empty database must yield `Ready+Empty`, not `NotReady`. |
 | Nix pollution | A fixture with 7,000 store paths must not produce phantom applications. |
 | Command rendering | One case per outcome in §8, per distribution, asserting the third case never emits a command. |
 | No shell | Every backend test asserts no command outside its declared argv. |

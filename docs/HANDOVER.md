@@ -9,13 +9,12 @@
 **Purpose:** audit what has been built, audit the plan, change the plan if it is
 wrong, then continue development to completion.
 
-This document is self-contained. If you read nothing else, you can work from
-this file plus the seven design documents in `/home/nomadx/privacy-bit/docs/plans/`.
+This document is a current status snapshot and design-audit record. Read the
+seven design documents in `/home/nomadx/privacy-bit/docs/plans/` for the
+authoritative product rules.
 
 **Read `/home/nomadx/privacy-bit/docs/CONTEXT.md` first.** It carries the
-origin, the owner's original request, the decisions made in dialogue that never
-reached a design document, and the open tension between what the owner wants
-next and what D5 currently specifies.
+project origin and the decisions the owner approved during design review.
 
 ---
 
@@ -25,7 +24,7 @@ Three different jobs, three reading orders:
 
 | If you want to… | Read |
 |---|---|
-| **Continue development** | §2 (paths) → §3 (file manifest) → §4 (invariants) → §11 (phases) → then the relevant design doc |
+| **Continue development** | §2 (paths) → §3 (file manifest) → §4 (invariants) → §6.2 (delivery phases) → then the relevant design doc |
 | **Audit the code written so far** | §8 (falsifiable claims with commands) → §10 (known defects) → §3 |
 | **Audit the plan itself** | §9 (opinions, not derivations) → §4 (invariants) → §10.2 (places the docs were already wrong) |
 
@@ -44,7 +43,8 @@ thing for a new contributor to reintroduce.
 
 **3. The design documents are authoritative for *why*. The code is
 authoritative for *what*.** Where they disagree, that is a bug in one of them:
-find it and fix it explicitly. Three disagreements are already known (§10.2).
+find it and fix it explicitly. See the corrected decisions and open conflicts in
+§10.2.
 
 ---
 
@@ -92,67 +92,79 @@ matters so much.
 
 | Absolute path | What it is | State |
 |---|---|---|
-| `/home/nomadx/privacy-bit` | **This project.** | 2,545 lines of Go + 2,658 lines of catalogue YAML. Build and tests green. |
-| `/home/nomadx/privacy-bit/docs/plans/` | Seven design documents. | Complete. Read D1 first. |
-| `/home/nomadx/sysc-shell/.worktrees/sysc-1307-privacy-20261019` | The live Control Centre privacy panel. Branch `feat/sysc-1307-privacy-20261019`. | **Not yet modified by privacybit work.** Target for phase 11. |
-| `/home/nomadx/sysc-shell/.worktrees/sysc-1307-privacy-20261019/plugin/v1/` | The plugin protocol the plugin speaks. | Target for the `activity` tone wire (§11). |
-| `/home/nomadx/sysc-plugins` | Plugin repository (`github.com/Nomadcxx/sysc-plugins`). | No privacy plugin yet. Target for phase 10. |
+| `/home/nomadx/privacy-bit` | **This project.** Branch `feat/privacybit-final-20261022`. | Delivery phases 0–9 and 12, installer follow-on, and Arch package preparation are committed here. |
+| `/home/nomadx/privacy-bit/docs/plans/` | Seven design documents and implementation plans. | D1–D7 record the approved design. Phase 3, 4, 8, and 9 plans remain as audit history. |
+| `/home/nomadx/sysc-plugins/.worktrees/privacybit-plugin-20261022` | Plugin branch `feat/privacybit-plugin`, commit `a502f38`. | Phase 10 publisher and synthetic catalog screenshot are committed locally. `catalog.json` has no privacy entry yet, so the store cannot install it. |
+| `/home/nomadx/sysc-shell/.worktrees/sysc-1307-privacy-final-20261022` | Shell branch `feat/sysc-1307-privacy-final-20261022`, deployed revision `9f05fcc8`. | Phases 11–12 are committed; live Niri verification passed on 2026-10-22. The branch also preserves deployed launcher fix `c2d274e3`. |
+| `/home/nomadx/.config/sysc-shell/plugins/org.sysc.privacy` | User plugin link to the sysc-plugins worktree. | Enabled for the local integration. The running plugin published a current schema-1 snapshot. |
+| `/home/nomadx/sysc-shell` | Primary shell checkout. | Contains independent work and Beads state; use its Beads database only, and do not clean or deploy this checkout. |
 | `/home/nomadx/sysc-plugins/cmd/sysc-plugin-calendar/main.go` | The precedent to copy for the plugin. | Reference only. |
 | `/home/nomadx/sysc-plugins/plugins/calendar/manifest.json` | Manifest shape to copy. | Reference only. |
 | `/home/nomadx/moonbit` | Sibling project this was modelled on. 100% owned by the same author, so reuse is unrestricted. | **132 commits behind its own `origin/main`** — read `origin/main`, not the working tree. |
 | `/tmp/moonbit-header` | Detached worktree at moonbit `origin/main` (`5948bd0`). | May not survive a reboot; recreate if missing. |
 
-### 2.2 Exact files to be edited in the sysc-shell worktree
+### 2.2 Privacybit integration files in the sysc-shell worktree
 
-These are the only sysc-shell files privacybit work will touch. All paths are
-relative to `/home/nomadx/sysc-shell/.worktrees/sysc-1307-privacy-20261019`.
+Phase 11 added the audit card using sysc-shell's existing warning-to-activity
+tone mapping. Phase 12 adds the host-owned scan action. All paths are relative to
+`/home/nomadx/sysc-shell/.worktrees/sysc-1307-privacy-final-20261022`.
 
-| File | Lines | What changes | When |
-|---|---|---|---|
-| `plugin/v1/node.go` | 170–179, 400 | Add `ToneActivity Tone = "activity"` and its `knownTones` entry | Phase 11, or **now** — see §11 |
-| `internal/shell/controlcenter_pages.go` | 391–406 | `ccPrivacy` gains a second card inside a scroll | Phase 11 |
-| `internal/shell/controlcenter_pages.go` | 539–576 | `ccCalendarSnapshotFor` is the pattern to mirror | Reference |
-| `internal/shell/registry.go` | ~1992, ~2796 | Action routing for new `privacybit:*` verbs | Phase 11 |
+| File | Role |
+|---|---|
+| `internal/shell/controlcenter_pages.go` | Reads bounded schema-1 plugin state and renders the audit card below capture activity. |
+| `internal/shell/controlcenter_test.go` | Covers snapshot validation, card rendering, currentness, and grade tones. |
+| `internal/shell/controlcenter_privacy_scan.go` | Runs `privacybit scan` outside `Registry.mu`, reads the private saved report on page open and after a scan, and renders scan status, grade, and timestamp. |
+| `internal/shell/controlcenter_privacy_scan_test.go` | Covers report bounds and freshness, timer-created report loading, duplicate-scan prevention, and missing-binary status. |
 
-`internal/ui/tree.go` lines 578–589 define `ToneActivity` **already** — see
-§10.2 item 1. No theme change is required; Tertiary exists on every palette.
+`plugin/v1.ToneWarning` already maps to `ui.ToneActivity` in current
+sysc-shell `main`; this integration reuses it. Protocol v1 also sends
+`input.event` to plugin-owned views. The privacy plugin remains state-only; the
+native Control Centre owns the `Run scan` action and reads privacybit's private
+XDG report.
 
 ---
 
-## 3. File manifest
+## 3. Implementation map
 
-Every file that exists today, with its absolute path and what it is for.
+The early source and catalogue tables below come from the phase 1–4 audit and
+do not list the later phase packages. Use `rg --files` for a complete current
+inventory. The phase map in §11 lists the added subsystems.
 
-### 3.1 Go source — `/home/nomadx/privacy-bit/` (2,545 lines, no tests)
+### 3.1 Original core source inventory
 
 | Lines | Absolute path | Purpose |
 |---|---|---|
-| 275 | `/home/nomadx/privacy-bit/internal/catalog/catalog.go` | `Grade`, `Risk()`, `Word()`/`Glyph()`/`ASCII()`, `DetectType` + `Confidence()`, `Install`, `Entry`, `Expectation`, `Category`, `Set` |
-| 279 | `/home/nomadx/privacy-bit/internal/catalog/load.go` | `//go:embed data/*.yaml`, `Load()`, `mergeFragments()`, `revision()`, `index()`, `detectKey()` |
-| 250 | `/home/nomadx/privacy-bit/internal/catalog/validate.go` | `Problem`/`Problems.Err()`, `(s *Set) validate()`, `ids()`, `categoryNames()` |
-| 227 | `/home/nomadx/privacy-bit/internal/detect/detect.go` | `Signal[T]`, `SignalState`, `Availability`, `Capabilities`, `Origin`, `Facts`, `Kind`, `Observation`, `Source` interface |
+| 289 | `/home/nomadx/privacy-bit/internal/catalog/catalog.go` | `Grade`, `Risk()`/`Worse()`, `Word()`/`Glyph()`/`ASCII()`, exact detect rules and lookup, `Entry`, `Expectation`, `Category`, `Set` |
+| 484 | `/home/nomadx/privacy-bit/internal/audit/audit.go` | Inventory evaluator, measured-signal grading, findings, tier 0/3 actions, expectation and coverage roll-up |
+| 287 | `/home/nomadx/privacy-bit/internal/catalog/load.go` | `//go:embed data/*.yaml`, `Load()`, strict one-document parsing, fragment merge, effective-catalogue revision, index |
+| 254 | `/home/nomadx/privacy-bit/internal/catalog/validate.go` | `Problem`/`Problems.Err()`, `(s *Set) validate()`, `ids()`, `categoryNames()` |
+| 238 | `/home/nomadx/privacy-bit/internal/detect/detect.go` | `Signal[T]` (including measured-state helpers), `Availability`, `Capabilities`, `Origin`, `Facts`, scoped `Observation`, `Source` interface |
 | 103 | `/home/nomadx/privacy-bit/internal/detect/runner.go` | `Runner` interface, `ExecRunner`, `MapRunner` for tests, `commandTimeout = 20s` |
-| 190 | `/home/nomadx/privacy-bit/internal/detect/pacman.go` | `Pacman` — richest backend; enriches catalogue matches only |
+| 199 | `/home/nomadx/privacy-bit/internal/detect/pacman.go` | `Pacman` — enriches catalogue matches only; retains a package if enrichment fails |
 | 133 | `/home/nomadx/privacy-bit/internal/detect/dpkg.go` | `Dpkg` — the I2 reference case |
-| 127 | `/home/nomadx/privacy-bit/internal/detect/flatpak.go` | `Flatpak` — `NetworkObservable`, duplicate scopes, `PermissionsFor()` |
+| 126 | `/home/nomadx/privacy-bit/internal/detect/flatpak.go` | `Flatpak` — preserves duplicate scopes; permission inspection still reads declared permissions and drops scope |
 | 185 | `/home/nomadx/privacy-bit/internal/detect/desktop.go` | `Desktop` — universal `.desktop` scan |
 | 210 | `/home/nomadx/privacy-bit/internal/detect/binary.go` | `Binary` — universal PATH/opt scan, nix-store exclusion |
-| 107 | `/home/nomadx/privacy-bit/cmd/privacybit/main.go` | Cobra root, `loadCatalogue()`, package doc |
+| 102 | `/home/nomadx/privacy-bit/internal/render/install.go` | D6 per-family install command and HTTPS upstream rendering |
+| 119 | `/home/nomadx/privacy-bit/cmd/privacybit/main.go` | Cobra root, `loadCatalogue()`, package doc |
 | 46 | `/home/nomadx/privacy-bit/cmd/privacybit/util.go` | `useColour`, `isTerminal()`, `userFragmentPath()` |
 | 142 | `/home/nomadx/privacy-bit/cmd/privacybit/list.go` | `list` + `gradeCell()` |
-| 215 | `/home/nomadx/privacy-bit/cmd/privacybit/explain.go` | `explain` + `installCommand()` per distro |
+| 201 | `/home/nomadx/privacy-bit/cmd/privacybit/explain.go` | `explain` + shared install renderer |
 | 56 | `/home/nomadx/privacy-bit/cmd/privacybit/catalog_cmd.go` | `catalog validate`, `catalog path` |
 
-### 3.2 Go tests (377 lines)
+### 3.2 Original core test inventory
 
 | Lines | Absolute path | Tests |
 |---|---|---|
-| 120 | `/home/nomadx/privacy-bit/internal/catalog/load_test.go` | 4 — see §8 |
-| 257 | `/home/nomadx/privacy-bit/internal/detect/detect_test.go` | 9 — see §8 |
+| 207 | `/home/nomadx/privacy-bit/internal/catalog/load_test.go` | 9 — see §8 |
+| 331 | `/home/nomadx/privacy-bit/internal/detect/detect_test.go` | 14 — see §8 |
+| 399 | `/home/nomadx/privacy-bit/internal/audit/audit_test.go` | Grading, coverage, findings, actions and Flatpak scope reporting |
+| 85 | `/home/nomadx/privacy-bit/internal/render/install_test.go` | Distribution commands, HTTPS fallback, unsafe route rejection and shipped route checks |
 
-**`cmd/privacybit` has no test file.** This is the most actionable gap; see §10.1 item 2.
+Command tests now cover audit snapshots, purge plans, scheduling, and TUI startup.
+The early test table above omits later phase tests.
 
-### 3.3 Catalogue data — `/home/nomadx/privacy-bit/internal/catalog/data/` (2,658 lines)
+### 3.3 Shipped catalogue data — `/home/nomadx/privacy-bit/internal/catalog/data/`
 
 Ten files, loaded in filename order so `list` output is alphabetical.
 
@@ -178,14 +190,26 @@ ignored typo.
 
 | Lines | Absolute path |
 |---|---|
-| 817 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-design.md` (**D1** — engine) |
-| 332 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-cli-design.md` (**D2** — CLI) |
-| 362 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-tui-design.md` (**D3** — TUI) |
-| 442 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-helper-design.md` (**D4** — root helper) |
-| 407 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-plugin-design.md` (**D5** — plugin + host) |
-| 387 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-sources-design.md` (**D6** — multi-distro sources) |
-| 256 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-daemon-design.md` (**D7** — daemon) |
-| 48 | `/home/nomadx/privacy-bit/README.md` |
+| 871 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-design.md` (**D1** — engine) |
+| 333 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-cli-design.md` (**D2** — CLI) |
+| 283 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-tui-design.md` (**D3** — TUI) |
+| 427 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-helper-design.md` (**D4** — root helper) |
+| 429 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-plugin-design.md` (**D5** — plugin + host) |
+| 391 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-sources-design.md` (**D6** — multi-distro sources) |
+| 262 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-daemon-design.md` (**D7** — daemon) |
+| 73 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-phase-3-audit-grader.md` (Phase 3 implementation plan) |
+| 46 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-phase-4-findings-actions-design.md` (Phase 4 approved design) |
+| 67 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-phase-4-findings-actions-plan.md` (Phase 4 implementation plan) |
+| — | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-phase-8-helper-plan.md` (Phase 8 implementation plan) |
+| — | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-phase-9-daemon-plan.md` (Phase 9 implementation plan) |
+| 71 | `/home/nomadx/privacy-bit/README.md` |
+| — | `/home/nomadx/privacy-bit/docs/screenshots/privacybit-overview.png` (synthetic report view) |
+| — | `/home/nomadx/privacy-bit/docs/screenshots/privacybit-categories.png` (synthetic category view) |
+| — | `/home/nomadx/sysc-plugins/.worktrees/privacybit-plugin-20261022/plugins/privacy/screenshot.png` (synthetic native Privacy page) |
+| — | `/home/nomadx/sysc-plugins/.worktrees/privacybit-plugin-20261022/plugins/privacy/thumbnail.webp` (generated catalog thumbnail) |
+| — | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-installer-design.md` |
+| — | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-installer.md` |
+| — | `/home/nomadx/sysc-shell/docs/plans/2026-10-20-privacybit-control-centre-scan.md` (Phase 12 integration plan) |
 
 **Reading order if you are new:** D1 §1–§5 (rating model, identity model,
 catalogue), then D6 §3 (the invariant), then D2 (how the CLI surfaces it).
@@ -195,8 +219,11 @@ The rest as you reach it.
 
 | Absolute path | Purpose |
 |---|---|
-| `/home/nomadx/privacy-bit/go.mod` | Module + deps: `cobra`, `yaml.v3`, `pflag`, `mousetrap` |
+| `/home/nomadx/privacy-bit/go.mod` | Module dependencies: Cobra, Bubble Tea, Lipgloss, YAML v3, plus transitive modules |
 | `/home/nomadx/privacy-bit/.gitignore` | Excludes audit output — it fingerprints what a user runs |
+| `/home/nomadx/privacy-bit/cmd/privacybit-install/` | Unprivileged TUI application installer |
+| `/home/nomadx/privacy-bit/internal/installer/binary.go` | Offline build and atomic install to `~/.local/bin` |
+| `/home/nomadx/privacy-bit/packaging/aur/` | `PKGBUILD` and generated `.SRCINFO` for the first Arch package |
 
 There is **no `testdata/` directory** anywhere in the repo. `internal/detect`
 fixtures are inline string literals in `detect_test.go`; `internal/catalog`
@@ -221,24 +248,30 @@ user changes the system and the audit re-runs from scratch.
 *Why:* the heuristic will be wrong sometimes, and the error mode of a heuristic
 that can improve a grade is a grade that silently improves.
 
-### I2 — An unavailable signal may not move a grade in **either** direction
+### I2 — Unavailable or unset signals cannot move a grade; contradictions can only worsen it
 
-Three rules:
-1. Only a signal in state `Observed` may inform a grade.
-2. The catalogue grade is always the floor.
-3. Insufficient coverage to judge means `unknown`, never `green`.
+Four rules:
+1. `Observed` and `Contradicted` signals carry measured evidence. Neither may
+   improve a grade; `Contradicted` may only worsen it.
+2. `Unavailable` and the zero state cannot move a grade in either direction.
+3. The catalogue grade is always the floor.
+4. Insufficient coverage to judge means `unknown`, never `green`.
 
 This is the general form of D1 §6.4's flatpak rule and D6 §3.2. It is the most
 important rule in the detection layer.
 
 *Concrete bug it prevents:* `dpkg` has no licence metadata. A Debian user with
-a package the catalogue calls FOSS cannot be cross-checked, so "no contradiction
-found" would read as clean — **a green browser because the backend had nothing
-to say.**
+a package the catalogue calls FOSS cannot be cross-checked, so the absence of a
+reported contradiction is not evidence of agreement or a clean result — the
+backend had nothing to say.
 
-*Implementation:* `SignalState` deliberately has a `StateZero` that is **not
-equal to** `StateObserved`, so a `Signal` nobody populated cannot read as a
-passing observation. Pinned by `TestZeroSignalIsNotObserved`.
+*Implementation:* `SignalState` distinguishes zero, observed, unavailable and
+contradicted. `IsMeasured()` accepts only observed and contradicted states.
+`TestZeroSignalIsNotObserved` and `TestContradictedSignalIsMeasuredEvidence`
+pin the state API. `internal/audit` preserves the effective catalogue grade,
+ignores zero and unavailable signals, and moves a contradicted entry one level
+worse. `TestContradictedEvidenceWorsensTheCatalogueGradeByOne` pins the grade
+rule; coverage tests pin `unknown` propagation.
 
 ### I3 — Absence is a finding, not a pass
 
@@ -277,13 +310,13 @@ and in the validator's requirement that every entry can be explained.
 ```
                     privacybit  (/home/nomadx/privacy-bit)
                     ├── CLI      privacybit audit|explain|list|watch|tui
-                    ├── TUI      privacybit tui                    [D3, not built]
-                    ├── daemon   event watcher, user-level         [D7, not built]
-                    ├── helper   privacybit-helper (root)         [D4, not built]
-                    └── library  importable Go packages
+                    ├── TUI      privacybit tui                    [D3]
+                    ├── daemon   event watcher, user-level         [D7]
+                    ├── helper   privacybit-helper (root)         [D4]
+                    └── internal packages
                               │
                               ▼  shells out to the binary
-                      sysc-plugins/plugins/privacy  [D5, not built]
+                      sysc-plugins/plugins/privacy  [D5]
                               │  state.set "control_center"
                               ▼
                      sysc-shell Control Centre → privacy panel
@@ -292,32 +325,35 @@ and in the validator's requirement that every entry can be explained.
 **The plugin shells out rather than importing the module.** The engine lives
 under `internal/`, and Go forbids cross-module import of `internal/`; a module
 dependency would force publishing the audit API publicly. `plugins/moonbit`
-already shells out to its binary, so this is the house pattern. (D1 §2.1 says
-otherwise and is wrong — §10.2 item 2.)
+already shells out to its binary, so this is the house pattern. D1 §2.1 now
+records the same architecture — see §10.2 item 2 for the correction history.
 
-### 5.1 Package map — EXISTS vs MISSING
+### 5.1 Package map
 
 ```
-internal/catalog/     EXISTS   entry model, loader, validator, 10 YAML categories
-internal/detect/      EXISTS   observation sources, honest unavailability
-cmd/privacybit/       EXISTS   list, explain, catalog validate  (NO TESTS YET)
-─────────────────────────────────────────────────────────────────────────────
-internal/audit/       MISSING  the grader — the heart of the project
-internal/report/      MISSING  shared grade rendering + snapshot types
-internal/render/      MISSING  per-distro command rendering (currently in explain.go)
-internal/tui/         MISSING  Bubble Tea UI                     [D3]
-internal/runner/      MISSING  sudo machinery                    [D3]
-internal/helper/      MISSING  root helper verbs                 [D4]
-internal/daemon/      MISSING  event watcher + systemd units     [D7]
-internal/network/     MISSING  VPN checks, telemetry connections [D1 §7]
-plugins/privacy/      MISSING  sysc-shell plugin                 [D5]
+internal/catalog/     entry model, loader, validator, shipped catalogue
+internal/detect/      package and universal inventory sources
+internal/audit/       exact matching, grades, expectations, findings
+internal/engine/      source orchestration and complete audit run
+internal/network/     point-in-time VPN route, DNS, and IPv6 checks
+internal/report/      shared report, NDJSON events, snapshot projection
+internal/render/      distribution-aware install instructions
+internal/tui/         Bubble Tea audit interface
+internal/helper/      constrained root helper and action plans
+internal/installer/   helper, service, and user-binary installation
+internal/daemon/      scheduler, Unix socket, event watcher
+cmd/privacybit/       CLI, audit, TUI, scheduled run, purge
+cmd/privacybit-helper/ constrained helper executable
+cmd/privacybit-installer/ installs the user watcher or timer
+cmd/privacybit-install/  builds and installs privacybit for the current user
+sysc-plugins/plugins/privacy   five-minute snapshot publisher
+sysc-shell/internal/shell     bounded reader and Control Centre card
 ```
 
-**Grade rendering is currently duplicated** between
-`/home/nomadx/privacy-bit/cmd/privacybit/list.go` (`gradeCell`) and
-`explain.go` (a direct `Grade.Glyph()` call), and that duplication already
-caused one bug: two renderings of one grade on one screen. Extracting
-`internal/report/` is a prerequisite for D3 and D5, not a nicety.
+`internal/report` owns shared report and grade rendering. The plugin shells
+out to `privacybit audit --snapshot`; the host accepts bounded schema-1 state.
+The panel reports telemetry attribution as unknown and shows stale snapshots as
+unrated.
 
 ---
 
@@ -333,11 +369,35 @@ See §3.4 for absolute paths. In brief:
 | **D2** | CLI surface, NDJSON contract, exit codes, config |
 | **D3** | Bubble Tea model, 13 screens, keybindings, navigation stack |
 | **D4** | Root helper, closed verb set, review tokens, sudo dance |
-| **D5** | sysc-shell plugin + host wiring, the `activity` tone |
+| **D5** | sysc-shell publisher + host wiring, reusing the existing warning tone |
 | **D6** | Multi-distribution source layer, invariant I2 |
 | **D7** | Daemon, event watcher, Class A/B/C, systemd units |
 
-### 6.2 Phase 1 — catalogue. Complete and green.
+### 6.2 Delivery phases
+
+Implementation for phases 0–12 is committed across the local feature branches
+listed in §2. Automated verification appears in §11. The clean sysc-shell
+branch was deployed through `scripts/deploy`; the live Niri check passed. The
+privacy plugin is linked and enabled locally, but is not in the published
+plugin catalog.
+
+| Phase | Deliverable | State |
+|---|---|---|
+| 0 | Repository and design | Complete |
+| 1 | Catalogue, loader, validator, `list`, `explain` | Complete |
+| 2 | Package and universal detection sources | Complete |
+| 3 | Exact matching and conservative grading | Complete |
+| 4 | Findings and tier 0/3 actions | Complete |
+| 5 | Point-in-time VPN checks | Complete |
+| 6 | Audit CLI, NDJSON, snapshot output, exit codes | Complete |
+| 7 | TUI | Complete |
+| 8 | Root helper and installer | Complete |
+| 9 | Scheduler, daemon, Unix socket, event watcher | Complete |
+| 10 | sysc-plugins privacy publisher | Complete |
+| 11 | sysc-shell Control Centre audit card using the existing warning tone | Complete |
+| 12 | Host-owned read-only scan action, shared report lock, and GPL-3.0-or-later licensing | Complete |
+
+### 6.3 Phase 1 — catalogue
 
 `/home/nomadx/privacy-bit/internal/catalog/`:
 
@@ -365,7 +425,7 @@ debian→`apt install`, fedora→`dnf install`, suse→`zypper install`,
 alpine→`apk add`, default→`""` so a missing key yields no command rather than an
 unrunnable one.
 
-### 6.3 Phase 2 — detection. Complete and green.
+### 6.4 Phase 2 — detection
 
 `/home/nomadx/privacy-bit/internal/detect/`:
 
@@ -392,8 +452,66 @@ unrunnable one.
   reporting "1.5" would be a confidently wrong fact. `binary.go` excludes
   `/nix/store` and maps store paths to `nix:<base>`.
 
-**Verified:** `go build ./...`, `go vet ./...`, `gofmt -l ./internal ./cmd` all
-clean. `go test ./...` → `ok internal/catalog`, `ok internal/detect`.
+The source tests cover exact matching, unavailable capabilities, Flatpak scope
+retention, and the universal scanners.
+
+### 6.5 Phase 3 — grading
+
+`/home/nomadx/privacy-bit/internal/audit/` evaluates supplied observations and
+source coverage without running commands:
+
+- Matches by exact detect type and name through `catalog.Set.Match`; unknown
+  observations remain `unknown`, and duplicate Flatpak scopes remain separate.
+- Starts matched entries at the effective catalogue grade. A contradicted
+  measured signal moves green to amber or amber to red; red stays red. Zero,
+  unavailable and ordinary observed signals do not change the grade.
+- Grades unmet high expectations red and unmet medium/low expectations amber.
+  Ungraded expectation tokens are matched as exact package names.
+- Marks a category unknown if an unmet expectation cannot be judged because a
+  required detect type has no ready source. Other incomplete coverage is
+  reported on the category and in the source coverage list. Category and
+  overall grades use worst evidence; unknown propagates to overall.
+
+`internal/engine` and the audit CLI connect the sources to the grader. A
+contradicted measured signal can worsen an entry; zero and unavailable signals
+cannot change it. Effective Flatpak sandbox posture remains unknown until the
+detector reads effective, scope-specific permissions.
+
+The owner approved worst-evidence roll-up: unmet high expectations are red,
+unmet medium/low expectations are amber, and an unknown category makes the
+overall grade unknown. Unmatched inventory entries do not change known
+categories.
+
+### 6.6 Follow-on TUI installer
+
+The approved installer design and implementation plan are in §3.4. The
+`privacybit-install` command builds the CLI from the checkout with network
+access disabled, installs it to the current user's `~/.local/bin`, and offers
+no background work, the watcher, or the monthly timer. It refuses root and
+requires confirmation before writing. The no-background choice disables any
+existing privacybit user units.
+
+`internal/installer/binary.go` validates ownership and file types, writes a
+temporary executable in the destination directory, syncs it, and atomically
+renames it into place. Service setup failure leaves the installed CLI in place
+and is reported as a partial result. Full tests, build, vet, formatting,
+focused race checks, and a VHS preview that quit before confirmation pass.
+
+The README describes implemented inventory and VPN checks, notes deferred
+coverage, and shows synthetic report and category screenshots. Its first-run
+`go run` may resolve the installer's Go modules; the installed CLI build itself
+is offline.
+
+### 6.7 Arch package preparation
+
+`packaging/aur/PKGBUILD` and `.SRCINFO` target version `0.1.0`. The package
+builds and installs the CLI, root helper, and user-service installer under
+`/usr/bin`; it does not enable units or include the checkout-only TUI installer.
+`makepkg --printsrcinfo` passes, and `makepkg` built a local package from the
+current source with the source URL redirected to a local archive. The public
+recipe is tag-based and needs the release tag to exist upstream before AUR
+publication. The README declares GPL-3.0-or-later, and the package installs the
+verbatim `LICENSE` file at `/usr/share/licenses/privacybit/LICENSE`.
 
 ---
 
@@ -449,22 +567,21 @@ Specific, falsifiable claims. Each is checkable.
 
 | # | Claim | How to check |
 |---|---|---|
-| 1 | **I2 is enforced, not merely documented.** | `TestZeroSignalIsNotObserved` in `/home/nomadx/privacy-bit/internal/detect/detect_test.go`. Then grep for any `Signal` built as a bare struct literal — that bypasses the state. Confirm `StateZero != StateObserved`. |
-| 2 | **No source sets `Product`.** | `TestSourcesNeverSetProduct`. `Product` is the catalogue entry id; a source assigning it would be converting a filename into a grade. |
+| 1 | **Signal states cannot silently turn unset or unavailable facts into observations or grade changes.** | `TestZeroSignalIsNotObserved`, `TestContradictedSignalIsMeasuredEvidence`, and `TestEveryCatalogueEntryAndSignalStateObeysTheGradeRule`; inspect `internal/audit/audit_test.go`. |
+| 2 | **No detection source sets `Product`.** | `TestSourcesNeverSetProduct` in `internal/detect/detect_test.go`. `Product` is assigned only after catalogue matching. |
 | 3 | **No duplicate detect keys.** | `TestEveryDetectKeyBelongsToOneEntry` in `…/internal/catalog/load_test.go`. A duplicate is a contradiction resolved silently into a confidently wrong grade. |
 | 4 | **Every red entry offers an alternative.** | `TestRedEntriesOfferAnAlternative`. Without it, a red entry is a wall of shame rather than a to-do list. |
 | 5 | **The catalogue is permissive, not strict, on `any_of`.** | `TestAnyOfToleratesUngradedPackages`. Current state: **118 tokens, 98 resolve to entries, 20 name ungraded packages (~17%)**. Deliberate — an expectation asks "does the user have something of this kind", not "did the catalogue happen to grade it". A user with Epiphany installed must not be told they have no browser. |
-| 6 | **Nothing renders silence as a pass.** | **Cannot be checked — `/home/nomadx/privacy-bit/cmd/privacybit/` has no test file.** Three real instances of this bug already occurred (§10.3). This is the weakest claim in the handover. |
+| 6 | **Matching is exact and unmatched apps cannot worsen known grades.** | `TestMatchUsesExactDetectTypeAndName` and `TestEvaluateMatchesExactObservationsAndKeepsFlatpakScopes`. |
+| 7 | **Expectations and incomplete coverage cannot read as a pass.** | `TestUnmetExpectationsUseSeverityAndUngradedPackageNamesCanSatisfy`, `TestCoverageGapsYieldUnknownWhenTheyBlockAnUnmetExpectation`, and `TestPartialCoverageDoesNotAlterAStillJudgeableCategory`. |
+| 8 | **Missing or invalid audit output stays unknown.** | `cmd/privacybit/audit_test.go`, `plugins/privacy/snapshot_test.go`, and `TestPrivacySnapshotReaderTreatsMissingPluginStateAsUnavailable`. |
+| 9 | **Findings preserve grade evidence and omit unsupported actions.** | `TestBuildFindingsIncludesNonGreenEntriesAndTierThreeAlternatives`, `TestBuildFindingsUsesJudgedExpectationSeverityAndOmitsUnknowns`, and `TestBuildFindingsReportsKnownFlatpakCopiesAtBothScopesWithoutRegrading`. |
+| 10 | **The host accepts only bounded, valid schema-1 state and treats old/future reports as unrated.** | `TestPrivacySnapshotReader...` and `TestPrivacyPageDowngradesStaleSnapshotToUnrated` in `internal/shell/controlcenter_test.go`. |
+| 11 | **The privacy panel preserves capture rows and reports grades, VPN state, findings, and coverage.** | `TestPrivacyPageKeepsCaptureRowsAndShowsUnavailableAudit`, `TestPrivacyGradePresentationUsesWordsAndThemeTones`, and `TestPrivacyPageRendersSnapshotTotalsAndCoverageLimits`. |
+| 12 | **Opening a stored report does not silently replace it with a fresh scan.** | `TestStoredSnapshotOpensWithoutScanningAndRefreshesOnRequest` in `internal/tui/model_test.go`; `Init` returns no scan command when a snapshot is present. |
 
-Run from `/home/nomadx/privacy-bit`:
-
-```console
-go build ./... && go vet ./... && gofmt -l ./internal ./cmd && go test ./...
-```
-
-All four must be clean. **Verify with a build, do not trust this document** —
-see §10.3 item 4 for a claim in a previous handover that was wrong because
-nobody ran a build.
+§11 records the latest gate results. Earlier phase checkpoints are historical;
+use the current results when judging the tree.
 
 ---
 
@@ -482,7 +599,7 @@ places the project is wrong, and each was chosen deliberately.
 | 9.5 | **The 0–100 score is not a quality measure.** | Only meaningful against the user's own past self. The UI must say so. |
 | 9.6 | **The panel performs no privileged operation in v1.** | Panel is a viewer, TUI is the operator. *"A control centre that can remove software with one click is a bad control centre."* D4's review token exists to make that impossible, not merely hard. |
 | 9.7 | **The daemon is a user daemon, not root.** | A root daemon's "current user" is `/root`, breaking per-user scoping on multi-user machines. All unattended work is user-scoped. moonbit needs root at 3am only for `pacman -Rns`, which is Class C here — so the direction rule applies to scheduling too. |
-| 9.8 | **⚠️ VPN monitoring was cut; the point-in-time VPN checks were NOT.** | **This reading has never been explicitly confirmed with the user.** They cut *monitoring* (continuous watching) and separately cut per-app network history ("that should be managed at the firewall level"). D1 §7's point-in-time checks were their original request. **Whoever builds this must ask before assuming.** |
+| 9.8 | **VPN monitoring was cut; point-in-time VPN checks remain in scope.** | On 2026-10-20 the owner directed completion of all remaining phases. Implement D1 §7's route, DNS and IPv6 checks. Continuous monitoring and per-app network history stay cut. |
 
 ### Ideas deliberately rejected — do not re-propose these
 
@@ -501,38 +618,35 @@ two do not collide.)
 | `install-entry` as a helper verb | Violates I4. |
 | A pacman `PostInstall` hook for instant alerts | Runs as root and is permanent attack surface on every future package transaction, for a latency improvement. Polling ships first. |
 | A shared moonbit/privacybit library | The genuinely-shared surface is ~900 lines and every file in it needs editing on arrival (moonbit strings in `errors.go`, the lock path in `oplock.go`, unit names in `units.go`). A module would be a merge queue, not reusable code. |
-| An `nix` source that fits the package-manager model | Nix has derivations in a store, not packages. It wants its own source type and is deferred (§10.1 item 5). |
+| An `nix` source that fits the package-manager model | Nix has derivations in a store, not packages. It wants its own source type and is deferred in D6 §12. |
 
 ---
 
 ## 10. Known defects and gaps
 
-### 10.1 Missing work, in priority order
+### 10.1 Work outside the implemented phases
 
-| Priority | Item | Why |
-|---|---|---|
-| 1 | **`internal/audit/` — the grader. Does not exist.** | The heart of the project. Without it nothing is graded; the tool is a catalogue browser. |
-| 2 | **`cmd/privacybit` has no test file.** | Three real bugs were found by *hand-running* the CLI and all three belong in tests. |
-| 3 | **`internal/report/` — shared grade rendering.** | Duplicated between `list.go` and `explain.go`. D3 and D5 both need one implementation. |
-| 4 | **No `audit` command.** | D2 specifies the full NDJSON contract; only `list`, `explain` and `catalog validate` exist. |
-| 5 | **dnf / zypper / apk / xbps / nix backends.** | Not a blocker — D6 deliberately made backends additive behind an interface that already exists. An unsupported distro still audits via the universal sources, with honest coverage. |
-| 6 | **`internal/network/` — VPN checks.** | Point-in-time only. **Ask first — see §9.8.** |
-| 7 | **D3 TUI, D4 helper, D7 daemon, D5 plugin.** | In that order. |
-| 8 | **`internal/render/` — per-distro command rendering.** | Currently a function in `explain.go`; it will also be needed by the tier-3 "print the command" action in D4. |
+| Item | State |
+|---|---|
+| Live Niri verification of the Control Centre page | Passed on 2026-10-22 after deploying sysc-shell revision `9f05fcc8`. The panel rendered on `DP-3`, the plugin published a current snapshot, and the capture rows remained visible. The live screenshot is local-only at `/home/nomadx/.cache/privacybit-live-20261022.png` because it includes real machine inventory. |
+| Live telemetry endpoint attribution | Deferred by D7 §5.2: no reviewed endpoint dataset or reliable PID attribution. Snapshots report this signal as unknown. |
+| Effective Flatpak permissions by installation scope | Deferred. Current detector reads declared permissions, so the grader leaves sandbox posture unmeasured. |
+| dnf, zypper, apk, and xbps backends | Deferred under D6; universal sources report what they can see, with coverage caveats. |
+| Nix and Snap package-manager sources | Deferred under D6 because their models do not fit the package-manager interface. |
+| Licence | `LICENSE`, README, `PKGBUILD`, and `.SRCINFO` use GPL-3.0-or-later. The full licence text matches `/usr/share/licenses/spdx/GPL-3.0-or-later.txt`. The checked sysc-shell tree remains BSD-3-Clause and sysc-plugins remains MIT; neither was changed. |
+| Panel scans and report actions | Implemented as the approved host-owned action in Phase 12. It runs the current user's `privacybit scan` and reads the bounded saved report; it does not invoke plugin actions or privileged operations. |
+| sysc-plugins store entry | Publisher and synthetic screenshot are committed locally, linked, enabled, and live-verified. `catalog.json` has no `org.sysc.privacy` entry or release assets, so users cannot install it from the store yet. |
+| Release and AUR package | `PKGBUILD` and `.SRCINFO` are prepared for `v0.1.0`; metadata matches. The local tag is not published, so the public source fetch and AUR publication remain. |
 
-### 10.2 Three places the design documents were wrong
+### 10.2 Design corrections and open conflicts
 
 Recorded because a future reader will trust the docs.
 
-1. **D1 §8.1 claimed plugin/v1 has no amber/warning tone. It does.**
-   `/home/nomadx/sysc-shell/.worktrees/sysc-1307-privacy-20261019/internal/ui/tree.go`
-   lines 578–589 have defined `ToneActivity` for some time, documented as *"a
-   reading past its activity threshold but short of critical"*, painting the
-   theme's **Tertiary** role. Already live at `controlcenter_monitor.go:184`,
-   `popout_process.go:204`, and `monitorscale_test.go:18-22` — the latter
-   asserting exactly the normal→activity→error progression privacybit grades
-   want. **Only the wire is missing**: two edits in `plugin/v1/node.go` plus one
-   conversion case. D1 §8.1 and §12 have been amended.
+1. **D5 proposed a duplicate wire tone.** The old privacy worktree was based on
+   sysc-shell before `plugin/v1.ToneWarning` landed. Current `origin/main`
+   accepts `warning` at protocol minor 18 and maps it to `ui.ToneActivity`.
+   The clean integration reuses that value; it does not add `activity` or bump
+   the protocol. D1 §8.1, D3, D5, and this handover record the correction.
 
 2. **D1 §2.1 said the plugin would import the module. It shells out.** The
    engine lives under `internal/`, and Go forbids cross-module import of
@@ -545,7 +659,35 @@ Recorded because a future reader will trust the docs.
    for why HTTP was dropped entirely. `serve` and `panel` also belong to phase
    9 with the scheduler, not to the CLI.
 
-### 10.3 Five bugs in the implementation worth knowing about
+4. **D6 §3.2 previously excluded `Contradicted` evidence from grades.** That
+   conflicted with D1's catalogue/package metadata cross-check and D6 §11's
+   explicit requirement that contradicted evidence may worsen a grade. The
+   owner confirmed that a measured contradiction may worsen an entry's grade.
+   D6 §3.2 and invariant I2 now state this; unavailable and unset signals still
+   cannot affect grades.
+
+5. **D1, D2 and D5 previously did not define category or overall grade
+   aggregation.** The owner chose worst-evidence roll-up. D1 §3.7 now states
+   the rule and D1/D2/D5 examples agree: a red category makes the overall red;
+   unknown category grades propagate to overall.
+
+6. **D7's Class B list included machine-wide systemd changes.** Class B is
+   user-scoped and the daemon runs as a user; D4 already places `set-unit`
+   behind the root helper. D7 now keeps system-wide unit changes out of
+   unattended work and leaves them as attended helper actions.
+
+7. **D4's `report-root` crossed D1's current-user boundary.** Running as root
+   exposes other users' processes and `/proc` entries. The verb is now deferred
+   from v1; any wider audit needs a separate owner decision.
+
+8. **D5's original viewer-only host boundary was revised.** Protocol v1 has
+   `input.event` for plugin-owned views, but the privacy plugin is state-only
+   and the native Control Centre does not route actions to it. The user
+   approved a host-owned read-only `Run scan` action instead: it runs
+   `privacybit scan` as the current user and reads the private bounded report.
+   The plugin protocol remains unchanged; D5 §6.5 records the revised design.
+
+### 10.3 Implementation defects and corrections
 
 1. **`Load` originally panicked on a malformed shipped file.** With ten
    hand-authored files, the first panic killed the test binary and hid the other
@@ -555,9 +697,9 @@ Recorded because a future reader will trust the docs.
 2. **`any_of` was validated as entry ids only.** 21 validation failures. This
    produced a genuine design correction (§8 item 5), not just a data fix.
 
-3. **Grade rendering diverged.** `explain`'s header used `Grade.Glyph()`
-   directly while the list below it used `gradeCell` — two renderings of one
-   grade on one screen.
+3. **Grade rendering diverged.** `explain`'s header and alternatives list once
+   rendered the same grade through different paths. The console views now share
+   `gradeCell`; JSON keeps the separate glyph and word fields required by D2.
 
 4. **`Observation.Branch` and `Permissive` were set by `flatpak.go` but had
    never been added to the struct.** The build was broken for several turns and
@@ -569,6 +711,39 @@ Recorded because a future reader will trust the docs.
    field did not exist. A rule that lives in a comment is a rule that gets
    forgotten the day someone refactors the caller. It is a real field now, with
    a zero value of `false` so a source that forgets to set it is conservative.
+
+6. **Flatpak permission inspection does not meet D1 §6.4.** `PermissionsFor`
+   calls `flatpak info --show-permissions`, which reports declared metadata,
+   and stores the result by application id without installation scope. It does
+   not inspect scope-specific overrides. Do not grade sandbox posture from this
+   field until effective-permission semantics are implemented and tested.
+
+7. **Pacman previously dropped a matched package when `pacman -Qi` failed.** It
+   now retains the package with enrichment facts marked unavailable.
+
+8. **User catalogue overrides previously lost the shipped grade in the
+   effective entry.** `CatalogueGrade` is now preserved across overrides and
+   shown separately.
+
+9. **Catalogue revisions previously ignored most effective fragment changes.**
+   They now hash the effective catalogue data, not only shipped entry ids and
+   grades plus a fragment count.
+
+10. **Malformed trailing YAML was accepted after the first document.** Parsing
+    now rejects malformed trailing content instead of treating it as EOF.
+
+11. **Opening `privacybit report` unexpectedly started another scan.** The
+    model's `Init` always ran its scan command, including when opened with a
+    stored snapshot. The scan replaced the report before the user could review
+    it, contrary to D3. `Init` now skips scanning when a snapshot is present;
+    `TestStoredSnapshotOpensWithoutScanningAndRefreshesOnRequest` exercises the
+    initialization hook as well as the explicit refresh path.
+
+12. **The Control Centre scan action used an icon outside the embedded subset.**
+    The full page-layout test caught `refresh` as unsupported. The button now
+    uses the existing `restart_alt` Material symbol, and the full shell package
+    test passes. Scan failure copy now points to CLI diagnostics without
+    assuming every failure means the executable is missing.
 
 ### 10.4 Environment traps
 
@@ -586,43 +761,44 @@ Recorded because a future reader will trust the docs.
   phantom applications.
 - **Test fixtures need real tabs.** `"${Package}\\t"` in Go source is a literal
   backslash-t and will not match the tab in the actual command line.
+- **Go 1.26 uses `GOTMPDIR` for `t.TempDir()`.** Keep build files in the
+  required cache path, then run test binaries with a short `GOTMPDIR` through
+  `go test -exec` so Unix socket fixtures stay below Linux's path limit.
+- **`go mod tidy -diff` is not currently an offline check.** The local module
+  cache lacks transitive `golang.org/x/exp/maps` and `slices` test packages.
+  Bubble Tea and Lipgloss are direct dependencies; do not run tidy with network
+  access merely to rewrite the module files.
 - **`resolvectl` is in `foreign` mode on this machine** — Tailscale MagicDNS
   owns `/etc/resolv.conf`. Any future DNS work must account for that.
 - **moonbit's working tree is 132 commits behind `origin/main`.**
 
 ---
 
-## 11. Remaining phases, in order
+## 11. Verification and remaining gate
 
-D1 §15 defines eleven phases. Phases 1–2 are done. The order of phases 2 and 3
-was **deliberately changed** so detection precedes grading: invariant I2 must
-exist before the first grade is computed. Retrofitting it means auditing every
-signal already emitted.
-
-| Phase | Deliverable | Depends on |
+| Repository | Automated checks | Result |
 |---|---|---|
-| 3 | **Grading** — match observations to catalogue entries, compute category grades | needs `internal/audit/` |
-| 4 | **Findings and actions**, tiers 0–3 | phase 3 |
-| 5 | **Network and VPN checks** | **Ask first — §9.8** |
-| 6 | **CLI completion** — `audit`, `--json`, exit codes | phases 3–5 |
-| 7 | **TUI** (D3) | `internal/report/` extracted |
-| 8 | **Root helper** (D4) | phase 4 actions |
-| 9 | **Daemon and timer** (D7) | phase 4 |
-| 10 | **sysc-shell plugin** (D5) | `audit` binary exists |
-| 11 | **Host wiring** — `activity` tone, `ccPrivacy` second card | phase 10 |
+| privacybit | Formatting, `go build -p 2 ./...`, `go vet -p 2 ./...`, `go test -count=1 -p 2 -exec='env GOTMPDIR=/run/user/1000/ss' ./...`, GPL text comparison, and generated `.SRCINFO` comparison | Pass on 2026-10-22. The suite includes scan/report, report-lock, and installer tests. The installer also completed an isolated-HOME TUI build/install using the no-background option. |
+| sysc-plugins | Privacy tests and race tests, focused vet, plugin build, `make validate catalog-validate thumbnails`, and gofmt check | Pass on 2026-10-22. The privacy screenshot and generated thumbnail match; `catalog.json` still has no privacy release entry. |
+| sysc-shell worktree | Full formatting check, `go build -p 2 ./...`, `go vet -p 2 ./...`, and normal tests for `plugin/v1`, `internal/plugin`, and all of `internal/shell`; dependency diff | Pass after merging the deployed launcher fix. `go.mod` and `go.sum` are unchanged. The live Privacy page displayed the capture card and a current audit snapshot without horizontal clipping. |
 
-**Two items can be built today, before the engine exists:**
+The live review's evidence is also recorded in sysc-shell issue `sysc-1444`.
+The primary checkout's Beads export has independent changes; inspect it before
+exporting any tracker update. The deployed screenshot remains in the local
+cache and is not part of the plugin's synthetic catalog screenshot.
 
-1. The **`activity` tone wire** in
-   `/home/nomadx/sysc-shell/.worktrees/sysc-1307-privacy-20261019/plugin/v1/node.go`
-   — completely independent of privacybit. Append to `knownTones`, add one
-   conversion case. Remember: append, never insert (§10.4).
-2. **`ccPrivacySnapshotFor` plus the second card** in
-   `…/internal/shell/controlcenter_pages.go`, tested against a hand-written
-   JSON fixture. This is the only part of the project whose user-visible outcome
-   is testable before the grader exists. Mirror `ccCalendarSnapshotFor`
-   (lines 539–576) exactly: absent plugin, absent key, or malformed JSON all
-   return `nil` and the page renders anyway.
+The environment guard blocked `go test -race ./...` because the repository-wide
+race run has repeatedly hard-locked this zram-only machine. Race checks were
+run sequentially for `plugin/v1`, `internal/plugin`, and `internal/shell`; all
+three passed.
+
+Privacybit Go commands use `GOTMPDIR=/home/nomadx/.cache/privacybit-gotmp`; the
+sysc-shell worktree uses `GOTMPDIR=/home/nomadx/.cache/sysc-shell-gotmp`. The
+repositories use `GOMAXPROCS=4` and `-p 2` for repository-wide work. Go 1.26 also uses
+`GOTMPDIR` for `t.TempDir()`; the long build paths exceed Linux's Unix socket
+limit in shell tests. Test commands therefore use
+`-exec='env GOTMPDIR=/tmp/pbt'` for test processes while the Go tool keeps build
+files in the cache directory.
 
 ---
 
@@ -635,9 +811,10 @@ noticed.
   analytics, no version ping.
 - **Audit output is gitignored.** It fingerprints exactly what someone runs.
   The `.gitignore` ships with the rationale inline so nobody adds it back.
-- **No reading outside the user's own scope.** No other users' processes, no
-  keys, and no browser profile *contents* beyond the specific preference keys a
-  grade depends on.
+- **The default audit does not read outside the invoking user's scope.** No
+  other users' processes, keys, or browser profile contents beyond the specific
+  preference keys a grade depends on. D4's `report-root` is deferred; do not
+  add a wider audit without a separate owner decision.
 - **Secret hygiene in the sudo path** follows moonbit exactly: the password
   never enters the helper's address space as a retained value, and
   `defer clear(password)` runs before any error return.

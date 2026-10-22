@@ -1,7 +1,7 @@
 # privacybit — TUI design
 
 **Date:** 2026-10-20
-**Status:** approved in dialogue, pre-implementation
+**Status:** approved; implementation audited 2026-10-20
 **Depends on:** [D1 engine](2026-10-20-privacybit-design.md),
 [D2 CLI](2026-10-20-privacybit-cli-design.md),
 [D4 helper](2026-10-20-privacybit-helper-design.md)
@@ -10,11 +10,11 @@
 
 ## 1. Scope
 
-`privacybit tui`. A full-screen terminal interface for reading an audit,
-navigating it, and acting on it.
+`privacybit tui` and `privacybit report`. A full-screen terminal interface for
+reading an audit, navigating it, and delegating the attended purge flow.
 
-In scope: screens, navigation, keybindings, grade rendering, live refresh, the
-purge review flow, and the root-helper auth state machine.
+In scope: screens, navigation, keybindings, grade rendering, opening a stored
+snapshot, fresh-scan refresh, and delegation of attended purge review to the CLI.
 
 Out of scope: the engine (D1), the machine-readable contract (D2), the helper's
 security model (D4), and the sysc-shell panel (D5).
@@ -35,12 +35,10 @@ screens. These parts transfer:
 | `tea.NewProgram(m, tea.WithAltScreen())` | Correct for a full-screen inspector. |
 | `runXCmd` → `xCompleteMsg` message pattern | Clean command/message separation; no blocking work in `Update`. |
 | `borderedPanel(content, borderColor, width)` | The layout primitive. Useful as-is. |
-| `overlayCenter(bg, fg, width)` | Modal overlays for plan review and auth. |
 | `interpolateColor` / `parseHexColor` | Animated grade transitions, for free. |
 | `isShiftX(msg)` | Key-variant helper. |
 | `colors.go` palette shape | Named role variables, not inline colours. |
 | `partialScanWarning(failures)` | Partial-failure disclosure, which privacybit needs more than moonbit does. |
-| `tick()` / `tickMsg` | The periodic-refresh skeleton. |
 | The `ui_test.go` method | See §11. |
 
 Three things do **not** transfer, and each one forces a different architecture
@@ -116,28 +114,23 @@ const (
     ScreenFinding   Screen = "finding"
     ScreenNetwork   Screen = "network"
     ScreenCoverage  Screen = "coverage"
-    ScreenAuth      Screen = "auth"
-    ScreenPlan      Screen = "plan"
-    ScreenConfirm   Screen = "confirm"
-    ScreenComplete  Screen = "complete"
+    ScreenFindings  Screen = "findings"
+    ScreenUnmatched Screen = "unmatched"
     ScreenHelp      Screen = "help"
 )
 ```
 
 | Screen | Shows |
 |---|---|
-| `Overview` | Overall grade, score, counts per grade, the achievable wins, and the highest-severity findings. Answers "what should I do?" first. |
-| `Scanning` | Progress per detection source, accumulating **coverage** as each completes. |
+| `Overview` | Overall grade, score, finding count, and routes into categories, network, coverage, and unmatched apps. |
+| `Scanning` | Initial scan or refresh status. |
 | `Categories` | Every category with its grade. The main index. |
 | `Category` | One category: installed apps with grades, expectations met, expectations missing. |
-| `App` | One app: why this grade, which sources detected it, caveats, channel/maturity, and its alternatives. |
-| `Finding` | One finding: the evidence, the severity, and the actions available at each tier. |
-| `Network` | VPN state and defects, plus live telemetry connections. |
+| `App` | One app: grade, sources, scope, reasons, and caveats. |
+| `Findings` / `Finding` | The bounded finding list and one finding's evidence and instructions. |
+| `Unmatched` | Installed applications absent from the catalogue, shown as unknown. |
+| `Network` | Point-in-time VPN state and defects; live telemetry attribution is unavailable. |
 | `Coverage` | What was scanned, what was not, what was truncated, and every `unknown` in the result. |
-| `Auth` | Root helper state — prompting, failed, cancelled. Never shows the password. |
-| `Plan` | A purge plan: exact removal set, reverse dependencies, reclaim, expiry. D4 §7. |
-| `Confirm` | Generic two-phase confirm. |
-| `Complete` | The outcome of an action. |
 | `Help` | Keybindings and the grade legend. |
 
 `Overview` is the default landing screen, not a menu. A menu would make the user
@@ -169,8 +162,8 @@ func (g Grade) Style(profile termenv.Profile) Render
 type Render struct { Colour termenv.Color; Glyph, ASCII, Word string }
 ```
 
-The TUI calls `grade.Style(profile)`. So does the CLI. So will the panel, once
-D5 has the `warning` tone that D1 §8.1 identified as missing from plugin/v1.
+The TUI and CLI use `internal/report`'s shared rendering. The sysc-shell panel
+uses the existing `warning` wire tone, which the host maps to `ToneActivity`.
 
 `lipgloss.SetColorProfile(termenv.Ascii)` in tests makes every golden render
 deterministic.
@@ -180,105 +173,46 @@ deterministic.
 | Key | Action |
 |---|---|
 | `↑` `↓` / `k` `j` | Move selection |
-| `g` `G` | Top / bottom |
 | `Enter` | Descend (push) |
 | `Esc` / `←` / `h` | Back (pop) |
 | `/` | Filter visible rows |
-| `e` | Explain the selected entry — why this grade, with sources |
-| `a` | Actions for the selection |
-| `d` | Dismiss the selected finding (tier 1) |
-| `p` | Plan a purge for the selected app |
+| `p` | Open `privacybit purge <entry-id>` for a red catalogue entry |
 | `n` | Network screen |
 | `c` | Coverage screen |
-| `w` | Toggle live refresh |
 | `r` | Re-run the audit |
 | `?` | Help |
 | `q` | Quit, or pop if the stack is not at root |
 
-`e` is deliberate and load-bearing. D1 §5.4 says the catalogue encodes
-opinions, and D1 §14 repeats it. A TUI that states a grade without offering the
-reasoning immediately is making an unfalsifiable claim. One keypress must turn
-any grade into its evidence.
+The app and finding detail screens display grade evidence and available tier
+0/3 instructions. Tier 1 dismissal and tier 2 settings are not exposed until
+their storage and handlers exist.
 
-`d` maps to tier 1 in D1 §9.1. Dismissal must be cheap and must not be buried,
-because an audit that cannot be argued with is an audit that gets deleted.
+## 7. Snapshot and refresh
 
-## 7. The audit is a document; the fast poll is a liveness overlay
+The TUI holds one audit snapshot. `privacybit tui` scans at startup; `privacybit
+report` opens the saved snapshot without scanning. In either case, `r` starts a
+fresh audit and replaces the snapshot when it completes. Scheduled scans write
+the saved snapshot and mark it unread; opening the report clears that marker
+after the TUI exits successfully. Live telemetry attribution is not implemented
+and renders as unavailable, never as an empty connection list.
 
-D1 §6.2 split the scan into a slow tier (package inventory, catalogue matching)
-and a fast tier (network, VPN, sandbox posture). They have different cadences
-and different costs, and the TUI must not blur them.
+## 8. Attended purge entry point
 
-```go
-type Model struct {
-    audit   *report.Snapshot  // the slow document; changes only on re-run
-    live    *report.Live      // the fast overlay; refreshed by tick
-}
-```
-
-`renderNetwork` composes both: the VPN verdict comes from `audit`, but the
-telemetry connection list and the "connected 40s ago" stamp come from `live` and
-carry a "as of" timestamp.
-
-The tick is moonbit's `tickMsg`, with one change: privacybit's tick refreshes
-`live` only, and never re-runs the slow scan. Re-running is an explicit `r`.
-That keeps a long-lived TUI from turning into a background scanner.
-
-When `live` is unavailable — the flatpak network-visibility case in D1 §6.4,
-where an unshared network namespace hides connections — the network screen
-renders **`unavailable`**, never "no telemetry found". That distinction is the
-single most important one in this screen, because conflating them is the
-under-grade arriving through the UI.
-
-## 8. Auth and the root helper
-
-D4 owns the security model. The TUI's job is to drive it without touching a
-password.
-
-The sudo machinery in `plugins/moonbit/runner.go` becomes a reusable
-`internal/runner` package in privacybit — the same code, minus the plugin
-coupling. The TUI holds a `*runner.Handle` and reacts to events:
-
-```
-Idle → Start → WaitingForReady → AuthPrompting → Ready → Running → Done
-                    ↓                  ↓
-                 Timeout         WrongPassword (2nd prompt)
-```
-
-Two rules, both from moonbit's runner and both load-bearing:
-
-- **The TUI never handles the password.** `runner` writes it to sudo's stdin and
-  `clear`s it. No `tea.Model` field ever holds it, so it cannot be rendered,
-  logged, or copied into a snapshot.
-- **A second password prompt means failure, not a retry.** moonbit detects a
-  wrong password by sudo asking twice rather than by parsing its complaint,
-  which survives localisation and every sudo message variant. Replicated exactly.
-
-`ScreenAuth` shows *that* authentication is happening and what it is for. It
-never echoes, masks, or holds the password. It is a status screen, not an input
-screen — because a TUI that owns a password field is a TUI that can leak it.
-
-Cancelling uses moonbit's sequence exactly: `SIGALRM` to sudo, wait out its
-`terminate_command`, then `SIGKILL` to the process group. Signalling sudo with
-something it does not handle aborts its cleanup and orphans a root child.
+The TUI does not own sudo, a password, a helper protocol, or a purge-plan
+screen. Pressing `p` on a red catalogue app starts the sibling CLI as
+`privacybit purge <entry-id>` and cedes the terminal to it. The CLI prints the
+complete plan, asks for the exact entry id on the controlling terminal, and
+starts the helper only after confirmation. The helper enforces the single-use
+review token independently. When the CLI exits, the TUI runs a fresh audit.
 
 ## 9. Purge review
 
-D4 §7 requires a token before `purge-entry`, and binds it to the entry, the plan
-hash, the audit's `generated_at`, and an expiry. The TUI implements that shape:
-
-1. `p` on a red app → `plan-purge` → `ScreenPlan`.
-2. `ScreenPlan` renders the removal set, each package's reverse dependencies, the
-   reclaim, and the token's expiry — all of it, not a summary of it.
-3. `Enter` → `ScreenConfirm` → `purge-entry` with the token.
-
-**The confirm here is a courtesy. D4 §7.2 is the control.** A `purge-entry`
-without a valid token is refused by the helper regardless of what the UI did,
-because D5's `privacybit:run-action` path bypasses this TUI entirely. The TUI
-must not be written as though its confirm were load-bearing.
-
-`ScreenPlan` is modal and cannot be dismissed by a stray keypress, following
-moonbit's file-preview pattern (`TestFilePreviewPopupIsModal`).
+The CLI implements D4's review flow: it shows the exact package removal set,
+reverse dependencies, reclaim estimate, and expiry, then requires the exact
+entry id on the controlling terminal. It sends no purge request when
+confirmation is canceled or mismatched. The helper checks its in-memory token
+and recomputed plan before mutation. The TUI delegates to this flow and never
+treats its own UI as the authorization boundary.
 
 ## 10. Coverage, truncation, and `unknown`
 
@@ -290,9 +224,9 @@ empty category. It renders as `unavailable`, with the reason. D1 §6.4's
 whole interface, not just one screen.
 
 **Truncation.** D2 requires `installed_truncated` and `installed_total` on every
-bounded list. The TUI renders `showing 20 of 63` rather than silently showing
-twenty, because "you have four browsers" and "I showed you four" are different
-claims and the user cannot tell them apart otherwise.
+bounded list. The TUI renders `showing 100 of 163` rather than silently showing
+one hundred, because "you have four browsers" and "I showed you four" are
+different claims and the user cannot tell them apart otherwise.
 
 **Unrated apps.** An installed app absent from the catalogue is `unknown` /
 `Unrated` / `?` — a distinct visual state from `green`, not a greyed-out
@@ -309,19 +243,16 @@ moonbit's `internal/ui/ui_test.go` is 866 lines and 42 tests, and the method is
 the house standard: drive `Update` with synthetic messages, assert on model
 state and on `View` strings. No PTY, no terminal emulator.
 
-Matched, plus three additions privacybit needs:
+The focused checks cover:
 
 | Property | Method |
 |---|---|
-| Navigation stack | Push, pop, push, pop; state at each depth is correct and scroll offsets are restored. |
-| **Rendering is pure** | `TestRenderDoesNotAudit` — `View()` on a model with no audit must not touch a detection source. moonbit's `TestScheduleRenderDoesNotRunSystemctl` is the precedent; this is the stronger version. |
-| Grade rendering is shared | Assert the CLI and the TUI produce the same colour, glyph and word for every grade. This is the test that stops the two front ends drifting. |
-| ASCII fallback | Force `termenv.Ascii`; assert every grade still renders a glyph and a word. |
-| Coverage states render | `unavailable`, `truncated`, `unknown` each have a golden render. |
-| Live overlay does not rescan | A tick updates `live` and leaves `audit` pointer-identical. |
-| Auth never holds a password | Struct-field reflection asserts no `string`/`[]byte` field on any model type ever contains one; and a test drives two prompts to `WrongPassword`. |
-| Cancel orphans nothing | Cancel mid-privileged-op; assert no surviving process in the group. |
-| Plan is modal and complete | `ScreenPlan` cannot be popped by a stray key, and contains every package in the removal set. |
+| Navigation | `TestNavigationPushAndPopPreserveParentSelection` checks stack behavior. |
+| Stored report | `TestStoredSnapshotOpensWithoutScanningAndRefreshesOnRequest` checks stored startup and explicit refresh. |
+| **Rendering is pure** | `TestViewDoesNotRunScan` verifies `View()` does not touch a detection source. |
+| Coverage states render | `TestUnknownAndCoverageRenderAsExplicitStates` checks unavailable, unknown, and reduced coverage output. |
+| Flatpak scope is retained | `TestAppRouteKeepsFlatpakScope` checks duplicate installation scopes remain addressable. |
+| Purge delegates narrowly | `TestPurgeKeyLaunchesHelperFlowOnlyForRedCatalogueApps` checks only a known red app invokes the CLI flow. |
 
 The purity test matters more than it looks. A `View()` that shells out is a
 `View()` that runs on every keystroke, and in a TUI wired to a root helper that
@@ -330,9 +261,10 @@ is a very bad afternoon.
 ## 12. Package layout
 
 ```
-internal/ui/          Bubble Tea model, screens, keybindings, layout
-internal/runner/      sudo machinery (moonbit's runner.go, de-pluginised)
-internal/report/      snapshot types + the shared grade rendering contract
+internal/tui/         Bubble Tea model, screens, keybindings, layout
+internal/runner/      bounded helper process session and shutdown
+internal/helper/      strict privileged protocol and mutation boundary
+internal/report/      snapshot types, storage, and shared grade rendering
 ```
 
 `internal/runner` is the addition this design makes to the earlier plan. It was
@@ -346,18 +278,6 @@ and D5 all read from it. If it lived in the TUI, D5 would reimplement it.
 
 ## 13. Open questions
 
-1. **Is a full-screen alt-screen TUI right, or should this be an inline
-   pager-style view?** moonbit uses `WithAltScreen`, which is right for a tool
-   you sit inside. privacybit might be a tool you run once and read once, where
-   taking over the terminal is heavier than the content deserves. Worth
-   deciding before 2,500 lines get written against the wrong interaction shape.
-2. **Should the filter (`/`) be fuzzy or substring?** Substring is predictable
-   and testable; fuzzy is friendlier across sixty catalogue ids. Deferred until
-   it is felt to matter.
-3. **Does dismissing a finding need a reason?** D1 §9.1 stores the reason.
-   Prompting for one on every dismissal is friction; storing an empty one makes
-   the record less useful. Probably optional with a default.
-4. **How much of D4's root flow belongs in the TUI at all?** If most privileged
-   actions are rare and consequential, a well-worded command line may be the
-   better interface and the TUI may link to it. The `ScreenPlan` work is
-   reusable either way.
+1. **Should the filter (`/`) be fuzzy or substring?** The current implementation
+   uses case-insensitive substring matching. Revisit only if users find it
+   insufficient.

@@ -5,8 +5,10 @@ import (
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -72,7 +74,6 @@ func Load(opts LoadOptions) (*Set, error) {
 	}
 
 	if opts.UserFragments {
-		s.fragments++
 		dir := opts.Dir
 		if dir == "" {
 			dir, err = UserFragmentDir()
@@ -85,7 +86,10 @@ func Load(opts LoadOptions) (*Set, error) {
 		}
 	}
 
-	s.Revision = s.revision(shipped)
+	s.Revision, err = s.revision()
+	if err != nil {
+		return nil, err
+	}
 	if err := s.validate(); err != nil {
 		return nil, err
 	}
@@ -137,8 +141,10 @@ func parse(raw []byte, name string) (file, error) {
 		return f, fmt.Errorf("%s: %w", name, err)
 	}
 	var extra any
-	if err := dec.Decode(&extra); !errors.Is(err, fs.ErrClosed) && err == nil {
+	if err := dec.Decode(&extra); err == nil {
 		return f, fmt.Errorf("%s: file must contain exactly one document", name)
+	} else if !errors.Is(err, io.EOF) {
+		return f, fmt.Errorf("%s: invalid trailing YAML: %w", name, err)
 	}
 	if f.Category.ID == "" {
 		return f, fmt.Errorf("%s: category id is required", name)
@@ -172,6 +178,7 @@ func (s *Set) mergeFragments(dir string) error {
 		if err != nil {
 			return err
 		}
+		s.fragments++
 		cat := s.Category(f.Category.ID)
 		if cat == nil {
 			c := f.Category
@@ -201,6 +208,12 @@ func (s *Set) mergeFragments(dir string) error {
 			e := f.Category.Entries[i]
 			e.Category = cat.ID
 			if at := indexOfEntry(cat, e.ID); at >= 0 {
+				previous := cat.Entries[at]
+				if previous.Overridden {
+					e.CatalogueGrade = previous.CatalogueGrade
+				} else {
+					e.CatalogueGrade = previous.Grade
+				}
 				e.Overridden = true
 				cat.Entries[at] = e
 				continue
@@ -220,26 +233,21 @@ func indexOfEntry(c *Category, id string) int {
 	return -1
 }
 
-// revision fingerprints the shipped table plus the number of fragments applied,
-// so a stored snapshot can be traced to the table that produced it (D2 §5).
-func (s *Set) revision(shipped []*Category) string {
-	h := sha256.New()
-	for _, c := range shipped {
-		fmt.Fprintf(h, "%s\x00", c.ID)
-		for i := range c.Entries {
-			e := &c.Entries[i]
-			fmt.Fprintf(h, "%s\x00%s\x00", e.ID, e.Grade)
-		}
+// revision fingerprints the effective catalogue so a stored snapshot can be
+// traced to every grade, match rule and explanation that produced it (D2 §5).
+func (s *Set) revision() (string, error) {
+	effective, err := json.Marshal(s.Categories)
+	if err != nil {
+		return "", fmt.Errorf("encode effective catalogue revision: %w", err)
 	}
-	sum := hex.EncodeToString(h.Sum(nil))[:12]
+	hash := sha256.Sum256(effective)
+	sum := hex.EncodeToString(hash[:])[:12]
 	var frag string
-	if n := s.fragmentCount(); n > 0 {
-		frag = fmt.Sprintf("+%d", n)
+	if s.fragments > 0 {
+		frag = fmt.Sprintf("+%d", s.fragments)
 	}
-	return "cat-" + sum + frag
+	return "cat-" + sum + frag, nil
 }
-
-func (s *Set) fragmentCount() int { return s.fragments }
 
 // index builds the lookup maps. It runs after validation, so it can assume
 // every detect string is unique and every grade is valid.
