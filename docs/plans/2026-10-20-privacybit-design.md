@@ -1,7 +1,7 @@
 # privacybit — design
 
 **Date:** 2026-10-20
-**Status:** approved in dialogue, pre-implementation
+**Status:** approved; implementation updates recorded through 2026-10-23
 **Repo:** https://github.com/Nomadcxx/privacybit
 
 ---
@@ -53,12 +53,12 @@ root helper. It does not depend on sysc-shell.
                               ▲
                               │ CLI and TUI call the engine directly
                               │
-                   sysc-plugins/plugins/privacy
-                     shells out to privacybit
-                              │
-                              │ state.set "control_center" (bounded JSON)
-                              ▼
-                    sysc-shell Control Centre → privacy panel
+                    org.sysc.privacy plugin
+                       │             │
+                       │             ├── bar widget → plugin audit panel
+                       │             └── `Scan now` → privacybit binary
+                       └── bounded state → Control Centre summary
+                                             └── `Open full audit` → plugin panel
 ```
 
 ### 2.1 Build order
@@ -66,26 +66,27 @@ root helper. It does not depend on sysc-shell.
 The dependency edge runs one way, so the order is forced:
 
 1. **privacybit** — engine, CLI, catalogue, helper. Independently useful.
-2. **plugins/privacy** — a thin sysc-shell plugin that runs the privacybit
-   binary on a tick and publishes its snapshot.
-3. **sysc-shell** — the host renders the snapshot in the existing Control Centre
-   privacy panel.
+2. **plugins/privacy** — runs the privacybit binary on a tick, publishes its
+   snapshot, and owns the bar widget and detailed audit panel.
+3. **sysc-shell** — preserves the capture activity card, renders a compact
+   snapshot summary, and routes `Open full audit` to the plugin panel.
 
 The logic lives in a project that can stand alone and can be tested without the
 shell. The CLI and TUI call the internal engine directly. The plugin shells out
 to the same CLI binary, following the existing moonbit plugin pattern.
 
-### 2.2 Why not render the panel from the plugin
+### 2.2 Why the plugin panel is separate from the Control Centre
 
-The Control Centre is entirely host-rendered: `ccPage` in
-`internal/shell/popout_controlcenter.go` is a `switch h.section` over host-side
-functions, and there is no plugin branch. plugin/v1 can publish bounded JSON
-into its own state and the host renders it natively — the calendar plugin
-(`org.sysc.calendar` → state key `control_center`) is the existing precedent.
+The Control Centre is host-rendered: `ccPage` in
+`internal/shell/popout_controlcenter.go` switches over host functions and does
+not render plugin views inside a Control Centre section. The shell can open a
+separate plugin-owned panel through the existing `panels` capability. The bar
+widget and the Control Centre's `Open full audit` action both open that panel.
 
-So the panel section stays in the host, and the plugin's only job is to produce
-data. The plugin runs the same privacybit binary as the CLI, so both surfaces
-use one audit implementation.
+The plugin also publishes bounded JSON state for the compact summary. The
+calendar plugin (`org.sysc.calendar` → state key `control_center`) is the
+existing state-publication precedent. The plugin shells out to the same
+privacybit binary as the CLI and TUI, so every surface uses one audit engine.
 
 ## 3. Rating model
 
@@ -432,7 +433,7 @@ it can and reports the *effective* posture, not the nominal one.
 
 Flatpak is not just another package source. It carries its own trust model, and
 an audit that flattens it to "is the app installed?" throws away most of what is
-worth knowing. Five things are checked.
+worth knowing. D1 specifies five checks; v1 does not implement all of them.
 
 **Effective permissions, not declared ones.** `flatpak info --show-permissions`
 reports what the app's *metadata* declares. `flatpak override` mutates what
@@ -440,6 +441,11 @@ actually happens, and overrides persist invisibly — nothing in the app listing
 shows them. There is no "list all overrides" command, so the audit enumerates
 known application ids and reads `flatpak override --show` for each. Reading
 declared permissions and reporting them as effective would be a false negative.
+
+**V1 status:** `internal/detect.Flatpak` reads declared metadata but does not
+read or merge system- and user-scope overrides. The grader leaves sandbox
+posture unmeasured; it must not treat declared permissions as effective. See
+`HANDOVER.md` §10.1 for the current coverage gap.
 
 **Installation scope, and duplicates across it.** `system` installations are
 root-owned; `user` installations are not, and for the owning user the `user`
@@ -532,22 +538,20 @@ carries **three redundant channels**:
 2. **Glyph shape** — circle / triangle / square, distinguishable in greyscale.
 3. **Word** — "Good" / "Review" / "Risky".
 
-### 8.1 Host tone
+### 8.1 Privacy grades in sysc-shell
 
-> **Corrected 2026-10-22.** `internal/ui` defines `ToneActivity`, which paints
-> the theme's Tertiary role. `plugin/v1` has accepted `ToneWarning` (`warning`)
-> since protocol minor 18, and `internal/plugin` maps that value to
-> `ui.ToneActivity`. The privacy panel uses this existing wire tone for amber.
-> The privacy plugin publishes state only, so its manifest keeps protocol minor
-> 8. It sends no view tone.
->
-> D5's first draft proposed an `activity` wire value before the warning tone
-> landed in current sysc-shell `main`. The implementation reuses `warning` and
-> makes no protocol or renderer change. `monitorscale_test.go` already asserts
-> the host's normal → activity → error progression.
+`internal/ui` defines `ToneActivity`, which paints the theme's Tertiary role.
+`plugin/v1` accepts `ToneWarning` (`warning`), and `internal/plugin` maps it to
+`ui.ToneActivity`. The privacy summary and plugin panel do not use this wire
+tone for amber; it appeared green on the laptop palette. D5 §11.2 defines the
+grade-specific theme fills, icons, and words. The plugin declares `panels` and
+`state` at protocol minor 8; no protocol or renderer change was needed.
 
-The host renders amber with its existing warning tone. The grade word remains
-visible without colour, while the theme tone gives it a second visual channel.
+The earlier D5 draft proposed an `activity` wire value. The host already had
+`warning`, so the plugin keeps the existing wire mapping for other views.
+
+The grade word remains visible without colour, and its icon and fill provide
+additional visual cues.
 
 ## 9. Actions
 
@@ -700,56 +704,59 @@ without a defensive pass.
 ```json
 {
   "schema": 1,
+  "available": true,
   "generated_at": "2026-10-20T12:00:00Z",
   "duration_ms": 412,
-  "coverage": { "package_manager": "pacman", "flatpak": true, "network": true },
-  "overall": { "grade": "red", "score": 62, "findings": 14, "high": 3 },
+  "catalog_rev": "2026.10.1",
+  "entry_point": "privacybit",
+  "overall": { "grade": "red", "score": 62, "findings": 1, "high": 1 },
   "network": {
     "vpn": {
       "state": "connected", "client": "mullvad",
       "default_route_via_tunnel": true, "dns_contained": false,
-      "ipv6_contained": false,
-      "defects": ["dns-leak", "ipv6-bypass"]
+      "ipv6_contained": true,
+      "defects": [{"id":"vpn.dns-leak", "title":"DNS leak",
+        "detail":"The configured resolver is outside the tunnel."}]
     },
-    "telemetry_connections": [
-      { "pid": 1234, "exe": "/usr/bin/chrome", "endpoint": "google-analytics.com", "class": "analytics" }
-    ]
+    "telemetry_connections_unknown": true
   },
   "categories": [
     {
       "id": "browser", "name": "Browser", "grade": "red",
       "installed": [ { "id": "chrome", "name": "Google Chrome", "grade": "red",
-                       "family": "chromium", "channel": "stable",
-                       "source": "official", "maturity": "stable",
-                       "caveats": ["Set as default browser"], "why": ["..."] } ],
-      "expectations_met": [ "librewolf" ],
-      "expectations_missing": [ "No content blocker installed" ]
+                       "family": "chromium", "scope": "system",
+                       "sources": ["pacman"], "why": ["Catalogue match"] } ],
+      "installed_shown": 1, "installed_total": 1,
+      "installed_truncated": false
     }
   ],
   "findings": [
-    { "id": "vpn.dns-leak", "severity": "high", "category": "network",
+    { "id": "vpn.dns-leak", "severity": "high", "grade": "red",
+      "category": "network",
       "title": "DNS queries are leaving the tunnel",
       "detail": "Resolver 192.168.1.1 is outside the Mullvad tunnel.",
       "alternatives": [],
       "actions": [ { "tier": 1, "kind": "acknowledge", "label": "Noted" },
                    { "tier": 3, "kind": "launch", "label": "Show fix" } ] }
-  ]
+  ],
+  "findings_total": 1, "findings_shown": 1, "findings_truncated": false,
+  "coverage": [ { "name": "pacman", "type": "package",
+                   "ready": true, "observed": 2882 } ]
 }
 ```
 
 `generated_at` is load-bearing: an audit is a point-in-time observation and a
-VPN can connect immediately afterwards. The panel shows "as of" and does not
-present stale data as current.
+VPN can connect immediately afterwards. The Control Centre summary and plugin
+panel show currentness and do not present stale data as current.
 
 ### 11.3 Plugin and host contract
 
-- Plugin runs `privacybit audit --json` on the slow tick and publishes
-  `state.set("control_center", <snapshot JSON>)`.
-- Host reads it with the exact `ccCalendarSnapshotFor` pattern: absent plugin,
-  absent key, or malformed JSON all mean "show what we have", never an error
-  page.
-- Panel actions route through `activateControlCentre` as new verbs
-  (`privacybit:refresh`, `privacybit:run-action`).
+- Plugin runs `privacybit audit --snapshot` on its five-minute tick and
+  publishes the bounded projection under state key `control_center`.
+- Host reads it with the `ccCalendarSnapshotFor` pattern. Missing or malformed
+  state becomes an explicit unavailable summary, never a clean result.
+- The bar widget and `Open full audit` route to the declared plugin panel. That
+  panel owns `Scan now`; the host does not run scans or remediation verbs.
 
 Because the plugin runs the same unprivileged binary as the CLI, **no socket
 IPC or privileged transport is involved in reading**. moonbit needs `sudo
@@ -765,25 +772,25 @@ the cache between review and action, and without the binding the operation acts
 on state the user never saw. The same hazard applies to a privacy audit whose
 findings have since changed.
 
-## 12. Host changes required in sysc-shell
+## 12. Host integration
 
-1. **`ccPrivacy` renders categories.** A second card under the existing capture
-   card, driven by the snapshot. The existing capture panel is untouched.
+1. **Compact `ccPrivacy` summary.** Show overall grade and currentness below
+   the existing capture activity card. `Open full audit` opens the plugin panel.
 2. **Snapshot reader.** `ccPrivacySnapshotFor(r *Registry)` mirroring
-   `ccCalendarSnapshotFor`.
-3. **Reuse the existing warning tone.** `plugin/v1.ToneWarning` maps to the
-   host's `ui.ToneActivity` and has been available since protocol minor 18.
-   The privacy panel uses it for amber, so this integration needs no wire or
-   renderer change. `ui.Tone` is an iota enum; any future tone must be
-   **appended**, never inserted, or every later value shifts.
-4. **Action verbs** in `activateControlCentre`.
-5. **Optional:** the bar widget badge could reflect overall grade. Deferred —
-   the widget currently reports capture state, and overloading it risks
-   conflating "something is recording" with "your setup is mediocre".
+   `ccCalendarSnapshotFor`; reject malformed or oversized state and show an
+   explicit unavailable result.
+3. **Grade treatment.** Use a visible word and theme-styled icon/fill from D5
+   §11.2. Do not use `ToneWarning` for amber because its tertiary color appeared
+   green on the laptop palette. Keep `ui.Tone` additions append-only.
+4. **Panel route.** Route `cc:privacy-open` through the existing plugin panel
+   API. The host does not launch audits or run remediation actions.
+5. **Plugin bar entry.** The user-placeable `org.sysc.privacy` bar widget shows
+   the overall grade and opens the same audit panel; it remains separate from
+   capture activity.
 
 Page budget is comfortable: the Control Centre body resolves to ~596 × 480 in
-a `KindScroll` viewport, and the existing privacy page is currently a single
-small card.
+a `KindScroll` viewport. The capture card and compact summary fit there; the
+620 × 720 plugin panel holds the detailed audit view.
 
 ## 13. Testing strategy
 
@@ -797,7 +804,7 @@ small card.
 | Helper | Fake `sudo` mimicking prompt, re-prompt, wrong password, and "not in the sudoers file"; argv-allowlist tests asserting rejection before sudo; process-group orphan tests. |
 | Snapshot bounds | Test asserting no list exceeds its cap under a synthetic 10,000-package input. |
 | No network | Assert no outbound socket is opened during any audit path. |
-| Rendering | `shelllint.Tree` against the declared panel size, so a tree that validates but refuses at render is caught in CI. |
+| Rendering | Check the compact Control Centre summary and plugin panel against their declared surfaces; exercise the plugin's scrollable view at its bounded panel size. |
 
 ## 14. Known gaps in this design
 
@@ -809,6 +816,9 @@ Recorded so they are decisions rather than surprises:
 - **Network visibility inside flatpak is degraded** and is reported as `unknown`
   rather than graded (§6.4). This is a permanent limitation, not a bug to be
   fixed later.
+- **Effective Flatpak permissions by install scope are unmeasured in v1.** The
+  detector reads declared metadata but does not merge system- and user-scope
+  overrides; the grader leaves sandbox posture unknown.
 - **Flatpak override enumeration is O(applications)** because flatpak offers no
   bulk listing command.
 - **Locale and translated metadata** are not parsed.
@@ -848,7 +858,8 @@ Each phase ends with something runnable.
 | 8 | Root helper (D4), tier 4 |
 | 9 | Scheduler, daemon, event watcher (D7) |
 | 10 | sysc-plugins `plugins/privacy` |
-| 11 | sysc-shell host wiring; amber reuses the existing warning tone |
+| 11 | sysc-shell compact summary and route to the plugin panel |
+| 12 | Plugin bar widget, detailed audit panel, read-only `Scan now`, and GPL-3.0-or-later licensing |
 
 Phase 2 was reordered ahead of phase 3 deliberately. Grading cannot be tested
 without something to grade, and D6 §3.2's three-state invariant needs the

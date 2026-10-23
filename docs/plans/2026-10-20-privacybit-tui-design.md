@@ -151,19 +151,21 @@ a monochrome terminal, and a screenshot:
 
 The ASCII fallback loses nothing semantic, because the word always renders.
 
-**This table does not live in the TUI.** It renders in three places — the CLI's
-human output, the TUI, and eventually D5's sysc-shell panel — and three
-implementations of one vocabulary is exactly how a colour that means "risky" in
-one surface and "selected" in another starts. It belongs in the engine, in
-`internal/report`, as:
+**This table does not live in the TUI.** The CLI and TUI share
+`internal/report`'s rendering. The sysc-shell summary and plugin panel use the
+same grade words with their theme-specific icons and fills from D5 §11.2. They
+cannot import the internal package across modules, so each view maps the same
+grade vocabulary to its native surface. The CLI/TUI rendering belongs in the
+engine, in `internal/report`, as:
 
 ```go
 func (g Grade) Style(profile termenv.Profile) Render
 type Render struct { Colour termenv.Color; Glyph, ASCII, Word string }
 ```
 
-The TUI and CLI use `internal/report`'s shared rendering. The sysc-shell panel
-uses the existing `warning` wire tone, which the host maps to `ToneActivity`.
+The TUI and CLI use `internal/report`'s shared rendering. The sysc-shell summary
+and plugin panel keep the same grade words and use their theme-specific styles;
+amber does not rely on the `warning` wire tone.
 
 `lipgloss.SetColorProfile(termenv.Ascii)` in tests makes every golden render
 deterministic.
