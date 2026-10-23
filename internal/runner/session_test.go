@@ -117,7 +117,7 @@ func TestProcessGroupKillTargetRefusesCallerGroup(t *testing.T) {
 func processRunning(pid int) (bool, error) {
 	data, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ESRCH) {
 			return false, nil
 		}
 		return false, err
