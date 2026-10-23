@@ -146,7 +146,7 @@ inventory. The phase map in §11 lists the added subsystems.
 | 238 | `/home/nomadx/privacy-bit/internal/detect/detect.go` | `Signal[T]` (including measured-state helpers), `Availability`, `Capabilities`, `Origin`, `Facts`, scoped `Observation`, `Source` interface |
 | 103 | `/home/nomadx/privacy-bit/internal/detect/runner.go` | `Runner` interface, `ExecRunner`, `MapRunner` for tests, `commandTimeout = 20s` |
 | 199 | `/home/nomadx/privacy-bit/internal/detect/pacman.go` | `Pacman` — enriches catalogue matches only; retains a package if enrichment fails |
-| 148 | `/home/nomadx/privacy-bit/internal/detect/dpkg.go` | `Dpkg` — the I2 reference case |
+| 150 | `/home/nomadx/privacy-bit/internal/detect/dpkg.go` | `Dpkg` — the I2 reference case |
 | 126 | `/home/nomadx/privacy-bit/internal/detect/flatpak.go` | `Flatpak` — preserves duplicate scopes; permission inspection still reads declared permissions and drops scope |
 | 185 | `/home/nomadx/privacy-bit/internal/detect/desktop.go` | `Desktop` — universal `.desktop` scan |
 | 210 | `/home/nomadx/privacy-bit/internal/detect/binary.go` | `Binary` — universal PATH/opt scan, nix-store exclusion |
@@ -162,7 +162,7 @@ inventory. The phase map in §11 lists the added subsystems.
 | Lines | Absolute path | Tests |
 |---|---|---|
 | 207 | `/home/nomadx/privacy-bit/internal/catalog/load_test.go` | 9 — see §8 |
-| 395 | `/home/nomadx/privacy-bit/internal/detect/detect_test.go` | 17 — see §8 |
+| 428 | `/home/nomadx/privacy-bit/internal/detect/detect_test.go` | 19 — see §8 |
 | 399 | `/home/nomadx/privacy-bit/internal/audit/audit_test.go` | Grading, coverage, findings, actions and Flatpak scope reporting |
 | 85 | `/home/nomadx/privacy-bit/internal/render/install_test.go` | Distribution commands, HTTPS fallback, unsafe route rejection and shipped route checks |
 
@@ -443,11 +443,13 @@ unrunnable one.
 - `dpkg.go` — the I2 reference case. Reports `Version` and uses
   `apt-mark showmanual` for explicit-install state, matched against
   architecture-qualified `${binary:Package}` while `Observation.Name` stays
-  `${Package}` for catalogue matching. If apt-mark fails, package observations
-  remain and `Explicit` is `Unavailable`; the dpkg status field cannot
-  distinguish manually selected packages from dependencies. Licence, vendor,
-  origin, reverse dependencies, and signature state remain unavailable with
-  stated reasons.
+  `${Package}` for catalogue matching. It emits only rows with
+  `${db:Status-Status}=installed`; residual `config-files` records do not count
+  as inventory or source availability. If apt-mark fails, installed package
+  observations remain and `Explicit` is `Unavailable`; the dpkg status field
+  cannot distinguish manually selected packages from dependencies. Licence,
+  vendor, origin, reverse dependencies, and signature state remain unavailable
+  with stated reasons.
 - `flatpak.go` — `Observation.NetworkObservable` carries D1 §6.4 in the **type
   system**, not a comment. Reports system and user installations of the same id
   as **two observations**, not deduplicated: two copies at two privilege levels
@@ -587,6 +589,7 @@ Specific, falsifiable claims. Each is checkable.
 | 11 | **The privacy panel preserves capture rows and reports grades, VPN state, findings, and coverage.** | `TestPrivacyPageKeepsCaptureRowsAndShowsUnavailableAudit`, `TestPrivacyGradePresentationUsesWordsAndThemeTones`, and `TestPrivacyPageRendersSnapshotTotalsAndCoverageLimits`. |
 | 12 | **Opening a stored report does not silently replace it with a fresh scan.** | `TestStoredSnapshotOpensWithoutScanningAndRefreshesOnRequest` in `internal/tui/model_test.go`; `Init` returns no scan command when a snapshot is present. |
 | 13 | **Debian explicit-install state reflects apt marks, distinguishes architectures, and remains unavailable when apt-mark fails.** | `TestDpkgUsesAptMarkForExplicitInstallState`, `TestDpkgMatchesAptMarksByArchitectureQualifiedName`, and `TestDpkgKeepsInventoryWhenAptMarkFails` in `internal/detect/detect_test.go`. |
+| 14 | **Debian inventory and availability include only installed packages.** | `TestDpkgInventoryIncludesOnlyInstalledPackages` and `TestDpkgAvailabilityTreatsConfigFilesOnlyAsEmpty` in `internal/detect/detect_test.go`. |
 
 §11 records the latest gate results. Earlier phase checkpoints are historical;
 use the current results when judging the tree.

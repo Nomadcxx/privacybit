@@ -124,9 +124,9 @@ func TestPacmanKeepsPackageWhenEnrichmentFails(t *testing.T) {
 // Other unsupported facts remain unavailable, so catalogue checks do not
 // treat missing Debian metadata as a clean result.
 func TestDpkgReportsNoFactsItCannotSupply(t *testing.T) {
-	out := "bash\tbash\t5.2\ncoreutils\tcoreutils\t9.1\n"
+	out := "bash\tbash\t5.2\tinstalled\ncoreutils\tcoreutils\t9.1\tinstalled\n"
 	r := MapRunner{Output: map[string]string{
-		"dpkg-query -W -f=${Package}\t${binary:Package}\t${Version}\n": out,
+		"dpkg-query -W -f=${Package}\t${binary:Package}\t${Version}\t${db:Status-Status}\n": out,
 	}}
 	obs, err := NewDpkg(r).Inventory(context.Background())
 	if err != nil {
@@ -151,9 +151,9 @@ func TestDpkgReportsNoFactsItCannotSupply(t *testing.T) {
 }
 
 func TestDpkgUsesAptMarkForExplicitInstallState(t *testing.T) {
-	listing := "firefox\tfirefox\t1.0\nlibexample1\tlibexample1\t2.0\n"
+	listing := "firefox\tfirefox\t1.0\tinstalled\nlibexample1\tlibexample1\t2.0\tinstalled\n"
 	r := MapRunner{Output: map[string]string{
-		"dpkg-query -W -f=${Package}\t${binary:Package}\t${Version}\n": listing,
+		"dpkg-query -W -f=${Package}\t${binary:Package}\t${Version}\t${db:Status-Status}\n": listing,
 		"apt-mark showmanual": "firefox\n",
 	}}
 	obs, err := NewDpkg(r).Inventory(context.Background())
@@ -172,10 +172,10 @@ func TestDpkgUsesAptMarkForExplicitInstallState(t *testing.T) {
 }
 
 func TestDpkgMatchesAptMarksByArchitectureQualifiedName(t *testing.T) {
-	listing := "libexample1\tlibexample1:amd64\t1.0\n" +
-		"libexample1\tlibexample1:i386\t1.0\n"
+	listing := "libexample1\tlibexample1:amd64\t1.0\tinstalled\n" +
+		"libexample1\tlibexample1:i386\t1.0\tinstalled\n"
 	r := MapRunner{Output: map[string]string{
-		"dpkg-query -W -f=${Package}\t${binary:Package}\t${Version}\n": listing,
+		"dpkg-query -W -f=${Package}\t${binary:Package}\t${Version}\t${db:Status-Status}\n": listing,
 		"apt-mark showmanual": "libexample1:i386\n",
 	}}
 	obs, err := NewDpkg(r).Inventory(context.Background())
@@ -200,7 +200,7 @@ func TestDpkgMatchesAptMarksByArchitectureQualifiedName(t *testing.T) {
 
 func TestDpkgKeepsInventoryWhenAptMarkFails(t *testing.T) {
 	r := MapRunner{Output: map[string]string{
-		"dpkg-query -W -f=${Package}\t${binary:Package}\t${Version}\n": "firefox\tfirefox\t1.0\n",
+		"dpkg-query -W -f=${Package}\t${binary:Package}\t${Version}\t${db:Status-Status}\n": "firefox\tfirefox\t1.0\tinstalled\n",
 	}}
 	obs, err := NewDpkg(r).Inventory(context.Background())
 	if err != nil {
@@ -214,18 +214,51 @@ func TestDpkgKeepsInventoryWhenAptMarkFails(t *testing.T) {
 	}
 }
 
+func TestDpkgInventoryIncludesOnlyInstalledPackages(t *testing.T) {
+	listing := "removed-app\tremoved-app\t1.0\tconfig-files\n" +
+		"installed-app\tinstalled-app\t2.0\tinstalled\n"
+	r := MapRunner{Output: map[string]string{
+		"dpkg-query -W -f=${Package}\t${binary:Package}\t${Version}\t${db:Status-Status}\n": listing,
+		"apt-mark showmanual": "installed-app\n",
+	}}
+	obs, err := NewDpkg(r).Inventory(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(obs) != 1 || obs[0].Name != "installed-app" {
+		t.Fatalf("inventory = %+v, want only installed-app", obs)
+	}
+}
+
+func TestDpkgAvailabilityTreatsConfigFilesOnlyAsEmpty(t *testing.T) {
+	r := MapRunner{Output: map[string]string{
+		"dpkg-query": "",
+		"dpkg-query -W -f=${db:Status-Status}\n": "config-files\n",
+	}}
+	got := NewDpkg(r).Availability()
+	if !got.Ready || !got.Empty {
+		t.Fatalf("config-files-only database = %+v, want Ready+Empty", got)
+	}
+}
+
 func TestDpkgAvailabilityIsNotTheSameAsTheBinaryExisting(t *testing.T) {
 	// dpkg-query is installed on this machine's Arch system and manages
 	// nothing. Reporting that as a coverage gap would be wrong.
 	empty := MapRunner{Output: map[string]string{
-		// Availability probes with a bare query; Inventory asks for the
-		// formatted listing. They are two calls and need two fixtures.
-		"dpkg-query -W": "",
-		"dpkg-query -W -f=${Package}\t${binary:Package}\t${Version}\n": "",
+		"dpkg-query": "",
+		"dpkg-query -W -f=${db:Status-Status}\n": "",
 	}}
 	a := NewDpkg(empty).Availability()
 	if !a.Ready || !a.Empty {
 		t.Fatalf("an installed dpkg-query with no packages must be Ready+Empty, got %+v", a)
+	}
+
+	installed := MapRunner{Output: map[string]string{
+		"dpkg-query": "",
+		"dpkg-query -W -f=${db:Status-Status}\n": "installed\n",
+	}}
+	if a := NewDpkg(installed).Availability(); !a.Ready || a.Empty {
+		t.Fatalf("an installed package must make dpkg availability non-empty, got %+v", a)
 	}
 
 	gone := MapRunner{Missing: map[string]bool{"dpkg-query": true}}
