@@ -753,6 +753,11 @@ Recorded because a future reader will trust the docs.
     install and disable operations continue through that path. The installer
     test covers canonical path resolution.
 
+14. **The runner test checked for a live helper child immediately after
+    sending `SIGKILL`.** Signal delivery is asynchronous, so load could make the
+    test observe the child before it exited. The test now waits for process
+    exit with a one-second deadline.
+
 ### 10.4 Environment traps
 
 - **`: ` inside an unquoted multi-line YAML plain scalar is a parse error** —

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/Nomadcxx/privacybit/internal/helper"
 )
@@ -70,6 +71,11 @@ wait
 	}
 	if err := session.Stop(); err != nil {
 		t.Fatal(err)
+	}
+	deadline := time.Now().Add(time.Second)
+	for processRunning(childPID) && time.Now().Before(deadline) {
+		// SIGKILL delivery is asynchronous; wait for the process table to reflect it.
+		time.Sleep(10 * time.Millisecond)
 	}
 	if processRunning(childPID) {
 		t.Fatalf("helper descendant %d survived session stop", childPID)
