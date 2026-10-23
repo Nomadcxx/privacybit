@@ -54,7 +54,7 @@ var (
 	frameStyle  = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(1, 2)
 )
 
-var asciiHeaderLines = []string{
+var wordmarkLines = []string{
 	"\033[0;37m██▀██ ██▀██ ▀██▀ ██ ██ ██▀██ ██▀██ ██ ██ ██▀█▄ ▀██▀ ▀██▀\033[0m",
 	"\033[0;37m██▄█▀ ██▄█▀  ██  ██ ██ ██▄██ ██    ██▄██ ██▄█▀  ██   ██ \033[0m",
 	"\033[0;37m█▓░   █▓░█▓  █▓░ █▓░█▓ █▓░█▓ █▓░▄▄ ▄▄░█▓ █▓ █▓  █▓░  █▓░\033[0m",
@@ -204,8 +204,18 @@ func (m *model) View() string {
 	if headerWidth < 1 {
 		headerWidth = 1
 	}
-	content.WriteString(lipgloss.NewStyle().Width(headerWidth).Align(lipgloss.Center).Render(strings.Join(asciiHeaderLines, "\n")))
-	content.WriteString("\n\n")
+	header := strings.Join(wordmarkLines, "\n")
+	if headerWidth < lipgloss.Width(header) {
+		// ponytail: keep the fixed-width ANSI mark; use text until a compact mark is approved.
+		header = "privacybit"
+		if headerWidth < lipgloss.Width(header) {
+			header = ""
+		}
+	}
+	if header != "" {
+		content.WriteString(lipgloss.NewStyle().Width(headerWidth).Align(lipgloss.Center).Render(header))
+		content.WriteString("\n\n")
+	}
 	content.WriteString(titleStyle.Render("privacybit  /  INSTALL"))
 	content.WriteString("\n\n")
 	content.WriteString("Build and install the CLI for your user.\n")
