@@ -5,10 +5,9 @@
 **Touches:** `/home/nomadx/sysc-plugins` and `/home/nomadx/sysc-shell`
 **Closes:** the user's original request — the Control Centre privacy panel
 
-> **Amended 2026-10-23:** Read §11 before implementing this design. The
-> approved plugin bar widget and audit panel supersede the original
-> state-only/no-plugin-UI boundary in §§1, 2, 5.1, 6.5 and 10. The no-root
-> boundary remains in force.
+> **Amended 2026-10-23:** §11 records the current owner-approved panel design.
+> It supersedes the original state-only boundary, host-owned scan and
+> `ToneWarning` grade treatment. The no-root boundary in §4.2 remains in force.
 
 ---
 
@@ -17,31 +16,36 @@
 This is the design that makes the whole project exist for the user. It is also
 the smallest, because it moves no audit logic.
 
-Two halves:
+Two parts:
 
-- **Plugin** — `plugins/privacy` in sysc-plugins. Runs an audit on a tick and
-  publishes a bounded JSON snapshot into its own state.
-- **Host** — renders the bounded snapshot on the existing Control Centre
-  privacy page and uses its existing warning tone for amber grades.
+- **Plugin** — `plugins/privacy` in sysc-plugins. Runs an audit on a tick,
+  publishes a bounded JSON snapshot, declares a bar widget and audit panel,
+  and offers the read-only `Scan now` action.
+- **Host** — keeps the existing capture activity card, renders a compact audit
+  summary, and opens the plugin panel from `Open full audit`.
 
 Out of scope: any privileged operation from the panel (§4), any change to the
-capture panel that exists today, any plugin-provided UI (§2).
+capture panel that exists today, or enforcement of audit findings.
 
-## 2. The plugin still cannot render UI
+## 2. The plugin panel is a separate surface
 
-Unchanged from D1 §2.2. The Control Centre is host-rendered: `ccPage` in
-`internal/shell/popout_controlcenter.go` is a `switch h.section` over host
-functions with no plugin branch. The plugin's only power is `CallStateSet`.
+The Control Centre remains host-rendered: `ccPage` in
+`internal/shell/popout_controlcenter.go` switches over host functions and does
+not render plugin views inside a Control Centre section. The shell can open a
+separate plugin-owned panel through the existing `panels` capability. The bar
+widget and `Open full audit` action both open that panel.
 
-The calendar plugin is the precedent, and D5 is a close copy of it.
+The plugin also publishes bounded state for the compact Control Centre summary.
+That state follows the existing calendar plugin precedent.
 
-## 3. Existing warning tone
+## 3. Existing warning wire tone
 
 sysc-shell `main` accepts `plugin/v1.ToneWarning` (`warning`) at protocol minor
 18. `internal/plugin/view.go` maps it to `ui.ToneActivity`, which paints the
-theme's Tertiary role and already appears in monitor and process panels. The
-privacy panel uses this wire value for amber grades. It needs no additional
-tone or protocol bump.
+theme's Tertiary role and appears in monitor and process panels. Privacy grade
+chips do not use this tone: the laptop palette made it appear green. §11.2
+defines the current grade treatment. The existing wire mapping remains
+available to other plugin views and needs no protocol change.
 
 D5's earlier draft called the wire value `activity`. That name duplicated the
 host's existing `warning` value, so the integration now reuses `warning`.
@@ -103,14 +107,14 @@ impossible, not merely hard.
 | Field | Value | Why |
 |---|---|---|
 | `id` | `org.sysc.privacy` | reverse-domain, matches `org.sysc.calendar` |
-| `capabilities` | `["state"]` | it publishes a snapshot and renders nothing |
+| `capabilities` | `["panels", "state"]` | it declares a bar widget and panel, and publishes a snapshot |
 | `exec` | `bin/sysc-plugin-privacy` | |
 | `requires.commands` | `[]` | must not refuse to start — §5.4 |
 | `version` | `0.1.0` | |
-| `protocol` | `{major: 1, minor: 8}` | minimum minor for this state-only plugin; it emits no activity-tone view nodes |
+| `protocol` | `{major: 1, minor: 8}` | minimum minor used by the panel and state calls |
 
-`capabilities` is just `["state"]`. It does **not** need `panels`, `settings`,
-or `open-url`. The plugin opens no surface of its own.
+The plugin needs `panels` to open its declared audit panel and `state` to publish
+the bounded summary. It does not need `settings` or `open-url`.
 
 The privacy plugin's source and package use GPL-3.0-or-later. Its Go files
 carry SPDX headers, `plugins/privacy/LICENSE` ships with the package, and the
@@ -140,9 +144,9 @@ publishWithStateSet(snapshot)
 
 The full snapshot carries the installed-app inventory, findings, and coverage
 information. It does not contain live telemetry connections because endpoint
-attribution is not implemented. The full report is still too large for a
-596-pixel panel, so the plugin **projects** it — exactly as calendar does with
-`BuildControlCenterSnapshot`.
+attribution is not implemented. The host summary has limited space and plugin
+state has an explicit size cap, so the plugin **projects** the report — using
+the same bounded-state pattern as calendar's `BuildControlCenterSnapshot`.
 
 The projection is bounded by explicit named caps, and **every capped list
 carries its total and a truncation flag**. This is the one place privacybit
@@ -194,19 +198,20 @@ could quietly under-report, so it is stated in the wire contract:
 }
 ```
 
-Per category: a grade, counts, a truncation pair, and the single worst entry.
-Not the whole list. The panel is a summary; the CLI and TUI provide the detail.
-The plugin snapshot carries the action suggestions from the report, but the
-Control Centre does not execute them.
+Each category carries its grade, counts, truncation state, and highest-risk
+entry. The scrollable plugin panel renders the bounded app, network, finding,
+and coverage details. It labels capped lists with their shown and total counts;
+the CLI and TUI retain the complete report. The snapshot carries action
+suggestions, but neither the panel nor the Control Centre executes them.
 
 Category grades use the worst known installed-entry grade and unmet
 expectations; the overall grade is the worst category grade. Unknown category
 grades propagate to the overall grade so incomplete judgement cannot appear as
 a pass. This follows D1 §3.7; the score is a separate progress indicator.
 
-`reduced` (D6 §10) is carried with total and truncation fields. The card always
-states that telemetry attribution is unavailable, then shows the reported
-coverage caveats. The panel does not imply that unmeasured telemetry is clean.
+`reduced` (D6 §10) is carried with total and truncation fields. Both views state
+that telemetry attribution is unavailable and show the reported coverage
+caveats. Neither view presents unmeasured telemetry as clean.
 
 ### 5.4 When privacybit is not installed
 
@@ -242,8 +247,9 @@ the hint, rather than an empty card. **An empty card is indistinguishable from
 
 ## 6. The host
 
-The host renders a bounded audit summary below the existing capture activity
-card and uses the existing warning tone for amber grades.
+The Control Centre keeps the existing capture activity card and adds a compact
+audit summary with an `Open full audit` action. The plugin panel owns the
+detailed audit view and the `Scan now` action.
 
 ### 6.1 `internal/ui` — existing tone
 
@@ -259,14 +265,14 @@ const (
 
 `ToneActivity` already exists as the final iota value in `ui.Tone` and paints
 the theme's tertiary role. Keep its position stable; this work does not change
-the renderer enum.
+the renderer enum. The privacy grade chips do not use this tone; see §11.2.
 
 ### 6.2 `plugin/v1` — the wire
 
 `plugin/v1.ToneWarning` (`warning`) already exists at protocol minor 18.
-`internal/plugin/view.go` maps it to `ui.ToneActivity`. The privacy panel uses
-that value for amber. The privacy plugin emits no view nodes, so its manifest
-keeps minimum protocol minor 8.
+`internal/plugin/view.go` maps it to `ui.ToneActivity`. The privacy views use
+the grade-specific treatment in §11.2 instead of that warning tone. The plugin
+uses the existing `panels` and `state` capabilities at protocol minor 8.
 
 ### 6.3 `controlcenter_pages.go` — the snapshot reader
 
@@ -299,7 +305,7 @@ func ccPrivacySnapshotFor(r *Registry) *ccPrivacySnapshot {
 }
 ```
 
-### 6.4 `ccPrivacy` — the second card
+### 6.4 `ccPrivacy` — the compact summary
 
 The page uses its existing scroll viewport. The capture card keeps its three
 rows and uses its natural content height. The audit card follows it:
@@ -311,56 +317,28 @@ rows and uses its natural content height. The audit card follows it:
 │ Screen sharing  Inactive
 └────────────────────────────────┘
 ┌─ Privacy audit ────────────────┐  new
-│ Overall             Risky
-│ VPN                 Connected
-│ Default route       Outside tunnel
-│ Browser             Risky · 4 installed
-│ Findings            1 finding · 1 high
-│ Coverage limits     Telemetry attribution unavailable
+│ Overall             Good
+│ Updated just now
+│ Coverage limits are listed in the full audit.
+│ [Open full audit]
 └────────────────────────────────┘
 ```
 
-The capture readings retain their existing meaning and refresh path. The audit
-card shows the overall grade, VPN route/DNS/IPv6 checks, category grades,
-bounded findings, and coverage limits. A report older than 15 minutes or with a
-future timestamp is shown as `Unrated`; the last grade appears only as subdued
-historical text, and stale category/finding details are hidden.
+The capture readings retain their existing meaning and refresh path. The
+summary shows the overall grade and currentness, then opens the plugin panel for
+VPN checks, categories, findings, and coverage details. A snapshot older than
+15 minutes or dated in the future is shown as `Unrated`; the plugin panel also
+hides stale category and finding details. Both surfaces keep grade words
+visible without relying on colour; §11.2 defines their visual treatment.
 
-Grade rendering uses a word and the existing theme tone:
+### 6.5 Scan ownership
 
-| Grade | Tone | Word |
-|---|---|---|
-| `green` | `ToneNormal` | Good |
-| `amber` | `ToneActivity` | Review |
-| `red` | `ToneError` | Risky |
-| `unknown` | `ToneSubtle` | Unrated |
-
-The grade word remains visible without colour, and the tone provides a second
-channel for colour-aware themes.
-
-### 6.5 Actions
-
-The original Phase 11 viewer-only boundary was revised by the owner on
-2026-10-20. The native Control Centre now exposes one host-owned `Run scan`
-action. It invokes `privacybit scan` as the current user, outside the registry
-lock. It resolves the binary from `PATH`, then `~/.local/bin/privacybit`, which
-is the installer target.
-
-The panel reads the private `$XDG_STATE_HOME/privacybit/report.json` file, or
-`~/.local/state/privacybit/report.json` when `XDG_STATE_HOME` is unset. The host
-validates the current user's ownership, private permissions, regular-file
-type, schema, grade and timestamp, and reads no more than 4 MiB. It reads this
-file when the user enters the Privacy page and after a manual scan. It does not
-mark the unread report as read. A report older than 15 minutes or dated in the
-future remains `Unrated`.
-
-The panel shows scan status, the saved report's grade, and its timestamp. The
-full report remains available through `privacybit report`. Manual scans,
-scheduled scans and TUI refreshes share an advisory lock in the per-user state
-directory from the start of scanning through the atomic report save. The panel
-does not use a daemon socket, change the plugin protocol, or run a privileged
-action. The plugin continues publishing its bounded audit summary on its
-five-minute tick.
+The first design put `Run scan` in the Control Centre and read the saved
+`privacybit scan` report. The owner superseded that design in §11 on
+2026-10-23. The Control Centre now opens the plugin panel; it does not run a
+scan or read the saved report. The plugin runs `privacybit audit --snapshot`
+as the current user with a timeout. It does not write a saved report or invoke
+the daemon or root helper. The CLI and TUI retain their saved-report workflows.
 
 ## 7. Failure matrix
 
@@ -384,11 +362,11 @@ report good.** It reports `unknown`, and the panel says so in words.
 
 | Property | Method |
 |---|---|
-| Tone accepted and converted | Existing tests cover `plugin/v1.ToneWarning` mapping to `ui.ToneActivity`; privacy tests pin amber to the activity theme tone. |
+| Grade presentation | Plugin and shell tests pin visible grade words and distinct fills/icons for Good, Review, Risky, and Unrated; amber does not depend on `ToneWarning`. |
 | Bounded plugin projection | `plugins/privacy` tests pin list caps, total/truncation fields, malformed/future-schema rejection, and telemetry remaining unknown. |
 | Safe snapshot reader | Shell tests cover absent state, malformed JSON, future schema, invalid grade/counts, oversized state, and available/unavailable snapshots. |
 | Currentness | Shell tests verify stale and future timestamps render unrated and hide stale details. |
-| Honest card | Shell tests check the capture rows, grade words/tones, VPN coverage, category/finding totals, caveats, and explicit unavailable state. |
+| Honest surfaces | Shell tests check the capture rows and compact audit summary; plugin tests check panel details, coverage, and explicit unavailable states. |
 | Plugin protocol | Plugin tests prove `audit --snapshot` invocation and state publication over the JSON-lines protocol. |
 
 ## 9. Ordering and dependencies
@@ -398,22 +376,22 @@ out to it.
 
 1. The plugin cannot be written meaningfully before `privacybit audit --snapshot`
    produces the document it publishes.
-2. The warning wire tone is independent of privacybit and already exists in
-   sysc-shell `main`.
-3. `ccPrivacySnapshotFor` plus the second card can land against a hand-written
-   fixture snapshot, so the host work is not blocked on the plugin at all.
+2. The host already supports the plugin's `panels` and `state` capabilities;
+   the integration needs no protocol or shell panel framework change.
+3. `ccPrivacySnapshotFor` and the compact summary can use a fixture snapshot.
+   Plugin tests cover its panel and `privacybit audit --snapshot` call.
 
-That last point is worth taking: **the panel can be built and reviewed before
-the privacybit CLI snapshot exists**, against a JSON file. It is the only part
-of this project where the user-visible outcome is testable today.
+The host summary can be reviewed against a JSON fixture before the CLI snapshot
+exists. The plugin panel still needs a valid snapshot to verify its audit
+details and scan action.
 
 ## 10. What this closes
 
-With D5, the Control Centre shows the current capture status separately from
-the latest privacy audit, including VPN checks, category grades, bounded
-findings, and coverage caveats. It can request a read-only scan and show the
-saved report's grade and timestamp. The CLI and TUI provide the full report and
-action detail.
+With the approved design, the Control Centre keeps current capture status
+separate from a compact audit summary and opens the plugin-owned panel. The
+panel shows VPN checks, category grades, bounded findings, and coverage
+caveats; its `Scan now` action requests a read-only snapshot. The CLI and TUI
+provide the complete report and action detail.
 
 What is deliberately *not* delivered: one-click remediation from the panel
 (§4.2), and any enforcement. D1 §1.1's framing holds — this grades privacy and
@@ -426,10 +404,10 @@ the helper's.
 **Approval:** owner approved the audited direction after reviewing the
 Control Centre, plugin examples and live laptop rendering.
 
-This amendment supersedes the state-only boundary in §§1, 2, 5.1, 6.5 and 10.
-The host already supports declared plugin bar widgets, plugin-owned panels,
-view input events and bounded panel placement; no protocol or shell panel
-framework change is needed.
+This amendment replaces the original state-only and host-owned scan model and
+sets the current grade treatment. The host already supports declared plugin
+bar widgets, plugin-owned panels, view input events and bounded panel
+placement; no protocol or shell panel framework change is needed.
 
 ### 11.1 Ownership and entry points
 
