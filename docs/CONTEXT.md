@@ -97,29 +97,42 @@ program name, this is why not to.**
 
 ---
 
-## 2. Why a standalone project rather than a plugin
+## 2. Why a standalone project with a plugin
 
-The decisive architectural finding was this: **a plugin cannot render UI inside
-a Control Centre section.**
+The decisive architectural finding was this: **a plugin cannot render its view
+inside a Control Centre section.**
 
-The Control Centre is entirely host-rendered. `ccPage` in
-`internal/shell/popout_controlcenter.go` is a `switch h.section` over host-side
-functions, and **there is no plugin branch**. A plugin can publish bounded JSON
-into its own state, and the host renders it natively — `org.sysc.calendar`
-writing to state key `control_center` is the existing, working precedent.
+The Control Centre is host-rendered. `ccPage` in
+`internal/shell/popout_controlcenter.go` switches over host-side functions; it
+does not render a plugin view inside a Control Centre section. A plugin can
+publish bounded JSON into its own state, and the host renders it natively —
+`org.sysc.calendar` writing to state key `control_center` is the existing,
+working precedent. The shell can also open a plugin-owned panel as a separate
+surface; D5 §11 records the approved route.
+
+The implementation keeps the audit engine in privacybit and gives the plugin
+its own panel. The plugin also publishes a bounded snapshot for the Control
+Centre summary. The bar widget and the Control Centre summary both open the
+same plugin panel.
 
 So the split is:
 
 ```
-privacybit (CLI/TUI + internal engine)  →  plugin shells out to privacybit
-                                              →  host renders its JSON snapshot
+privacybit (CLI/TUI + internal engine)
+                ▲
+                │ `audit --snapshot`
+org.sysc.privacy plugin
+   ├── bar widget ────────────────→ audit panel
+   ├── audit panel (`Scan now`) ───→ privacybit
+   └── bounded snapshot ──────────→ Control Centre summary
+                                       └── `Open full audit` → audit panel
 ```
 
-This gives the plugin-only benefits (crash isolation, catalogue distribution,
-independent versioning) while keeping the UI where the user expects it. The CLI
-and TUI call one internal engine. The plugin shells out to the same binary;
-Go's `internal/` import rule keeps the audit API from becoming a cross-module
-compatibility commitment.
+The plugin provides crash isolation, catalogue distribution, independent
+versioning, and a place for the full audit UI. The Control Centre keeps the
+existing capture activity card and a compact audit summary. The CLI, TUI, and
+plugin call the same binary; Go's `internal/` import rule keeps the audit API
+from becoming a cross-module compatibility commitment.
 
 ---
 
@@ -299,56 +312,54 @@ existing result fields.
 ## 4. What is built
 
 Delivery phases 0–12 are implemented across privacybit, sysc-plugins, and
-sysc-shell. The clean shell branch was deployed and the live Niri check passed
-on 2026-10-22. The privacy plugin is locally linked and enabled; its synthetic
-catalog screenshot is committed, while the live screenshot remains local
-because it contains real machine inventory. See `HANDOVER.md` for revisions,
-verification, and the remaining publication gate.
+sysc-shell. The privacy plugin is in the published catalog and release, with a
+user-placeable bar widget and a plugin-owned audit panel. The Control Centre
+shows a compact audit summary and opens that panel. On 2026-10-23, the laptop
+testbench used the merged sysc-plugins and sysc-shell revisions, had the plugin
+bar item enabled, and had privacybit installed. See `HANDOVER.md` for revisions
+and verification evidence.
 
 ---
 
-## 5. Approved follow-on work
+## 5. Approved panel amendment
 
-The owner approved GPL-3.0-or-later for privacybit and a host-owned `Run scan`
-action; both are implemented. The panel runs `privacybit scan` as the current
-user and reads the private saved report; it does not call the plugin or daemon
-and does not apply findings. The live Niri check passed after a clean deploy.
-The AUR recipe still points to the upstream `v0.1.0` tag, and the plugin store
-catalog has no privacy release entry, so public installation remains gated on
-publishing the relevant release assets and catalog update.
+The owner approved GPL-3.0-or-later for privacybit and, in D5 §11 on
+2026-10-23, a plugin-owned bar widget and audit panel. The panel runs
+`privacybit audit --snapshot` as the current user. It refreshes the bounded
+snapshot without writing a saved report or invoking privileged actions. The
+plugin release and catalog entry are published; the AUR package is also
+published.
 
 ---
 
 ## 6. Panel control boundary
 
-The owner first approved a viewer after an audit found no route from the native
-Control Centre to the state-only privacy plugin. Protocol v1 supports
-`input.event` for plugin-owned views, but this plugin publishes no view and the
-native Control Centre does not forward its input to plugins. The owner later
-approved a native, read-only scan action that does not change that boundary.
-The Control Centre runs `privacybit scan` as the current user, outside the
-registry lock, then reads the private bounded report in XDG state. It refreshes
-that report when the Privacy page opens, so timer-created reports appear there.
-The plugin continues publishing its bounded audit snapshot on its five-minute
-tick.
+The first design used a host-rendered viewer because the original publisher had
+no plugin-owned view. D5 §11 amended that design on 2026-10-23: the plugin now
+declares a bar widget and its own audit panel. The bar widget and the Control
+Centre's `Open full audit` action open the same panel. The plugin runs
+`privacybit audit --snapshot` as the current user, applies a timeout, and
+publishes the result to both views. The Control Centre no longer starts a scan
+or reads the saved report. Its capture activity card remains unchanged.
 
 | Capability | Current implementation |
 |---|---|
-| Show grades, VPN checks, findings totals, and coverage | Implemented in the host-rendered audit card |
-| Run a read-only scan and show saved report status, grade, and timestamp | Native host action; reports over 15 minutes old or dated in the future remain unrated |
-| Refresh or explain through the plugin | Not implemented; the state-only plugin has no view or action route |
-| Run tier 4 actions | Stays in the TUI/helper; never exposed by the panel |
+| Show the overall grade and currentness in Control Centre | Compact host summary with an `Open full audit` route |
+| Open the full audit from the bar | User-placeable plugin bar widget opens the plugin panel |
+| Show categories, network checks, findings, coverage, and scan status | Plugin-owned panel renders the bounded snapshot and supports `Scan now` |
+| Run tier 4 actions | Stays in the TUI/helper; the panel cannot invoke them |
 
 ---
 
 ## 7. Remaining non-phase work
 
-- **Live Niri verification** passed on 2026-10-22; the screenshot containing
-  real inventory stays in the local cache.
-- **Public release and AUR fetch** remain gated on publishing the local
-  `v0.1.0` tag; privacybit's selected licence is GPL-3.0-or-later.
-- **Plugin store installation** remains unavailable until the privacy plugin's
-  release assets and `catalog.json` entry are published.
+- **Live Niri verification** of the earlier host-rendered audit card passed on
+  2026-10-22; its screenshot stays in the local cache because it contains real
+  inventory. On 2026-10-23, the laptop testbench confirmed the merged plugin
+  and shell revisions, an active plugin process, installed privacybit, and the
+  bar placement.
+- **Publication** is complete: privacybit `v0.1.0`, the privacy plugin release
+  and catalog entry, and the AUR package are published.
 - Additional package-manager backends and effective, scope-specific Flatpak
   permission inspection remain explicit D6 follow-up work. Coverage stays
   unknown or caveated where those capabilities are unavailable.
