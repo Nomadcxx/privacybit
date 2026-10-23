@@ -5,6 +5,11 @@
 **Touches:** `/home/nomadx/sysc-plugins` and `/home/nomadx/sysc-shell`
 **Closes:** the user's original request — the Control Centre privacy panel
 
+> **Amended 2026-10-23:** Read §11 before implementing this design. The
+> approved plugin bar widget and audit panel supersede the original
+> state-only/no-plugin-UI boundary in §§1, 2, 5.1, 6.5 and 10. The no-root
+> boundary remains in force.
+
 ---
 
 ## 1. Scope
@@ -414,3 +419,63 @@ What is deliberately *not* delivered: one-click remediation from the panel
 (§4.2), and any enforcement. D1 §1.1's framing holds — this grades privacy and
 reports it. Acting on it is the TUI's job, and the destructive part of that is
 the helper's.
+
+## 11. Owner-approved amendment — plugin bar widget and audit panel
+
+**Date:** 2026-10-23
+**Approval:** owner approved the audited direction after reviewing the
+Control Centre, plugin examples and live laptop rendering.
+
+This amendment supersedes the state-only boundary in §§1, 2, 5.1, 6.5 and 10.
+The host already supports declared plugin bar widgets, plugin-owned panels,
+view input events and bounded panel placement; no protocol or shell panel
+framework change is needed.
+
+### 11.1 Ownership and entry points
+
+- `org.sysc.privacy` declares one user-placeable `bar` widget and one `panel`.
+- Activating the bar widget requests the declared panel through the existing
+  `panels` capability. The shell's Bar Editor persists its placement.
+- The Control Centre keeps its existing microphone, camera and screen-sharing
+  activity card. Its audit area becomes a compact grade/currentness summary
+  with an `Open full audit` action that opens the same plugin panel.
+- The plugin panel owns the audit display and the single `Scan now` action.
+  Both the bar and Control Centre lead to that panel, so there is one refresh
+  path and one current snapshot. The old host-owned `privacybit scan` card and
+  its separate saved-report read are removed from the Control Centre.
+
+The plugin continues to publish its bounded state snapshot for the Control
+Centre. The panel renders the same in-memory snapshot and refreshes it by
+running `privacybit audit --snapshot`; the refresh runs as the current user,
+with a timeout, and does not write a saved report. It has no privileged host
+calls and cannot invoke helper actions.
+
+### 11.2 Visual treatment and honest states
+
+Use the existing SYSC card spacing, type roles and theme-derived surfaces.
+The panel header uses the `privacybit` wordmark in host-rendered text; the
+plugin view protocol does not expose the user's light/dark theme variant, so a
+fixed light or dark logo raster could become unreadable. Grade chips use
+distinct shared theme styling: accent for Good, outlined surface with a warning
+icon for Review, error container for Risky, and soft neutral for Unrated. The
+shell's embedded icon set does not include a generic warning glyph, so Review
+uses its supported `flag` caution icon. Grade words remain visible and
+accessible without colour. The sticky-note mint/sun/rose fills are rejected
+for panels by the protocol and are not used here.
+
+The panel uses the plugin protocol's scrollable list node as its bounded
+viewport. Native Control Centre grade capsules keep their icon and label in one
+row child, matching the host renderer's capsule layout rule. The scan button
+uses the bundled `restart_alt` icon.
+
+The snapshot's 15-minute freshness boundary applies in both surfaces. A stale
+or future timestamp yields Unrated and hides category/finding details; partial
+coverage and every capped list remain explicitly labelled. A missing plugin
+state, missing `privacybit`, failed scan or invalid state never produces a
+green grade. Amber must not rely on `ToneWarning`, because that maps to the
+theme's tertiary token and appeared green on the laptop palette.
+
+The plugin still runs with the same user privileges as sysc-shell. The panel
+cannot reach root, remove software, execute suggested remediation or act on
+findings. GPL-3.0-or-later applies to the plugin's source, UI and packaged
+assets.

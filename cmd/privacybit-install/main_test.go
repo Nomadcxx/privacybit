@@ -3,11 +3,29 @@ package main
 import (
 	"context"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
+
+func TestInstallerHeaderMatchesOfficialWordmark(t *testing.T) {
+	asset, err := os.ReadFile("../../assets/privacybit-header.conf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const prefix = "ansi_style=true\nascii_1=\"\"\"\n"
+	const suffix = "\n\"\"\"\n"
+	if !strings.HasPrefix(string(asset), prefix) || !strings.HasSuffix(string(asset), suffix) {
+		t.Fatal("official wordmark is not a valid ANSI header profile")
+	}
+	body := strings.TrimSuffix(strings.TrimPrefix(string(asset), prefix), suffix)
+	want := strings.ReplaceAll(strings.Join(asciiHeaderLines, "\n"), "\x1b", `\033`)
+	if body != want {
+		t.Fatalf("installer header differs from assets/privacybit-header.conf:\n got: %q\nwant: %q", body, want)
+	}
+}
 
 func TestInstallWaitsForReviewAndUsesSelectedServiceMode(t *testing.T) {
 	var buildCalls, serviceCalls int

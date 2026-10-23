@@ -54,6 +54,13 @@ var (
 	frameStyle  = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(1, 2)
 )
 
+var asciiHeaderLines = []string{
+	"\033[0;37m██▀██ ██▀██ ▀██▀ ██ ██ ██▀██ ██▀██ ██ ██ ██▀█▄ ▀██▀ ▀██▀\033[0m",
+	"\033[0;37m██▄█▀ ██▄█▀  ██  ██ ██ ██▄██ ██    ██▄██ ██▄█▀  ██   ██ \033[0m",
+	"\033[0;37m█▓░   █▓░█▓  █▓░ █▓░█▓ █▓░█▓ █▓░▄▄ ▄▄░█▓ █▓ █▓  █▓░  █▓░\033[0m",
+	"\033[0;37m▀▀    ▀▀ ▀▀ ▀▀▀▀  ▀▀▀  ▀▀ ▀▀ ▀▀▀▀▀ ▀▀▀▀▀ ▀▀▀▀  ▀▀▀▀  ▀▀ \033[0m",
+}
+
 var serviceModes = []struct {
 	name        string
 	label       string
@@ -193,6 +200,12 @@ func (m *model) View() string {
 		width = 88
 	}
 	var content strings.Builder
+	headerWidth := width - 10
+	if headerWidth < 1 {
+		headerWidth = 1
+	}
+	content.WriteString(lipgloss.NewStyle().Width(headerWidth).Align(lipgloss.Center).Render(strings.Join(asciiHeaderLines, "\n")))
+	content.WriteString("\n\n")
 	content.WriteString(titleStyle.Render("privacybit  /  INSTALL"))
 	content.WriteString("\n\n")
 	content.WriteString("Build and install the CLI for your user.\n")

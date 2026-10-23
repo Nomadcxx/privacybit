@@ -1,8 +1,23 @@
-# privacybit
+<div align="center">
 
-A privacy audit for Linux desktops. It checks installed applications and local
-VPN routing state, then explains what its evidence supports and where coverage
-is incomplete.
+<picture>
+  <source media="(prefers-reduced-motion: reduce) and (prefers-color-scheme: dark)" srcset="assets/header-dark-still.webp" />
+  <source media="(prefers-reduced-motion: reduce)" srcset="assets/header-light-still.webp" />
+  <source media="(prefers-color-scheme: dark)" srcset="assets/header-dark.webp" />
+  <img src="assets/header-light.webp" alt="privacybit ANSI wordmark with a moving cyan beam" width="88%" />
+</picture>
+
+<p>A local privacy audit for Linux desktops.</p>
+
+[![License](https://img.shields.io/badge/license-GPL--3.0--or--later-3434ff.svg)](LICENSE)
+![Platform](https://img.shields.io/badge/platform-Linux-3434ff.svg)
+![Go](https://img.shields.io/badge/Go-1.26.4+-00ADD8.svg)
+
+[Checks](#what-it-checks) · [Installation](#installation) · [Usage](#usage) · [sysc-shell](#sysc-shell) · [License](#license)
+
+</div>
+
+---
 
 ## What it checks
 
@@ -57,6 +72,18 @@ privacybit catalog validate
 
 Audits make no network requests. VPN checks inspect local interface, routing,
 and resolver state. privacybit does not send reports or usage data.
+
+## sysc-shell
+
+The **Privacy audit** plugin is available in the
+[sysc-plugins catalog](https://github.com/Nomadcxx/sysc-plugins/tree/main/plugins/privacy).
+Install it from sysc-shell's plugin manager. In Bar Editor, add **Privacy
+audit** to your bar. Click its shield **Review** item to open the panel. The
+Privacy page in Control Centre shows the grade and scan freshness; choose
+**Open full audit** to open the same panel. The panel lists categories,
+findings, VPN state, and coverage. **Scan now** runs a read-only audit. The
+plugin looks for `privacybit` on sysc-shell's `PATH` or at
+`~/.local/bin/privacybit`.
 
 ## Design
 
