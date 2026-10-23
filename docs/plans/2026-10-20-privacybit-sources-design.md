@@ -99,6 +99,13 @@ a null value is the whole design.
 not expose it as a vendor fact.
 ² `apk info -W` gives copyright text, not a licence identifier.
 
+`dpkg / apt` explicit-install state comes from `apt-mark showmanual`.
+`db:Status-Status=installed` only reports package state; it does not separate
+manually selected packages from automatic dependencies. Match apt marks against
+dpkg's architecture-qualified `${binary:Package}` identity while keeping
+`${Package}` as the catalogue name. If `apt-mark` is missing or fails,
+explicit-install state is unavailable for that scan.
+
 Verified on this machine (Arch, 2,882 packages), pacman's field set is:
 `Name Version Description Architecture URL Licenses Groups Provides DependsOn
 OptionalDeps RequiredBy OptionalFor ConflictsWith Replaces InstalledSize
@@ -176,7 +183,7 @@ of packages is slow, and D1 §6.2's two-tier cadence depends on that split.
 | Backend | Enumerate | Metadata for matches | Origin from |
 |---|---|---|---|
 | pacman | `pacman -Qq` | `pacman -Qi <name>` | repo list, `InstallReason`, `ValidatedBy` |
-| dpkg | `dpkg-query -W` | `dpkg-query -W -f=...` | apt policy / sources.list |
+| dpkg | `dpkg-query -W` | `dpkg-query -W -f=...`; `apt-mark showmanual` for explicit state | apt policy / sources.list |
 | dnf/yum | `dnf repoquery --installed` | `dnf repoquery --info` | `@System` vs repo id |
 | zypper | `zypper --query --installed` | `zypper --info` | repo id |
 | apk | `apk info` | `apk info -a` | repo tag |

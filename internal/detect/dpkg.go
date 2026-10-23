@@ -23,10 +23,9 @@ type Dpkg struct {
 
 // NewDpkg returns a dpkg source using r.
 //
-// Unlike Pacman there is no matches callback, because dpkg has no enrich pass
-// to narrow: Version and Explicit are the only facts dpkg -W reports, and both
-// are in the one listing call. Carrying a callback here would imply dpkg can be
-// asked to widen its own coverage, which it cannot.
+// Unlike Pacman there is no matches callback. dpkg-query reports versions in
+// one listing call, and apt-mark reports explicit-install state in one bulk
+// query; neither needs per-package enrichment.
 func NewDpkg(r Runner) *Dpkg {
 	return &Dpkg{Runner: r}
 }
@@ -34,13 +33,12 @@ func NewDpkg(r Runner) *Dpkg {
 // Name identifies the source in coverage reporting.
 func (d *Dpkg) Name() string { return "dpkg" }
 
-// Capabilities declares what dpkg can actually supply. Everything absent from
-// the -W format is false here, which is what makes the unavailable states
-// honest rather than a matter of remembering to fill them in.
+// Capabilities declares what dpkg and apt-mark can supply. Explicit-install
+// state is unavailable on systems where apt-mark is missing or cannot run.
 func (d *Dpkg) Capabilities() Capabilities {
 	return Capabilities{
 		Version:     true,
-		Explicit:    true, // from the "deinstall" and Section fields
+		Explicit:    true, // from apt-mark showmanual when available
 		Origin:      false,
 		Licence:     false,
 		Vendor:      false,
@@ -78,18 +76,30 @@ func (d *Dpkg) Availability() Availability {
 
 // Inventory lists installed packages.
 //
-// The one fact dpkg can supply beyond the name is whether the package was
-// explicitly requested or pulled in as a dependency, which it infers from the
-// status field's request state. Licence, vendor and signature state are
-// unavailable by construction rather than by omission.
+// apt-mark showmanual distinguishes packages selected by the user from
+// automatic dependencies. dpkg's binary:Package field retains architecture
+// qualifiers for exact apt-mark matching while Name stays catalogue-friendly.
+// If that query fails, package inventory remains useful and explicit-install
+// state stays unavailable.
 func (d *Dpkg) Inventory(ctx context.Context) ([]Observation, error) {
 	out, err := d.Runner.Run(ctx, "dpkg-query", "-W",
-		"-f=${Package}\t${Version}\t${db:Status-Status}\n")
+		"-f=${Package}\t${binary:Package}\t${Version}\n")
 	if err != nil {
 		if isNoPackages(err) || strings.Contains(err.Error(), "no packages found") {
 			return nil, nil
 		}
 		return nil, err
+	}
+	manualOutput, manualErr := d.Runner.Run(ctx, "apt-mark", "showmanual")
+	manual := make(map[string]struct{})
+	if manualErr == nil {
+		for _, name := range lines(manualOutput) {
+			manual[name] = struct{}{}
+		}
+	}
+	explicitWhy := "apt-mark showmanual failed"
+	if manualErr != nil {
+		explicitWhy += ": " + manualErr.Error()
 	}
 	const (
 		licenceWhy = "dpkg records no licence; cross-checking the catalogue is impossible here"
@@ -102,7 +112,12 @@ func (d *Dpkg) Inventory(ctx context.Context) ([]Observation, error) {
 		if len(fields) < 3 {
 			continue
 		}
-		name, version, status := fields[0], fields[1], fields[2]
+		name, binaryName, version := fields[0], fields[1], fields[2]
+		explicit := Unavailable[bool](explicitWhy)
+		if manualErr == nil {
+			_, isManual := manual[binaryName]
+			explicit = Observed(isManual)
+		}
 		o := Observation{
 			Name:    name,
 			Kind:    KindPackage,
@@ -111,7 +126,7 @@ func (d *Dpkg) Inventory(ctx context.Context) ([]Observation, error) {
 			Facts: Facts{
 				Licence:     Unavailable[string](licenceWhy),
 				Vendor:      Unavailable[string](vendorWhy),
-				Explicit:    Observed(status == "installed"),
+				Explicit:    explicit,
 				ReverseDeps: Unavailable[[]string]("dpkg -W does not report reverse dependencies"),
 				Signed:      Unavailable[bool](signedWhy),
 			},
