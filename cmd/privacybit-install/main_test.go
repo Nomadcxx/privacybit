@@ -21,9 +21,30 @@ func TestInstallerHeaderMatchesOfficialWordmark(t *testing.T) {
 		t.Fatal("official wordmark is not a valid ANSI header profile")
 	}
 	body := strings.TrimSuffix(strings.TrimPrefix(string(asset), prefix), suffix)
-	want := strings.ReplaceAll(strings.Join(asciiHeaderLines, "\n"), "\x1b", `\033`)
+	want := strings.ReplaceAll(strings.Join(wordmarkLines, "\n"), "\x1b", `\033`)
 	if body != want {
 		t.Fatalf("installer header differs from assets/privacybit-header.conf:\n got: %q\nwant: %q", body, want)
+	}
+}
+
+func TestInstallerWordmarkFallsBackOnNarrowTerminal(t *testing.T) {
+	model := newModel(context.Background(), nil, nil)
+	model.width = 50
+	view := model.View()
+	if strings.Contains(view, "██") {
+		t.Fatalf("wide wordmark was rendered into a narrow terminal:\n%s", view)
+	}
+	titleIndex := strings.Index(view, "privacybit  /  INSTALL")
+	if titleIndex < 0 || !strings.Contains(view[:titleIndex], "privacybit") {
+		t.Fatalf("narrow header lost the product name:\n%s", view)
+	}
+}
+
+func TestInstallerShowsWordmarkAtNormalTerminalWidth(t *testing.T) {
+	model := newModel(context.Background(), nil, nil)
+	model.width = 80
+	if view := model.View(); !strings.Contains(view, wordmarkLines[0]) {
+		t.Fatalf("normal-width installer is missing the official wordmark:\n%s", view)
 	}
 }
 

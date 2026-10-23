@@ -68,7 +68,8 @@ func Install(ctx context.Context, configHome, binaryPath, mode string, systemctl
 		return err
 	}
 	unitDir := filepath.Join(configHome, "systemd", "user")
-	if err := ensureUnitDir(unitDir); err != nil {
+	unitDir, err = ensureUnitDir(unitDir)
+	if err != nil {
 		return err
 	}
 	for _, name := range []string{"privacybit-daemon.service", "privacybit-scan.service", "privacybit-scan.timer"} {
@@ -104,15 +105,16 @@ func Disable(ctx context.Context, configHome string, systemctl SystemctlFunc) er
 		return errors.New("configuration home must be an absolute path")
 	}
 	unitDir := filepath.Join(configHome, "systemd", "user")
-	dirInfo, err := os.Lstat(unitDir)
+	_, err := os.Lstat(unitDir)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
 	}
 	if err != nil {
 		return fmt.Errorf("inspect user unit directory: %w", err)
 	}
-	if !dirInfo.IsDir() || dirInfo.Mode()&os.ModeSymlink != 0 || !ownedByCurrentUser(dirInfo) {
-		return errors.New("user unit directory must be a real directory owned by the current user")
+	unitDir, err = validateUnitDir(unitDir)
+	if err != nil {
+		return err
 	}
 	var units []string
 	for _, name := range []string{"privacybit-daemon.service", "privacybit-scan.timer"} {
@@ -157,25 +159,58 @@ func quoteSystemdPath(path string) (string, error) {
 			return "", errors.New("privacybit path contains a control character")
 		}
 	}
-	escaped := strings.NewReplacer(`\`, `\\`, `"`, `\"`, "%", "%%").Replace(path)
+	escaped := strings.NewReplacer(`\`, `\\`, `"`, `\"`, "%", "%%", "$", "$$").Replace(path)
 	return `"` + escaped + `"`, nil
 }
 
-func ensureUnitDir(dir string) error {
+func ensureUnitDir(dir string) (string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("create user unit directory: %w", err)
+		return "", fmt.Errorf("create user unit directory: %w", err)
 	}
+	return validateUnitDir(dir)
+}
+
+func validateUnitDir(dir string) (string, error) {
 	info, err := os.Lstat(dir)
 	if err != nil {
-		return err
+		return "", fmt.Errorf("inspect user unit directory: %w", err)
 	}
 	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-		return errors.New("user unit path must be a real directory")
+		return "", errors.New("user unit path must be a real directory")
 	}
 	if !ownedByCurrentUser(info) {
-		return errors.New("user unit directory is not owned by the current user")
+		return "", errors.New("user unit directory is not owned by the current user")
 	}
-	return nil
+	if info.Mode().Perm()&0o022 != 0 {
+		return "", errors.New("user unit directory must not be group- or world-writable")
+	}
+	resolved, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return "", fmt.Errorf("resolve user unit directory: %w", err)
+	}
+	current := string(filepath.Separator)
+	for _, component := range strings.Split(strings.TrimPrefix(filepath.Clean(resolved), current), current) {
+		if component == "" {
+			continue
+		}
+		current = filepath.Join(current, component)
+		ancestor, err := os.Lstat(current)
+		if err != nil {
+			return "", fmt.Errorf("inspect user unit path component %s: %w", current, err)
+		}
+		if !ancestor.IsDir() || ancestor.Mode()&os.ModeSymlink != 0 {
+			return "", fmt.Errorf("user unit path component %s must be a real directory", current)
+		}
+		stat, ok := ancestor.Sys().(*syscall.Stat_t)
+		if !ok || (stat.Uid != 0 && stat.Uid != uint32(os.Geteuid())) {
+			return "", fmt.Errorf("user unit path component %s must be owned by root or the current user", current)
+		}
+		// Root-owned sticky directories such as /tmp protect user-owned child paths.
+		if ancestor.Mode().Perm()&0o022 != 0 && ancestor.Mode()&os.ModeSticky == 0 {
+			return "", fmt.Errorf("user unit path component %s must not be writable by other users", current)
+		}
+	}
+	return resolved, nil
 }
 
 func writeUnit(dir, name string, data []byte) error {

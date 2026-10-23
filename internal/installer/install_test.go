@@ -120,6 +120,85 @@ func TestInstallRejectsInvalidModeAndSymlinkUnitDirectory(t *testing.T) {
 	}
 }
 
+func TestInstallRejectsGroupWritableUnitDirectory(t *testing.T) {
+	root := t.TempDir()
+	configHome := filepath.Join(root, "config")
+	unitDir := filepath.Join(configHome, "systemd", "user")
+	if err := os.MkdirAll(unitDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(unitDir, 0o777); err != nil {
+		t.Fatal(err)
+	}
+	binary := filepath.Join(root, "privacybit")
+	if err := os.WriteFile(binary, []byte("binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	runner := func(context.Context, ...string) error { calls++; return nil }
+	if err := Install(context.Background(), configHome, binary, "watcher", runner); err == nil {
+		t.Fatal("group- and world-writable user unit directory was accepted")
+	}
+	if calls != 0 {
+		t.Fatalf("rejected install called systemctl %d times", calls)
+	}
+}
+
+func TestInstallRejectsGroupWritableUnitDirectoryAncestor(t *testing.T) {
+	root := t.TempDir()
+	configHome := filepath.Join(root, "config")
+	systemdDir := filepath.Join(configHome, "systemd")
+	unitDir := filepath.Join(systemdDir, "user")
+	if err := os.MkdirAll(unitDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(systemdDir, 0o777); err != nil {
+		t.Fatal(err)
+	}
+	binary := filepath.Join(root, "privacybit")
+	if err := os.WriteFile(binary, []byte("binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	runner := func(context.Context, ...string) error { calls++; return nil }
+	if err := Install(context.Background(), configHome, binary, "watcher", runner); err == nil {
+		t.Fatal("group- and world-writable unit directory ancestor was accepted")
+	}
+	if calls != 0 {
+		t.Fatalf("rejected install called systemctl %d times", calls)
+	}
+}
+
+func TestValidateUnitDirReturnsCanonicalPathForOwnedSymlink(t *testing.T) {
+	root := t.TempDir()
+	configHome := filepath.Join(root, "config-real")
+	unitDir := filepath.Join(configHome, "systemd", "user")
+	if err := os.MkdirAll(unitDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	configLink := filepath.Join(root, "config-link")
+	if err := os.Symlink(configHome, configLink); err != nil {
+		t.Fatal(err)
+	}
+	got, err := validateUnitDir(filepath.Join(configLink, "systemd", "user"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != unitDir {
+		t.Fatalf("validated unit directory = %q, want canonical path %q", got, unitDir)
+	}
+}
+
+func TestQuoteSystemdPathEscapesDollarExpansion(t *testing.T) {
+	got, err := quoteSystemdPath("/home/user/$HOME/bin%/privacybit")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `"/home/user/$$HOME/bin%%/privacybit"`; got != want {
+		t.Fatalf("quoted path = %q, want %q", got, want)
+	}
+}
+
 func TestDisableStopsInstalledWatcherAndTimer(t *testing.T) {
 	configHome := t.TempDir()
 	unitDir := filepath.Join(configHome, "systemd", "user")
@@ -172,5 +251,27 @@ func TestDisableDoesNothingWithoutUnitsAndRejectsSymlinkUnit(t *testing.T) {
 	}
 	if calls != 0 {
 		t.Fatalf("rejected unit called systemctl %d times", calls)
+	}
+}
+
+func TestDisableRejectsGroupWritableUnitDirectory(t *testing.T) {
+	configHome := t.TempDir()
+	unitDir := filepath.Join(configHome, "systemd", "user")
+	if err := os.MkdirAll(unitDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(unitDir, 0o777); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(unitDir, "privacybit-daemon.service"), []byte("unit"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	runner := func(context.Context, ...string) error { calls++; return nil }
+	if err := Disable(context.Background(), configHome, runner); err == nil {
+		t.Fatal("group- and world-writable user unit directory was accepted")
+	}
+	if calls != 0 {
+		t.Fatalf("rejected directory called systemctl %d times", calls)
 	}
 }
