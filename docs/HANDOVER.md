@@ -92,35 +92,40 @@ matters so much.
 
 | Absolute path | What it is | State |
 |---|---|---|
-| `/home/nomadx/privacy-bit` | **This project.** Branch `main`; local branch `feat/privacybit-final-20261022` retained. Release tag `v0.1.0` points to `fae52ba`. | Delivery phases 0–9 and 12, installer follow-on, Arch package preparation, and the GPL-3.0-or-later README/ANSI wordmark update are published. The unrelated untracked `.commandcode/` data is untouched. |
+| `/home/nomadx/privacy-bit` | **This project.** Branch `main`; release tag `v0.1.0` points to `fae52ba`, which is now an ancestor of `main`. | PRs #2 and #5 are merged. The installer path fix, ANSI wordmark, README update, and runner descendant-exit test are on `main`. The unrelated untracked `.commandcode/` data is untouched. |
 | `/home/nomadx/privacy-bit/docs/plans/` | Seven design documents and implementation plans. | D1–D7 record the approved design. Phase 3, 4, 8, and 9 plans remain as audit history. |
-| `/home/nomadx/sysc-plugins/.worktrees/privacybit-plugin-20261022` | Plugin branch `feat/privacybit-plugin`, commit `a502f38`. | Phase 10 publisher and synthetic catalog screenshot are committed locally. `catalog.json` has no privacy entry yet, so the store cannot install it. |
-| `/home/nomadx/sysc-shell/.worktrees/sysc-1307-privacy-final-20261022` | Shell branch `feat/sysc-1307-privacy-final-20261022`, deployed revision `9f05fcc8`. | Phases 11–12 are committed; live Niri verification passed on 2026-10-22. The branch also preserves deployed launcher fix `c2d274e3`. |
-| `/home/nomadx/.config/sysc-shell/plugins/org.sysc.privacy` | User plugin link to the sysc-plugins worktree. | Enabled for the local integration. The running plugin published a current schema-1 snapshot. |
-| `/home/nomadx/sysc-shell` | Primary shell checkout. | Contains independent work and Beads state; use its Beads database only, and do not clean or deploy this checkout. |
+| `Nomadcxx/sysc-plugins` `main` | Upstream revision `e542651b` (2026-10-23). | PRs #207 and #208 are merged. The catalog contains `org.sysc.privacy`; release `privacy-v0.1.0` provides Linux amd64 and arm64 assets. The manifest declares a bar widget and plugin panel. |
+| `Nomadcxx/sysc-shell` `main` | Upstream revision `72caa273` (2026-10-23). | PRs #436 and #437 are merged. The Control Centre keeps its capture card, displays a compact audit summary, and routes `Open full audit` to the plugin panel. |
+| `nomadx@192.168.0.64:7777` laptop testbench | Plugin worktree `/home/nomadx/worktrees/privacybit-plugin-testbench-20261023` at `e542651b`. | The plugin binary is executable; `~/.local/bin/privacybit` is runnable; `~/.local/bin/sysc-shell` embeds revision `72caa273` with `vcs.modified=false`. `config.json` enables the plugin and places its `bar` widget as `privacybit-testbench`. |
+| Local `/home/nomadx/.config/sysc-shell/plugins/org.sysc.privacy` | Symlink to `/home/nomadx/sysc-plugins/.worktrees/privacybit-plugin-20261022/plugins/privacy`. | This local link still targets publisher-only commit `0eb063f`; it does not contain the merged bar and panel. Do not use it as current integration evidence. |
+| `/home/nomadx/sysc-plugins` | Primary plugin checkout. | Branch `fix/kdeconnect-pairing-card-routing` has independent dirty changes, including an untracked `plugins/privacy`. Do not clean or repurpose it; upstream `main` is the source of truth for the published plugin. |
+| `/home/nomadx/sysc-shell` | Primary shell checkout. | Branch `audit/toasthost-wayland-crash` is behind upstream and has independent dirty changes and Beads state. Do not clean or deploy it; upstream `main` is the source of truth for the merged integration. |
 | `/home/nomadx/sysc-plugins/cmd/sysc-plugin-calendar/main.go` | The precedent to copy for the plugin. | Reference only. |
 | `/home/nomadx/sysc-plugins/plugins/calendar/manifest.json` | Manifest shape to copy. | Reference only. |
 | `/home/nomadx/moonbit` | Sibling project this was modelled on. 100% owned by the same author, so reuse is unrestricted. | **132 commits behind its own `origin/main`** — read `origin/main`, not the working tree. |
 | `/tmp/moonbit-header` | Detached worktree at moonbit `origin/main` (`5948bd0`). | May not survive a reboot; recreate if missing. |
 
-### 2.2 Privacybit integration files in the sysc-shell worktree
+### 2.2 Privacybit integration files on upstream main
 
-Phase 11 added the audit card using sysc-shell's existing warning-to-activity
-tone mapping. Phase 12 adds the host-owned scan action. All paths are relative to
-`/home/nomadx/sysc-shell/.worktrees/sysc-1307-privacy-final-20261022`.
+The current implementation is merged in sysc-plugins PRs #207/#208 and
+sysc-shell PRs #436/#437. The plugin owns the full audit panel and scan action;
+sysc-shell owns the Control Centre summary and route. The laptop testbench uses
+these merged revisions.
 
 | File | Role |
 |---|---|
-| `internal/shell/controlcenter_pages.go` | Reads bounded schema-1 plugin state and renders the audit card below capture activity. |
-| `internal/shell/controlcenter_test.go` | Covers snapshot validation, card rendering, currentness, and grade tones. |
-| `internal/shell/controlcenter_privacy_scan.go` | Runs `privacybit scan` outside `Registry.mu`, reads the private saved report on page open and after a scan, and renders scan status, grade, and timestamp. |
-| `internal/shell/controlcenter_privacy_scan_test.go` | Covers report bounds and freshness, timer-created report loading, duplicate-scan prevention, and missing-binary status. |
+| `sysc-plugins/plugins/privacy/manifest.json` | Declares the `bar` widget and `panel` entry under `org.sysc.privacy`. |
+| `sysc-plugins/plugins/privacy/view.go` | Renders the overall grade in the bar and the detailed, scrollable audit panel. |
+| `sysc-plugins/cmd/sysc-plugin-privacy/main.go` | Publishes bounded state, refreshes the snapshot with `privacybit audit --snapshot`, and opens the panel from the bar event. |
+| `sysc-shell/internal/shell/controlcenter_pages.go` | Preserves capture activity and renders the compact audit summary with an `Open full audit` action. |
+| `sysc-shell/internal/shell/popout_controlcenter.go` | Routes `Open full audit` to the plugin's declared audit panel. |
+| `sysc-shell/internal/shell/controlcenter_test.go` | Covers snapshot validation, currentness, grade presentation, and the audit summary. |
+| `sysc-shell/internal/shell/privacy_test.go` | Covers the existing microphone, camera, and screen-share activity shown above the audit summary. |
 
-`plugin/v1.ToneWarning` already maps to `ui.ToneActivity` in current
-sysc-shell `main`; this integration reuses it. Protocol v1 also sends
-`input.event` to plugin-owned views. The privacy plugin remains state-only; the
-native Control Centre owns the `Run scan` action and reads privacybit's private
-XDG report.
+The full panel displays categories, network checks, findings, and coverage
+limits. It treats stale and unavailable snapshots as unrated. The Control
+Centre no longer launches scans or reads the saved report; both the bar and its
+`Open full audit` action open the plugin panel.
 
 ---
 
@@ -308,18 +313,15 @@ and in the validator's requirement that every entry can be explained.
 ## 5. Architecture
 
 ```
-                    privacybit  (/home/nomadx/privacy-bit)
-                    ├── CLI      privacybit audit|explain|list|watch|tui
-                    ├── TUI      privacybit tui                    [D3]
-                    ├── daemon   event watcher, user-level         [D7]
-                    ├── helper   privacybit-helper (root)         [D4]
-                    └── internal packages
-                              │
-                              ▼  shells out to the binary
-                      sysc-plugins/plugins/privacy  [D5]
-                              │  state.set "control_center"
-                              ▼
-                     sysc-shell Control Centre → privacy panel
+privacybit binary (CLI, TUI, and internal audit engine)
+       ▲
+       │ `privacybit audit --snapshot`
+       │
+org.sysc.privacy plugin
+   ├── bar widget ────────────────┐
+   ├── audit panel (`Scan now`) ───┤
+   └── bounded state snapshot ──→ Control Centre summary
+                                     └── `Open full audit` → audit panel
 ```
 
 **The plugin shells out rather than importing the module.** The engine lives
@@ -346,8 +348,8 @@ cmd/privacybit/       CLI, audit, TUI, scheduled run, purge
 cmd/privacybit-helper/ constrained helper executable
 cmd/privacybit-installer/ installs the user watcher or timer
 cmd/privacybit-install/  builds and installs privacybit for the current user
-sysc-plugins/plugins/privacy   five-minute snapshot publisher
-sysc-shell/internal/shell     bounded reader and Control Centre card
+sysc-plugins/plugins/privacy   snapshot publisher, bar widget, audit panel
+sysc-shell/internal/shell     snapshot reader, summary, panel route
 ```
 
 `internal/report` owns shared report and grade rendering. The plugin shells
@@ -369,17 +371,16 @@ See §3.4 for absolute paths. In brief:
 | **D2** | CLI surface, NDJSON contract, exit codes, config |
 | **D3** | Bubble Tea model, 13 screens, keybindings, navigation stack |
 | **D4** | Root helper, closed verb set, review tokens, sudo dance |
-| **D5** | sysc-shell publisher + host wiring, reusing the existing warning tone |
+| **D5** | sysc-plugins publisher and panel, plus the sysc-shell summary route |
 | **D6** | Multi-distribution source layer, invariant I2 |
 | **D7** | Daemon, event watcher, Class A/B/C, systemd units |
 
 ### 6.2 Delivery phases
 
-Implementation for phases 0–12 is committed across the local feature branches
-listed in §2. Automated verification appears in §11. The clean sysc-shell
-branch was deployed through `scripts/deploy`; the live Niri check passed. The
-privacy plugin is linked and enabled locally, but is not in the published
-plugin catalog.
+Implementation for phases 0–12 is merged in privacybit, sysc-plugins, and
+sysc-shell. Automated verification appears in §11. The privacy plugin is
+published in the catalog and release. The laptop testbench runs the merged
+plugin and shell revisions, with the plugin enabled and its bar widget placed.
 
 | Phase | Deliverable | State |
 |---|---|---|
@@ -394,8 +395,8 @@ plugin catalog.
 | 8 | Root helper and installer | Complete |
 | 9 | Scheduler, daemon, Unix socket, event watcher | Complete |
 | 10 | sysc-plugins privacy publisher | Complete |
-| 11 | sysc-shell Control Centre audit card using the existing warning tone | Complete |
-| 12 | Host-owned read-only scan action, shared report lock, and GPL-3.0-or-later licensing | Complete |
+| 11 | Control Centre audit summary with a route to the plugin panel | Complete |
+| 12 | Plugin-owned bar, audit panel, read-only scan, and GPL-3.0-or-later licensing | Complete |
 
 ### 6.3 Phase 1 — catalogue
 
@@ -630,15 +631,15 @@ two do not collide.)
 
 | Item | State |
 |---|---|
-| Live Niri verification of the Control Centre page | Passed on 2026-10-22 after deploying sysc-shell revision `9f05fcc8`. The panel rendered on `DP-3`, the plugin published a current snapshot, and the capture rows remained visible. The live screenshot is local-only at `/home/nomadx/.cache/privacybit-live-20261022.png` because it includes real machine inventory. |
+| Laptop testbench integration | Checked over SSH on 2026-10-23. The plugin link resolves to worktree `e542651b`; `plugins/privacy/bin/sysc-plugin-privacy` is executable and its process is running. The active `sysc-shell.service` embeds `72caa273` with `vcs.modified=false`; config enables `org.sysc.privacy` and places its bar entry as `privacybit-testbench`. `/home/nomadx/.local/bin/privacybit --help` runs. |
 | Live telemetry endpoint attribution | Deferred by D7 §5.2: no reviewed endpoint dataset or reliable PID attribution. Snapshots report this signal as unknown. |
 | Effective Flatpak permissions by installation scope | Deferred. Current detector reads declared permissions, so the grader leaves sandbox posture unmeasured. |
 | dnf, zypper, apk, and xbps backends | Deferred under D6; universal sources report what they can see, with coverage caveats. |
 | Nix and Snap package-manager sources | Deferred under D6 because their models do not fit the package-manager interface. |
 | Licence | `LICENSE`, README, `PKGBUILD`, and `.SRCINFO` use GPL-3.0-or-later. The full licence text matches `/usr/share/licenses/spdx/GPL-3.0-or-later.txt`. The checked sysc-shell tree remains BSD-3-Clause and sysc-plugins remains MIT; neither was changed. |
-| Panel scans and report actions | Implemented as the approved host-owned action in Phase 12. It runs the current user's `privacybit scan` and reads the bounded saved report; it does not invoke plugin actions or privileged operations. |
-| sysc-plugins store entry | Publisher and synthetic screenshot are committed locally, linked, enabled, and live-verified. `catalog.json` has no `org.sysc.privacy` entry or release assets, so users cannot install it from the store yet. |
-| Release and AUR package | GitHub release [`v0.1.0`](https://github.com/Nomadcxx/privacybit/releases/tag/v0.1.0) and AUR package [`privacybit 0.1.0-1`](https://aur.archlinux.org/packages/privacybit) are published. Tag `v0.1.0` points to `fae52ba`, one commit on top of `origin/main`; the release commit is not merged into `main`. |
+| Panel scans and report actions | The plugin panel runs `privacybit audit --snapshot` as the current user and renders the bounded snapshot. The Control Centre routes to that panel; it does not scan or read the saved report. |
+| sysc-plugins store entry | `catalog.json` contains `org.sysc.privacy`. Release `privacy-v0.1.0` provides amd64 and arm64 assets; PRs #207 and #208 are merged. |
+| Release and AUR package | GitHub release [`v0.1.0`](https://github.com/Nomadcxx/privacybit/releases/tag/v0.1.0) and AUR package [`privacybit 0.1.0-1`](https://aur.archlinux.org/packages/privacybit) are published. Tag `v0.1.0` points to `fae52ba` and is an ancestor of `main`. |
 
 ### 10.2 Design corrections and open conflicts
 
@@ -682,12 +683,11 @@ Recorded because a future reader will trust the docs.
    exposes other users' processes and `/proc` entries. The verb is now deferred
    from v1; any wider audit needs a separate owner decision.
 
-8. **D5's original viewer-only host boundary was revised.** Protocol v1 has
-   `input.event` for plugin-owned views, but the privacy plugin is state-only
-   and the native Control Centre does not route actions to it. The user
-   approved a host-owned read-only `Run scan` action instead: it runs
-   `privacybit scan` as the current user and reads the private bounded report.
-   The plugin protocol remains unchanged; D5 §6.5 records the revised design.
+8. **D5's host-owned `Run scan` design was superseded.** The owner approved it
+   on 2026-10-20, then approved D5 §11 on 2026-10-23. The current plugin owns
+   the bar widget, audit panel, and read-only `Scan now` action. The Control
+   Centre keeps a compact summary and routes `Open full audit` to that panel.
+   The plugin protocol remains unchanged.
 
 ### 10.3 Implementation defects and corrections
 
@@ -787,13 +787,13 @@ Recorded because a future reader will trust the docs.
 
 ---
 
-## 11. Verification and remaining gate
+## 11. Verification and open gaps
 
 | Repository | Automated checks | Result |
 |---|---|---|
-| privacybit | Formatting, `git diff --check`, `go test -count=1 -p 2 ./...`, `go vet -p 2 ./...`, and `go build -p 2 ./...`; packaging checks | Go checks pass on 2026-10-23, including the installer canonical-path regression test. GPL text comparison, generated `.SRCINFO` comparison, and an isolated-HOME TUI build/install passed on 2026-10-22. |
-| sysc-plugins | Privacy tests and race tests, focused vet, plugin build, `make validate catalog-validate thumbnails`, and gofmt check | Pass on 2026-10-22. The privacy screenshot and generated thumbnail match; `catalog.json` still has no privacy release entry. |
-| sysc-shell worktree | Full formatting check, `go build -p 2 ./...`, `go vet -p 2 ./...`, and normal tests for `plugin/v1`, `internal/plugin`, and all of `internal/shell`; dependency diff | Pass after merging the deployed launcher fix. `go.mod` and `go.sum` are unchanged. The live Privacy page displayed the capture card and a current audit snapshot without horizontal clipping. |
+| privacybit | Formatting, `git diff --check`, `go test -count=1 -p 2 ./...`, `go vet -p 2 ./...`, and `go build -p 2 ./...`; packaging checks | Go checks pass on 2026-10-23 after PR #5, including the runner descendant-exit test and installer canonical-path regression test. GPL text comparison, generated `.SRCINFO` comparison, and an isolated-HOME TUI build/install passed on 2026-10-22. |
+| sysc-plugins | PR #207 adds the catalog entry; PR #208 adds the bar widget and audit panel | Both PRs are merged. PR #207 reported no checks; PR #208's GitHub `test` check passed. Release `privacy-v0.1.0` supplies amd64 and arm64 assets. |
+| sysc-shell | PR #436 adds the original summary; PR #437 routes it to the plugin panel | Both PRs are merged and their GitHub `test` checks passed. The laptop testbench runs `72caa273`; its plugin process is running and the bar placement is configured. |
 
 The live review's evidence is also recorded in sysc-shell issue `sysc-1444`.
 The primary checkout's Beads export has independent changes; inspect it before
@@ -807,11 +807,12 @@ three passed.
 
 Privacybit Go commands use `GOTMPDIR=/home/nomadx/.cache/privacybit-gotmp`; the
 sysc-shell worktree uses `GOTMPDIR=/home/nomadx/.cache/sysc-shell-gotmp`. The
-repositories use `GOMAXPROCS=4` and `-p 2` for repository-wide work. Go 1.26 also uses
-`GOTMPDIR` for `t.TempDir()`; the long build paths exceed Linux's Unix socket
-limit in shell tests. Test commands therefore use
-`-exec='env GOTMPDIR=/tmp/pbt'` for test processes while the Go tool keeps build
-files in the cache directory.
+repositories use `GOMAXPROCS=4` and `-p 2` for repository-wide work. Go 1.26
+also uses `GOTMPDIR` for `t.TempDir()`. Long test paths exceed Linux's Unix
+socket limit, so this machine runs test processes with
+`-exec='env GOTMPDIR=/var/tmp/pbtt'` while the Go command keeps build files in
+the cache directory. `/tmp` hit its quota during a nested installer build; use
+the root-backed `/var/tmp` path for the test process.
 
 ---
 
