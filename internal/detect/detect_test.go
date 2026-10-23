@@ -120,13 +120,13 @@ func TestPacmanKeepsPackageWhenEnrichmentFails(t *testing.T) {
 }
 
 // TestDpkgReportsNoFactsItCannotSupply is the reference case for the invariant.
-// dpkg lists versions and whether a package was explicitly requested, and
-// nothing else. Every other fact must be unavailable rather than empty, so the
-// reason a licence cannot be cross-checked reaches the person reading it.
+// dpkg lists versions, while apt-mark supplies explicit-install state.
+// Other unsupported facts remain unavailable, so catalogue checks do not
+// treat missing Debian metadata as a clean result.
 func TestDpkgReportsNoFactsItCannotSupply(t *testing.T) {
-	out := "bash\t5.2\tsomething-installed\ncoreutils\t9.1\tinstall\n"
+	out := "bash\tbash\t5.2\ncoreutils\tcoreutils\t9.1\n"
 	r := MapRunner{Output: map[string]string{
-		"dpkg-query -W -f=${Package}\t${Version}\t${db:Status-Status}\n": out,
+		"dpkg-query -W -f=${Package}\t${binary:Package}\t${Version}\n": out,
 	}}
 	obs, err := NewDpkg(r).Inventory(context.Background())
 	if err != nil {
@@ -150,6 +150,70 @@ func TestDpkgReportsNoFactsItCannotSupply(t *testing.T) {
 	}
 }
 
+func TestDpkgUsesAptMarkForExplicitInstallState(t *testing.T) {
+	listing := "firefox\tfirefox\t1.0\nlibexample1\tlibexample1\t2.0\n"
+	r := MapRunner{Output: map[string]string{
+		"dpkg-query -W -f=${Package}\t${binary:Package}\t${Version}\n": listing,
+		"apt-mark showmanual": "firefox\n",
+	}}
+	obs, err := NewDpkg(r).Inventory(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(obs) != 2 {
+		t.Fatalf("got %d observations, want 2", len(obs))
+	}
+	if got := obs[0].Facts.Explicit; got.State != StateObserved || !got.Value {
+		t.Fatalf("manual package explicit state = %+v, want observed true", got)
+	}
+	if got := obs[1].Facts.Explicit; got.State != StateObserved || got.Value {
+		t.Fatalf("automatic dependency explicit state = %+v, want observed false", got)
+	}
+}
+
+func TestDpkgMatchesAptMarksByArchitectureQualifiedName(t *testing.T) {
+	listing := "libexample1\tlibexample1:amd64\t1.0\n" +
+		"libexample1\tlibexample1:i386\t1.0\n"
+	r := MapRunner{Output: map[string]string{
+		"dpkg-query -W -f=${Package}\t${binary:Package}\t${Version}\n": listing,
+		"apt-mark showmanual": "libexample1:i386\n",
+	}}
+	obs, err := NewDpkg(r).Inventory(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(obs) != 2 {
+		t.Fatalf("got %d observations, want both architectures", len(obs))
+	}
+	for _, observation := range obs {
+		if observation.Name != "libexample1" {
+			t.Fatalf("catalogue name = %q, want unqualified libexample1", observation.Name)
+		}
+	}
+	if got := obs[0].Facts.Explicit; got.State != StateObserved || got.Value {
+		t.Fatalf("native package explicit state = %+v, want observed false", got)
+	}
+	if got := obs[1].Facts.Explicit; got.State != StateObserved || !got.Value {
+		t.Fatalf("foreign package explicit state = %+v, want observed true", got)
+	}
+}
+
+func TestDpkgKeepsInventoryWhenAptMarkFails(t *testing.T) {
+	r := MapRunner{Output: map[string]string{
+		"dpkg-query -W -f=${Package}\t${binary:Package}\t${Version}\n": "firefox\tfirefox\t1.0\n",
+	}}
+	obs, err := NewDpkg(r).Inventory(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(obs) != 1 || obs[0].Name != "firefox" {
+		t.Fatalf("inventory = %+v, want firefox retained after apt-mark failure", obs)
+	}
+	if got := obs[0].Facts.Explicit; got.State != StateUnavailable || got.Why == "" {
+		t.Fatalf("explicit-install state = %+v, want unavailable with a reason", got)
+	}
+}
+
 func TestDpkgAvailabilityIsNotTheSameAsTheBinaryExisting(t *testing.T) {
 	// dpkg-query is installed on this machine's Arch system and manages
 	// nothing. Reporting that as a coverage gap would be wrong.
@@ -157,7 +221,7 @@ func TestDpkgAvailabilityIsNotTheSameAsTheBinaryExisting(t *testing.T) {
 		// Availability probes with a bare query; Inventory asks for the
 		// formatted listing. They are two calls and need two fixtures.
 		"dpkg-query -W": "",
-		"dpkg-query -W -f=${Package}\t${Version}\t${db:Status-Status}\n": "",
+		"dpkg-query -W -f=${Package}\t${binary:Package}\t${Version}\n": "",
 	}}
 	a := NewDpkg(empty).Availability()
 	if !a.Ready || !a.Empty {
