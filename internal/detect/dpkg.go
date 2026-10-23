@@ -57,7 +57,7 @@ func (d *Dpkg) Availability() Availability {
 	if _, err := d.Runner.LookPath("dpkg-query"); err != nil {
 		return NotReady("dpkg-query is not installed")
 	}
-	out, err := d.Runner.Run(context.Background(), "dpkg-query", "-W")
+	out, err := d.Runner.Run(context.Background(), "dpkg-query", "-W", "-f=${db:Status-Status}\n")
 	if err != nil {
 		// dpkg-query exits 1 when no packages match the selection. On a
 		// real Debian host that is not possible, but on a foreign host it
@@ -68,10 +68,12 @@ func (d *Dpkg) Availability() Availability {
 		}
 		return NotReady("dpkg-query -W failed: " + err.Error())
 	}
-	if len(lines(out)) == 0 {
-		return ReadyEmpty()
+	for _, status := range lines(out) {
+		if status == "installed" {
+			return Available()
+		}
 	}
-	return Available()
+	return ReadyEmpty()
 }
 
 // Inventory lists installed packages.
@@ -83,7 +85,7 @@ func (d *Dpkg) Availability() Availability {
 // state stays unavailable.
 func (d *Dpkg) Inventory(ctx context.Context) ([]Observation, error) {
 	out, err := d.Runner.Run(ctx, "dpkg-query", "-W",
-		"-f=${Package}\t${binary:Package}\t${Version}\n")
+		"-f=${Package}\t${binary:Package}\t${Version}\t${db:Status-Status}\n")
 	if err != nil {
 		if isNoPackages(err) || strings.Contains(err.Error(), "no packages found") {
 			return nil, nil
@@ -109,7 +111,7 @@ func (d *Dpkg) Inventory(ctx context.Context) ([]Observation, error) {
 	var obs []Observation
 	for _, l := range lines(out) {
 		fields := strings.Split(l, "\t")
-		if len(fields) < 3 {
+		if len(fields) < 4 || fields[3] != "installed" {
 			continue
 		}
 		name, binaryName, version := fields[0], fields[1], fields[2]

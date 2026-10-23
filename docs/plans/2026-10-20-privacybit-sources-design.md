@@ -106,6 +106,10 @@ dpkg's architecture-qualified `${binary:Package}` identity while keeping
 `${Package}` as the catalogue name. If `apt-mark` is missing or fails,
 explicit-install state is unavailable for that scan.
 
+`dpkg-query -W` also returns residual package records whose status is
+`config-files`. Inventory and availability count only rows with
+`${db:Status-Status}=installed`.
+
 Verified on this machine (Arch, 2,882 packages), pacman's field set is:
 `Name Version Description Architecture URL Licenses Groups Provides DependsOn
 OptionalDeps RequiredBy OptionalFor ConflictsWith Replaces InstalledSize
@@ -183,7 +187,7 @@ of packages is slow, and D1 §6.2's two-tier cadence depends on that split.
 | Backend | Enumerate | Metadata for matches | Origin from |
 |---|---|---|---|
 | pacman | `pacman -Qq` | `pacman -Qi <name>` | repo list, `InstallReason`, `ValidatedBy` |
-| dpkg | `dpkg-query -W` | `dpkg-query -W -f=...`; `apt-mark showmanual` for explicit state | apt policy / sources.list |
+| dpkg | `dpkg-query -W` (installed status only) | `dpkg-query -W -f=...`; `apt-mark showmanual` for explicit state | apt policy / sources.list |
 | dnf/yum | `dnf repoquery --installed` | `dnf repoquery --info` | `@System` vs repo id |
 | zypper | `zypper --query --installed` | `zypper --info` | repo id |
 | apk | `apk info` | `apk info -a` | repo tag |
