@@ -1,6 +1,6 @@
 # privacybit — project handover
 
-**Written:** 2026-10-20
+**Written:** 2026-10-23
 **This file's absolute path:** `/home/nomadx/privacy-bit/docs/HANDOVER.md`
 **Repository:** `https://github.com/Nomadcxx/privacybit` (branch `main`)
 **Module:** `github.com/Nomadcxx/privacybit` (Go 1.26.4)
@@ -92,7 +92,7 @@ matters so much.
 
 | Absolute path | What it is | State |
 |---|---|---|
-| `/home/nomadx/privacy-bit` | **This project.** Branch `feat/privacybit-final-20261022`; release tag `v0.1.0` points to `fae52ba`. | Delivery phases 0–9 and 12, installer follow-on, and Arch package preparation are committed. The unrelated untracked `.commandcode/` data is untouched. |
+| `/home/nomadx/privacy-bit` | **This project.** Branch `main`; local branch `feat/privacybit-final-20261022` retained. Release tag `v0.1.0` points to `fae52ba`. | Delivery phases 0–9 and 12, installer follow-on, Arch package preparation, and the GPL-3.0-or-later README/ANSI wordmark update are published. The unrelated untracked `.commandcode/` data is untouched. |
 | `/home/nomadx/privacy-bit/docs/plans/` | Seven design documents and implementation plans. | D1–D7 record the approved design. Phase 3, 4, 8, and 9 plans remain as audit history. |
 | `/home/nomadx/sysc-plugins/.worktrees/privacybit-plugin-20261022` | Plugin branch `feat/privacybit-plugin`, commit `a502f38`. | Phase 10 publisher and synthetic catalog screenshot are committed locally. `catalog.json` has no privacy entry yet, so the store cannot install it. |
 | `/home/nomadx/sysc-shell/.worktrees/sysc-1307-privacy-final-20261022` | Shell branch `feat/sysc-1307-privacy-final-20261022`, deployed revision `9f05fcc8`. | Phases 11–12 are committed; live Niri verification passed on 2026-10-22. The branch also preserves deployed launcher fix `c2d274e3`. |
