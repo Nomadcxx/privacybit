@@ -169,6 +169,26 @@ func TestInstallRejectsGroupWritableUnitDirectoryAncestor(t *testing.T) {
 	}
 }
 
+func TestValidateUnitDirReturnsCanonicalPathForOwnedSymlink(t *testing.T) {
+	root := t.TempDir()
+	configHome := filepath.Join(root, "config-real")
+	unitDir := filepath.Join(configHome, "systemd", "user")
+	if err := os.MkdirAll(unitDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	configLink := filepath.Join(root, "config-link")
+	if err := os.Symlink(configHome, configLink); err != nil {
+		t.Fatal(err)
+	}
+	got, err := validateUnitDir(filepath.Join(configLink, "systemd", "user"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != unitDir {
+		t.Fatalf("validated unit directory = %q, want canonical path %q", got, unitDir)
+	}
+}
+
 func TestQuoteSystemdPathEscapesDollarExpansion(t *testing.T) {
 	got, err := quoteSystemdPath("/home/user/$HOME/bin%/privacybit")
 	if err != nil {

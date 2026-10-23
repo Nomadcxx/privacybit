@@ -747,6 +747,12 @@ Recorded because a future reader will trust the docs.
     test passes. Scan failure copy now points to CLI diagnostics without
     assuming every failure means the executable is missing.
 
+13. **Installer validation checked a resolved unit directory but later used its
+    original symlinked path.** A replaced symlink could redirect unit writes
+    after validation. `validateUnitDir` now returns the canonical directory;
+    install and disable operations continue through that path. The installer
+    test covers canonical path resolution.
+
 ### 10.4 Environment traps
 
 - **`: ` inside an unquoted multi-line YAML plain scalar is a parse error** —
@@ -780,7 +786,7 @@ Recorded because a future reader will trust the docs.
 
 | Repository | Automated checks | Result |
 |---|---|---|
-| privacybit | Formatting, `go build -p 2 ./...`, `go vet -p 2 ./...`, `go test -count=1 -p 2 -exec='env GOTMPDIR=/run/user/1000/ss' ./...`, GPL text comparison, and generated `.SRCINFO` comparison | Pass on 2026-10-22. The suite includes scan/report, report-lock, and installer tests. The installer also completed an isolated-HOME TUI build/install using the no-background option. |
+| privacybit | Formatting, `git diff --check`, `go test -count=1 -p 2 ./...`, `go vet -p 2 ./...`, and `go build -p 2 ./...`; packaging checks | Go checks pass on 2026-10-23, including the installer canonical-path regression test. GPL text comparison, generated `.SRCINFO` comparison, and an isolated-HOME TUI build/install passed on 2026-10-22. |
 | sysc-plugins | Privacy tests and race tests, focused vet, plugin build, `make validate catalog-validate thumbnails`, and gofmt check | Pass on 2026-10-22. The privacy screenshot and generated thumbnail match; `catalog.json` still has no privacy release entry. |
 | sysc-shell worktree | Full formatting check, `go build -p 2 ./...`, `go vet -p 2 ./...`, and normal tests for `plugin/v1`, `internal/plugin`, and all of `internal/shell`; dependency diff | Pass after merging the deployed launcher fix. `go.mod` and `go.sum` are unchanged. The live Privacy page displayed the capture card and a current audit snapshot without horizontal clipping. |
 
