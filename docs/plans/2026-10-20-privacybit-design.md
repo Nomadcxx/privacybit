@@ -158,8 +158,8 @@ which is what the scheduler's history is for. The UI must say so.
 ### 3.7 Category and overall grades
 
 Use the worst evidence at each level; do not average away a serious finding.
-An entry starts at its effective catalogue grade and measured signals may only
-push it toward more risk. A category takes the worst grade of its known
+An entry starts at its effective catalogue grade and grade-bearing measured
+signals may only push it toward more risk. A category takes the worst grade of its known
 installed entries and unmet expectations. A missing high-severity expectation
 is `red`; a missing medium- or low-severity expectation is at least `amber`, so
 an unmet expectation never reads as a pass. An expectation is met when any of
@@ -170,10 +170,11 @@ whether the source is marked official, but origin never changes an application,
 category, or overall grade, including when an origin signal is contradicted.
 The owner confirmed this rule in issue #22.
 
-The Phase 3 grader moves an entry one level worse when any measured signal is
-`Contradicted` (`green` → `amber`, `amber` → `red`; `red` stays `red`). A
-contradiction is evidence to review, but does not by itself establish a red
-privacy posture. Zero and `Unavailable` signals do not change the grade.
+The Phase 3 grader moves an entry one level worse when any grade-bearing
+measured signal is `Contradicted` (`green` → `amber`, `amber` → `red`; `red`
+stays `red`). A contradiction is evidence to review, but does not by itself
+establish a red privacy posture. Zero and `Unavailable` signals do not change
+the grade.
 
 An expectation that is not met can be graded only when every detect type on
 each catalogue entry named by `any_of` has a ready source. An ungraded `any_of`

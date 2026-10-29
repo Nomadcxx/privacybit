@@ -191,6 +191,9 @@ func writeHuman(w io.Writer, snapshot report.Snapshot, severity string) error {
 			fmt.Fprintf(&out, "  %s\n", app.Name)
 			writeOriginContext(&out, app)
 		}
+		if snapshot.UnmatchedTruncated {
+			fmt.Fprintf(&out, "  Origin context shown for %d of %d unmatched apps; %d total.\n", unmatchedWithOrigins, len(snapshot.Unmatched), snapshot.UnmatchedTotal)
+		}
 	}
 	fmt.Fprintf(&out, "\nFlatpak sandbox: %s\n", gradeCell(snapshot.Sandbox.Grade))
 	if snapshot.Sandbox.Reason != "" {

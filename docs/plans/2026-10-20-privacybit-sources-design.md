@@ -153,8 +153,8 @@ network-visibility rule — "no telemetry observed" is not evidence of clean.
 
 Four rules follow:
 
-1. **`Observed` and `Contradicted` carry measured evidence.** Neither may
-   improve a grade; `Contradicted` may only worsen it.
+1. **`Observed` and `Contradicted` carry measured evidence.** A grade-bearing
+   field cannot improve a grade; a contradiction may only worsen it.
 2. **`Unavailable` and the zero state cannot inform a grade in either
    direction.** They reduce coverage only.
 3. **Catalogue grade is always the floor.** Signals can push toward risk, never
@@ -377,7 +377,7 @@ thirteen-screen inventory.
 |---|---|
 | Per-backend parsing | Golden fixtures per backend per distro. Recorded output, never live. |
 | Cross-distribution catalogue | Run the full catalogue against each distro's package set fixture; assert every entry with a known alias resolves. This is what catches the misspelled aliases §9 cannot. |
-| Monotone + unavailable | Property test: for every entry and every signal-state combination, an `Unavailable` signal cannot improve or worsen the grade. `Contradicted` may only worsen it. |
+| Monotone + unavailable | Property test: for every grade-bearing signal-state combination, `Unavailable` cannot change a grade and `Contradicted` may only worsen it. Origin contradictions leave the grade unchanged. |
 | Availability ≠ binary | `dpkg-query` present with an empty database must yield `Ready+Empty`, not `NotReady`. |
 | Nix pollution | A fixture with 7,000 store paths must not produce phantom applications. |
 | Command rendering | One case per outcome in §8, per distribution, asserting the third case never emits a command. |

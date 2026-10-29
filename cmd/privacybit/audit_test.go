@@ -116,13 +116,13 @@ func TestWriteHumanShowsUnmatchedOriginsAsUnratedContext(t *testing.T) {
 			Name: "Mystery browser", Grade: catalog.GradeUnknown,
 			Origins: []report.AppOrigin{{Source: "community"}}, OriginsShown: 1, OriginsTotal: 1,
 		}},
-		UnmatchedTotal: 1,
+		UnmatchedTotal: 2, UnmatchedTruncated: true,
 	}
 	var out bytes.Buffer
 	if err := writeHuman(&out, snapshot, "low"); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"Unmatched apps", "Mystery browser", "Unrated", "Origin context", "community (not marked official)"} {
+	for _, want := range []string{"Unmatched apps", "Mystery browser", "Unrated", "Origin context", "community (not marked official)", "Origin context shown for 1 of 1 unmatched apps; 2 total"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("human output does not contain %q: %s", want, out.String())
 		}
