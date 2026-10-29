@@ -83,7 +83,10 @@ func TestUnfixturedCommandNeverLooksEmpty(t *testing.T) {
 // while one that is not installed is NotReady with a reason. Neither is an
 // error, and collapsing them would report a coverage gap where there is none.
 func TestAvailabilitySeparatesEmptyFromMissing(t *testing.T) {
-	r := MapRunner{Output: map[string]string{"pacman -Qq": ""}}
+	r := MapRunner{Output: map[string]string{
+		"pacman":     "",
+		"pacman -Qq": "",
+	}}
 	a := (&Pacman{Runner: r}).Availability()
 	if !a.Ready {
 		t.Fatal("an installed manager that reports nothing must be Ready")
