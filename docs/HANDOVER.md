@@ -637,7 +637,7 @@ Specific, falsifiable claims. Each is checkable.
 | 17 | **Installer cancellation preserves the current CLI and reports partial service state.** | `TestCtrlCCancelsBuildAndReportsCLIState`, `TestCtrlCCancelsServiceSetupAndReportsPartialState`, `TestCtrlCAfterBuildCompletionDoesNotStartServices`, and `TestInstallBinaryCancellationPreservesTarget`. |
 | 18 | **Origin status reports a recognized local name without claiming source authentication.** | `TestWriteHumanShowsOriginsAsContext` in `cmd/privacybit/audit_test.go`, `TestAppViewShowsOriginContextWithoutChangingGrade` in `internal/tui/model_test.go`, and `TestPrivacyPanelShowsOriginAsContext` in sysc-plugins `plugins/privacy/view_test.go`. |
 | 19 | **Source capability gaps reach the report without changing grades.** | `TestCapabilitiesFactsUseStableNamesAndOrder`, `TestRunReportsSourceFactsAndUnsupportedCoverage`, `TestWriteHumanShowsSupportedAndReducedFacts`, `TestCoverageViewShowsSupportedAndReducedFacts`, `TestParseAuditOutputProjectsBoundedReducedSources`, and `TestPrivacyPanelShowsSourcesBehindReducedCoverage`. |
-| 20 | **PATH exclusions match directory boundaries.** | `TestUserPathDirsUsePathComponentBoundaries` in `internal/detect/detect_test.go` keeps adjacent paths visible while excluding system roots and their descendants, including the Nix store. |
+| 20 | **PATH exclusions match directory boundaries and symlink aliases.** | `TestUserPathDirsUsePathComponentBoundaries` and `TestUserPathDirsIgnoreSymlinkAliasesOfSystemRoots` in `internal/detect/detect_test.go` cover adjacent paths, lexical Nix-store exclusions, and a symlink alias to `/usr/bin`. |
 | 21 | **VPN checks treat every verified tunnel interface consistently.** | `TestMultipleVerifiedTunnelsAreCheckedAsASet` in `internal/network/network_test.go` covers stable client reporting and route, DNS, IPv6, and default-route checks with Tailscale and WireGuard. |
 
 §11 records the latest gate results. Earlier phase checkpoints are historical;
@@ -863,9 +863,11 @@ Recorded because a future reader will trust the docs.
     cannot provide each fact. Origin remains context only, and no grade changes.
 
 19. **Binary inventory used string prefixes to filter PATH.** That skipped
-    adjacent directories such as `/usr/bin-extra` and included exact roots such
-    as `/nix/store` and `/usr/lib`. `userPathDirs` now compares cleaned path
-    components; its test covers roots, descendants, and adjacent names.
+    adjacent directories such as `/usr/bin-extra`, included exact roots such as
+    `/nix/store`, and admitted symlink aliases to system roots. `userPathDirs`
+    now compares path components and resolves aliases for system roots. The
+    Nix-store exclusion stays lexical so selected Nix-profile paths remain
+    visible to the universal scanner. Issue #66 and its tests record the fix.
 
 20. **VPN checks selected the first tunnel from a map.** With multiple active
     tunnel interfaces, the route checks could report one tunnel as an escape.

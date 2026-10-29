@@ -519,6 +519,20 @@ func TestUserPathDirsUsePathComponentBoundaries(t *testing.T) {
 	}
 }
 
+func TestUserPathDirsIgnoreSymlinkAliasesOfSystemRoots(t *testing.T) {
+	if _, err := os.Stat("/usr/bin"); err != nil {
+		t.Skip("/usr/bin does not exist")
+	}
+	alias := filepath.Join(t.TempDir(), "system-bin")
+	if err := os.Symlink("/usr/bin", alias); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", alias)
+	if got := userPathDirs(); len(got) != 0 {
+		t.Fatalf("userPathDirs() = %v, want symlink alias to /usr/bin excluded", got)
+	}
+}
+
 func TestBinaryExcludesNixStoreAndSharedLibraries(t *testing.T) {
 	dir := t.TempDir()
 	makeExec := func(name string) {
