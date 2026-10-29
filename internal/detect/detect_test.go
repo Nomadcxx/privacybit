@@ -437,6 +437,28 @@ func TestFlatpakInventoryHonorsCancellationDuringPermissionQueries(t *testing.T)
 	}
 }
 
+func TestFlatpakInventoryDoesNotTreatOriginAsVendorOrExplicitEvidence(t *testing.T) {
+	r := MapRunner{Output: map[string]string{
+		"flatpak list --app --columns=application,version,branch,origin,installation,arch": "com.example.App\t1.0\tstable\tflathub\tuser\tx86_64\n",
+	}}
+	obs, err := NewFlatpak(r).Inventory(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(obs) != 1 {
+		t.Fatalf("got %d observations, want one", len(obs))
+	}
+	if got := obs[0].Origin; got.State != StateObserved || got.Value.Source != "flathub" {
+		t.Fatalf("origin = %+v, want observed flathub provenance", got)
+	}
+	if got := obs[0].Facts.Vendor; got.State != StateUnavailable || got.Why == "" {
+		t.Fatalf("vendor = %+v, want unavailable with a reason", got)
+	}
+	if got := obs[0].Facts.Explicit; got.State != StateUnavailable || got.Why == "" {
+		t.Fatalf("explicit install = %+v, want unavailable with a reason", got)
+	}
+}
+
 // TestDesktopSkipsTombstonesAndNonApplications covers the two desktop entry
 // states that mean something other than "this program is installed".
 func TestDesktopSkipsTombstonesAndNonApplications(t *testing.T) {

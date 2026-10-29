@@ -357,8 +357,8 @@ per-source entry, and D2's human output renders it.
   "coverage": {
     "distribution": { "id": "arch", "id_like": ["arch"] },
     "sources": [
-      { "name": "pacman",    "state": "ready", "observed": 2882, "facts": ["licence","vendor","explicit","origin","reverse_deps","signed"] },
-      { "name": "flatpak",   "state": "ready", "observed": 5,    "facts": ["origin"] },
+      { "name": "pacman",    "state": "ready", "observed": 2882, "facts": ["explicit","licence","origin","reverse_deps","signed","vendor","version"] },
+      { "name": "flatpak",   "state": "ready", "observed": 5,    "facts": ["origin","version"] },
       { "name": "desktop",   "state": "ready", "observed": 497,  "facts": [] },
       { "name": "binary",    "state": "ready", "observed": 61,   "facts": [] },
       { "name": "dpkg",      "state": "empty", "observed": 0,    "facts": [] },

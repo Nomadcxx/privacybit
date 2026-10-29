@@ -766,6 +766,11 @@ Recorded because a future reader will trust the docs.
     TUI, and plugin now label a name match as recognized and say that the source
     is not authenticated. Origin remains context and does not affect grades.
 
+11. **D6's coverage example omitted supported version facts.**
+    `Capabilities.Facts()` lists `version` for pacman and Flatpak; the example
+    now reflects both sources' declared capabilities. D6 still marks Flatpak
+    vendor and explicit-install state unsupported.
+
 ### 10.3 Implementation defects and corrections
 
 1. **`Load` originally panicked on a malformed shipped file.** With ten
@@ -873,6 +878,13 @@ Recorded because a future reader will trust the docs.
     tunnel interfaces, the route checks could report one tunnel as an escape.
     The audit now checks membership in the full verified interface set and
     sorts client names before reporting them.
+
+21. **Flatpak inventory reported its remote as vendor and claimed explicit
+    installation without evidence.** `Capabilities()` declares version and
+    origin only; D6 marks vendor and explicit-install unsupported. Flatpak
+    now reports those facts unavailable and preserves origin separately.
+    `TestFlatpakInventoryDoesNotTreatOriginAsVendorOrExplicitEvidence` covers
+    the correction.
 
 ### 10.4 Environment traps
 
