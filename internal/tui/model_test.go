@@ -103,6 +103,39 @@ func TestUnknownAndCoverageRenderAsExplicitStates(t *testing.T) {
 	}
 }
 
+func TestCoverageViewShowsSupportedAndReducedFacts(t *testing.T) {
+	model := NewModel(context.Background(), nil)
+	model.snapshot = ptr(testSnapshot())
+	model.snapshot.Coverage = []report.Coverage{{
+		Name: "dpkg", Type: "package", Ready: true, Observed: 1,
+		Facts: []string{"explicit", "version"},
+	}}
+	model.snapshot.Reduced = []report.Reduced{{
+		Fact: "licence", Effect: "not supported by the listed sources",
+		Sources: []string{"desktop", "dpkg"},
+	}}
+	view := model.coverageView()
+	for _, want := range []string{
+		"dpkg (package): ready — 1 observations; facts: explicit, version",
+		"Reduced · licence (desktop, dpkg): not supported by the listed sources",
+	} {
+		if !strings.Contains(view, want) {
+			t.Errorf("coverage view does not contain %q: %s", want, view)
+		}
+	}
+}
+
+func TestCoverageViewDoesNotInferMissingLegacyFactsAreEmpty(t *testing.T) {
+	model := NewModel(context.Background(), nil)
+	model.snapshot = ptr(testSnapshot())
+	model.snapshot.Coverage = []report.Coverage{{
+		Name: "dpkg", Type: "package", Ready: true, Observed: 1,
+	}}
+	if view := model.coverageView(); strings.Contains(view, "facts:") {
+		t.Fatalf("legacy coverage without a facts field was presented as empty: %s", view)
+	}
+}
+
 func TestAppRouteKeepsFlatpakScope(t *testing.T) {
 	model := NewModel(context.Background(), nil)
 	model.snapshot = ptr(testSnapshot())

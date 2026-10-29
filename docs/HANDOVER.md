@@ -490,6 +490,13 @@ unrunnable one.
 The source tests cover exact matching, unavailable capabilities, Flatpak scope
 retention, and the universal scanners.
 
+`engine.Run` carries each source's `Capabilities` into the report. Schema-1
+`coverage` rows list supported facts for ready, non-empty sources;
+`reduced` notes list active sources that do not support each fact. The CLI and
+TUI show both views, and the privacy plugin shows the reduced source list in its
+Coverage limits card. These fields do not affect grades, and older snapshots
+without them remain valid.
+
 ### 6.5 Phase 3 — grading
 
 `/home/nomadx/privacy-bit/internal/audit/` evaluates supplied observations and
@@ -629,6 +636,7 @@ Specific, falsifiable claims. Each is checkable.
 | 16 | **Sandbox coverage and panel rendering stay explicit and bounded.** | `TestFlatpakSandboxWithoutInventoryCoverageIsUnknown`, `TestBuildBoundsPerCopySandboxEvidence`, `TestParseAuditOutputBoundsFlatpakSandboxEvidence`, `TestParseAuditOutputRejectsInvalidAndFutureSnapshots`, and `TestPrivacyPanelShowsSeparateFlatpakSandboxGradesAndCoverage`. |
 | 17 | **Installer cancellation preserves the current CLI and reports partial service state.** | `TestCtrlCCancelsBuildAndReportsCLIState`, `TestCtrlCCancelsServiceSetupAndReportsPartialState`, `TestCtrlCAfterBuildCompletionDoesNotStartServices`, and `TestInstallBinaryCancellationPreservesTarget`. |
 | 18 | **Origin status reports a recognized local name without claiming source authentication.** | `TestWriteHumanShowsOriginsAsContext` in `cmd/privacybit/audit_test.go`, `TestAppViewShowsOriginContextWithoutChangingGrade` in `internal/tui/model_test.go`, and `TestPrivacyPanelShowsOriginAsContext` in sysc-plugins `plugins/privacy/view_test.go`. |
+| 19 | **Source capability gaps reach the report without changing grades.** | `TestCapabilitiesFactsUseStableNamesAndOrder`, `TestRunReportsSourceFactsAndUnsupportedCoverage`, `TestWriteHumanShowsSupportedAndReducedFacts`, `TestCoverageViewShowsSupportedAndReducedFacts`, `TestParseAuditOutputProjectsBoundedReducedSources`, and `TestPrivacyPanelShowsSourcesBehindReducedCoverage`. |
 
 §11 records the latest gate results. Earlier phase checkpoints are historical;
 use the current results when judging the tree.
@@ -841,6 +849,12 @@ Recorded because a future reader will trust the docs.
     not authenticate the configured source. Issues #37 and #276 are closed.
     The schema and grading rules stay unchanged. Published `v0.1.2` assets
     predate this wording correction.
+
+18. **Source capabilities were declared but dropped from reports.** D6 §3 and
+    §10 require supported facts per source and visible reduced-coverage notes.
+    `engine.Run` now passes each capability declaration into the schema-1
+    report. The CLI and TUI list supported facts; the plugin lists sources that
+    cannot provide each fact. Origin remains context only, and no grade changes.
 
 ### 10.4 Environment traps
 

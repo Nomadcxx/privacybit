@@ -374,6 +374,16 @@ per-source entry, and D2's human output renders it.
 `reduced` array is non-empty, the overall grade carries a visible caveat rather
 than silently reading as more confident than the evidence supports.
 
+In privacybit's schema-1 snapshot, `coverage` is a flat array of source rows.
+Each ready, non-empty source includes the facts from its `Capabilities`
+declaration; unavailable and empty sources have an empty `facts` list. A
+`reduced` note includes `sources` naming active backends that do not provide
+that fact. The CLI and TUI show supported facts and source names. The privacy
+plugin shows reduced notes in its Coverage limits card. These fields are
+additive, so older schema-1 snapshots without them remain valid. `version` is
+listed because a contradicted version signal can worsen a grade. `origin`
+remains provenance context and never changes one.
+
 D3's `ScreenCoverage` renders exactly this, and it already exists on the
 thirteen-screen inventory.
 

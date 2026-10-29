@@ -644,10 +644,22 @@ func (m *Model) coverageView() string {
 		} else if source.Empty {
 			state = "ready, empty"
 		}
-		fmt.Fprintf(&out, "%s (%s): %s — %d observations\n", source.Name, source.Type, state, source.Observed)
+		fmt.Fprintf(&out, "%s (%s): %s — %d observations", source.Name, source.Type, state, source.Observed)
+		if source.Ready && !source.Empty && source.Facts != nil {
+			facts := "none"
+			if len(source.Facts) > 0 {
+				facts = strings.Join(source.Facts, ", ")
+			}
+			fmt.Fprintf(&out, "; facts: %s", facts)
+		}
+		fmt.Fprintln(&out)
 	}
 	for _, reduced := range m.snapshot.Reduced {
-		fmt.Fprintf(&out, "\nReduced · %s: %s\n", reduced.Fact, reduced.Effect)
+		fmt.Fprintf(&out, "\nReduced · %s", reduced.Fact)
+		if len(reduced.Sources) > 0 {
+			fmt.Fprintf(&out, " (%s)", strings.Join(reduced.Sources, ", "))
+		}
+		fmt.Fprintf(&out, ": %s\n", reduced.Effect)
 	}
 	if m.snapshot.UnmatchedTruncated {
 		fmt.Fprintf(&out, "\nUnmatched applications: showing %d of %d\n", len(m.snapshot.Unmatched), m.snapshot.UnmatchedTotal)
