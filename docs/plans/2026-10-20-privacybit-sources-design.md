@@ -136,12 +136,14 @@ type Signal[T any] struct {
 ### 3.2 The invariant
 
 > **Unavailable or unset signals cannot move a grade. Contradicted evidence may
-> only worsen it.**
+> only worsen it, except packaging origin, which is context only.**
 
-Unavailable signals only reduce reported coverage. Contradicted signals contain
-a measured fact that disagrees with the catalogue and may push the grade toward
-more risk. This is D1 §3.3's monotone rule applied to measured evidence, with
-absence of evidence kept out of the grade entirely.
+Unavailable signals only reduce reported coverage. A contradicted signal from a
+grade-bearing metadata field contains a measured fact that disagrees with the
+catalogue and may push the grade toward more risk. Packaging origin remains
+provenance context and never moves a grade. This is D1 §3.3's monotone rule
+applied to grade-bearing evidence, with absence of evidence kept out of the
+grade entirely.
 
 The failure it prevents is concrete and would have shipped on Debian: `dpkg`
 has no licence metadata, so a package whose catalogue entry says FOSS cannot be
@@ -151,14 +153,17 @@ network-visibility rule — "no telemetry observed" is not evidence of clean.
 
 Four rules follow:
 
-1. **`Observed` and `Contradicted` carry measured evidence.** Neither may
-   improve a grade; `Contradicted` may only worsen it.
+1. **`Observed` and `Contradicted` carry measured evidence.** A grade-bearing
+   field cannot improve a grade; a contradiction may only worsen it.
 2. **`Unavailable` and the zero state cannot inform a grade in either
    direction.** They reduce coverage only.
 3. **Catalogue grade is always the floor.** Signals can push toward risk, never
    lift it. This is D1 §3.3, unchanged.
 4. **Insufficient coverage to judge means `unknown`, not `green`.** Absence of
    evidence is a reportable state, never a passing one.
+5. **Packaging origin is context only.** Reports may show its source and
+   official status, but it never changes a grade. The owner resolved the D1/D6
+   conflict this way in issue #22.
 
 ### 3.3 Availability means data, not binary
 
@@ -372,7 +377,7 @@ thirteen-screen inventory.
 |---|---|
 | Per-backend parsing | Golden fixtures per backend per distro. Recorded output, never live. |
 | Cross-distribution catalogue | Run the full catalogue against each distro's package set fixture; assert every entry with a known alias resolves. This is what catches the misspelled aliases §9 cannot. |
-| Monotone + unavailable | Property test: for every entry and every signal-state combination, an `Unavailable` signal cannot improve or worsen the grade. `Contradicted` may only worsen it. |
+| Monotone + unavailable | Property test: for every grade-bearing signal-state combination, `Unavailable` cannot change a grade and `Contradicted` may only worsen it. Origin contradictions leave the grade unchanged. |
 | Availability ≠ binary | `dpkg-query` present with an empty database must yield `Ready+Empty`, not `NotReady`. |
 | Nix pollution | A fixture with 7,000 store paths must not produce phantom applications. |
 | Command rendering | One case per outcome in §8, per distribution, asserting the third case never emits a command. |

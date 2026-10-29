@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/Nomadcxx/privacybit/internal/audit"
 	"github.com/Nomadcxx/privacybit/internal/catalog"
@@ -40,6 +41,167 @@ func TestBuildBoundsEveryRuntimeList(t *testing.T) {
 		if len(category.Installed) != category.InstalledShown || category.InstalledShown > ListLimit {
 			t.Fatalf("category %s installed bounds = %d shown %d", category.ID, len(category.Installed), category.InstalledShown)
 		}
+	}
+}
+
+func TestBuildPreservesDeduplicatedOriginContextByAppAndFlatpakScope(t *testing.T) {
+	set, err := catalog.Load(catalog.LoadOptions{UserFragments: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry := set.Entry("brave-origin")
+	observations := []detect.Observation{
+		{Name: "brave-origin", Kind: detect.KindPackage, Origin: detect.Observed(detect.Origin{Source: "extra", Official: true})},
+		{Name: "brave-origin-bin", Kind: detect.KindPackage, Origin: detect.Observed(detect.Origin{Source: "extra", Official: true})},
+		{Name: "brave-origin-custom", Kind: detect.KindPackage, Origin: detect.Observed(detect.Origin{Source: "extra", Official: false})},
+		{Name: "com.brave.Browser", Kind: detect.KindFlatpak, Scope: "user", Origin: detect.Observed(detect.Origin{Source: "flathub", Official: true})},
+		{Name: "com.brave.Browser", Kind: detect.KindFlatpak, Scope: "system", Origin: detect.Observed(detect.Origin{Source: "flathub", Official: true})},
+	}
+	result := audit.Result{Overall: catalog.GradeGreen, Categories: []audit.CategoryResult{{
+		ID: entry.Category, Name: "Browser", Grade: catalog.GradeGreen,
+	}}}
+	for _, observation := range observations {
+		result.Inventory = append(result.Inventory, audit.InstalledEntry{
+			Observation: observation, Product: entry.ID, Category: entry.Category, Grade: catalog.GradeGreen,
+		})
+	}
+	snapshot := Build(set, result, nil, network.UnknownResult("not checked"), nil, time.Now(), 0, BuildOptions{})
+	encoded, err := json.Marshal(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Overall struct {
+			Grade catalog.Grade `json:"grade"`
+		} `json:"overall"`
+		Categories []struct {
+			Installed []struct {
+				Scope   string `json:"scope"`
+				Origins []struct {
+					Source   string `json:"source"`
+					Official bool   `json:"official"`
+				} `json:"origins"`
+				Shown     int  `json:"origins_shown"`
+				Total     int  `json:"origins_total"`
+				Truncated bool `json:"origins_truncated"`
+			} `json:"installed"`
+		} `json:"categories"`
+	}
+	if err := json.Unmarshal(encoded, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Overall.Grade != catalog.GradeGreen {
+		t.Fatalf("origin context changed overall grade to %q", got.Overall.Grade)
+	}
+	if len(got.Categories) != 1 || len(got.Categories[0].Installed) != 3 {
+		t.Fatalf("app groups = %+v, want a package group and separate Flatpak scopes", got.Categories)
+	}
+	var packageApp, userCopy, systemCopy *struct {
+		Scope   string `json:"scope"`
+		Origins []struct {
+			Source   string `json:"source"`
+			Official bool   `json:"official"`
+		} `json:"origins"`
+		Shown     int  `json:"origins_shown"`
+		Total     int  `json:"origins_total"`
+		Truncated bool `json:"origins_truncated"`
+	}
+	for i := range got.Categories[0].Installed {
+		app := &got.Categories[0].Installed[i]
+		switch app.Scope {
+		case "":
+			packageApp = app
+		case "user":
+			userCopy = app
+		case "system":
+			systemCopy = app
+		}
+	}
+	if packageApp == nil || packageApp.Total != 2 || packageApp.Shown != 2 || packageApp.Truncated {
+		t.Fatalf("package origins = %+v, want two deduplicated status variants", packageApp)
+	}
+	if got := packageApp.Origins; got[0].Source != "extra" || got[0].Official || got[1].Source != "extra" || !got[1].Official {
+		t.Fatalf("package origins = %+v, want stable order and both official states", got)
+	}
+	if userCopy == nil || systemCopy == nil || len(userCopy.Origins) != 1 || len(systemCopy.Origins) != 1 {
+		t.Fatalf("Flatpak copies lost their separate origins: user=%+v system=%+v", userCopy, systemCopy)
+	}
+}
+
+func TestBuildPreservesOriginContextForUnmatchedApps(t *testing.T) {
+	set, err := catalog.Load(catalog.LoadOptions{UserFragments: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := audit.Result{
+		Overall: catalog.GradeUnknown,
+		Inventory: []audit.InstalledEntry{{
+			Observation: detect.Observation{Name: "mystery-browser", Kind: detect.KindPackage,
+				Origin: detect.Observed(detect.Origin{Source: "community"})},
+			Grade: catalog.GradeUnknown,
+		}},
+	}
+	snapshot := Build(set, result, nil, network.UnknownResult("not checked"), nil, time.Now(), 0, BuildOptions{})
+	if snapshot.Overall.Grade != catalog.GradeUnknown || len(snapshot.Unmatched) != 1 {
+		t.Fatalf("unmatched result = %+v, want one unrated app", snapshot)
+	}
+	app := snapshot.Unmatched[0]
+	if app.Grade != catalog.GradeUnknown || len(app.Origins) != 1 || app.Origins[0] != (AppOrigin{Source: "community"}) {
+		t.Fatalf("unmatched app = %+v, want unchanged unrated grade and origin context", app)
+	}
+}
+
+func TestBuildSanitizesAndBoundsOriginContext(t *testing.T) {
+	set, err := catalog.Load(catalog.LoadOptions{UserFragments: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry := set.Entry("brave-origin")
+	result := audit.Result{Overall: catalog.GradeGreen, Categories: []audit.CategoryResult{{
+		ID: entry.Category, Name: "Browser", Grade: catalog.GradeGreen,
+	}}}
+	for i := range 10 {
+		source := fmt.Sprintf("repo-%02d", i)
+		if i == 0 {
+			source = " [31mééé\nrepo " + strings.Repeat("界", 40)
+		}
+		result.Inventory = append(result.Inventory, audit.InstalledEntry{
+			Product: entry.ID, Category: entry.Category, Grade: catalog.GradeGreen,
+			Observation: detect.Observation{Name: "brave-origin", Kind: detect.KindPackage,
+				Origin: detect.Observed(detect.Origin{Source: source})},
+		})
+	}
+	snapshot := Build(set, result, nil, network.UnknownResult("not checked"), nil, time.Now(), 0, BuildOptions{})
+	encoded, err := json.Marshal(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Categories []struct {
+			Installed []struct {
+				Origins []struct {
+					Source string `json:"source"`
+				} `json:"origins"`
+				Shown     int  `json:"origins_shown"`
+				Total     int  `json:"origins_total"`
+				Truncated bool `json:"origins_truncated"`
+			} `json:"installed"`
+		} `json:"categories"`
+	}
+	if err := json.Unmarshal(encoded, &got); err != nil {
+		t.Fatal(err)
+	}
+	app := got.Categories[0].Installed[0]
+	if len(app.Origins) != 8 || app.Shown != 8 || app.Total != 10 || !app.Truncated {
+		t.Fatalf("origin cap = %+v, want 8 shown of 10", app)
+	}
+	for _, origin := range app.Origins {
+		if len(origin.Source) > 80 || !utf8.ValidString(origin.Source) || strings.ContainsAny(origin.Source, "\n\r\x1b") {
+			t.Errorf("unsafe origin label %q (%d bytes)", origin.Source, len(origin.Source))
+		}
+	}
+	if app.Origins[0].Source != "[31mééé repo "+strings.Repeat("界", 20)+"…" {
+		t.Errorf("sanitized long origin = %q", app.Origins[0].Source)
 	}
 }
 

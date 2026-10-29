@@ -146,6 +146,11 @@ consumer must be able to tell "you have four browsers" from "I only showed you
 four browsers", because confusing them is how a privacy tool talks someone into
 thinking they are fine.
 
+Schema 1 app records may also include a bounded `origins` list with the
+observed source name and whether that source is marked official. The list has
+shown, total, and truncation fields. Origin is provenance context and never
+changes a grade. Consumers accept schema-1 app records that omit these fields.
+
 ## 6. Exit codes
 
 The trap: exit code zero meaning "your machine is fine" conflates **did the tool

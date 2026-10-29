@@ -456,7 +456,6 @@ func gradeEntry(floor catalog.Grade, observation detect.Observation, findings *[
 		*findings = append(*findings, why)
 	}
 	add("version", observation.Version.State, observation.Version.Why)
-	add("origin", observation.Origin.State, observation.Origin.Why)
 	add("licence", observation.Facts.Licence.State, observation.Facts.Licence.Why)
 	add("vendor", observation.Facts.Vendor.State, observation.Facts.Vendor.Why)
 	add("explicit-install state", observation.Facts.Explicit.State, observation.Facts.Explicit.Why)

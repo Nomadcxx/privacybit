@@ -83,6 +83,55 @@ func TestWriteHumanShowsFlatpakSandboxGradeAndCoverage(t *testing.T) {
 	}
 }
 
+func TestWriteHumanShowsOriginsAsContext(t *testing.T) {
+	snapshot := report.Snapshot{
+		Overall: report.Overall{Grade: catalog.GradeGreen},
+		Categories: []report.Category{{
+			Name: "Browser", Grade: catalog.GradeGreen, InstalledShown: 1, InstalledTotal: 1,
+			Installed: []report.App{{
+				Name: "Brave Origin", Grade: catalog.GradeGreen, Scope: "user",
+				Origins:      []report.AppOrigin{{Source: "flathub", Official: true}, {Source: "aur"}},
+				OriginsShown: 2, OriginsTotal: 3, OriginsTruncated: true,
+			}},
+		}},
+	}
+	var out bytes.Buffer
+	if err := writeHuman(&out, snapshot, "low"); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"Origin context", "Brave Origin (user)", "flathub (official)", "aur (not marked official)", "Showing 2 of 3 origins"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("human output does not contain %q: %s", want, out.String())
+		}
+	}
+	if !strings.Contains(out.String(), "Overall: o Good") {
+		t.Errorf("origin context changed the displayed grade: %s", out.String())
+	}
+}
+
+func TestWriteHumanShowsUnmatchedOriginsAsUnratedContext(t *testing.T) {
+	snapshot := report.Snapshot{
+		Overall: report.Overall{Grade: catalog.GradeGreen},
+		Unmatched: []report.App{{
+			Name: "Mystery browser", Grade: catalog.GradeUnknown,
+			Origins: []report.AppOrigin{{Source: "community"}}, OriginsShown: 1, OriginsTotal: 1,
+		}},
+		UnmatchedTotal: 2, UnmatchedTruncated: true,
+	}
+	var out bytes.Buffer
+	if err := writeHuman(&out, snapshot, "low"); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"Unmatched apps", "Mystery browser", "Unrated", "Origin context", "community (not marked official)", "Origin context shown for 1 of 1 unmatched apps; 2 total"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("human output does not contain %q: %s", want, out.String())
+		}
+	}
+	if !strings.Contains(out.String(), "Overall: o Good") {
+		t.Errorf("unmatched origin context changed the overall grade: %s", out.String())
+	}
+}
+
 func TestJSONEmitsStartAndDoneAndPassesNoNetworkScope(t *testing.T) {
 	var out bytes.Buffer
 	userFragments := false

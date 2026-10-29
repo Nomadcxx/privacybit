@@ -274,6 +274,10 @@ func (m *Model) enterSelected() {
 		if selected.kind == "app" {
 			m.push(Route{Screen: ScreenApp, ID: selected.id})
 		}
+	case ScreenUnmatched:
+		if selected.kind == "unmatched" {
+			m.push(Route{Screen: ScreenApp, ID: selected.id})
+		}
 	case ScreenFindings:
 		m.push(Route{Screen: ScreenFinding, ID: selected.id})
 	}
@@ -327,7 +331,7 @@ func (m *Model) visibleRows(route Route) []row {
 		}
 	case ScreenUnmatched:
 		for _, app := range m.snapshot.Unmatched {
-			rows = append(rows, row{id: app.Name, label: app.Name, grade: catalog.GradeUnknown, kind: "unmatched"})
+			rows = append(rows, row{id: unmatchedRouteID(app), label: app.Name, grade: catalog.GradeUnknown, kind: "unmatched"})
 		}
 		if m.snapshot.UnmatchedTruncated {
 			rows = append(rows, row{label: fmt.Sprintf("Showing %d of %d unmatched apps", len(m.snapshot.Unmatched), m.snapshot.UnmatchedTotal), kind: "note"})
@@ -503,6 +507,16 @@ func (m *Model) appView(id string) string {
 	if app.Scope != "" {
 		fmt.Fprintf(&out, "Scope: %s\n", app.Scope)
 	}
+	for _, origin := range app.Origins {
+		status := "not marked official"
+		if origin.Official {
+			status = "official"
+		}
+		fmt.Fprintf(&out, "Origin context: %s (%s)\n", origin.Source, status)
+	}
+	if app.OriginsTruncated {
+		fmt.Fprintf(&out, "Showing %d of %d origins.\n", app.OriginsShown, app.OriginsTotal)
+	}
 	for _, why := range app.Why {
 		fmt.Fprintf(&out, "\nWhy: %s\n", why)
 	}
@@ -517,6 +531,19 @@ func (m *Model) appView(id string) string {
 
 func (m *Model) app(id string) *report.App {
 	if m.snapshot == nil {
+		return nil
+	}
+	if strings.HasPrefix(id, "unmatched\x00") {
+		parts := strings.Split(strings.TrimPrefix(id, "unmatched\x00"), "\x00")
+		if len(parts) != 3 {
+			return nil
+		}
+		for i := range m.snapshot.Unmatched {
+			app := &m.snapshot.Unmatched[i]
+			if app.Name == parts[0] && app.Scope == parts[1] && strings.Join(app.Sources, "\x00") == parts[2] {
+				return app
+			}
+		}
 		return nil
 	}
 	entryID, scope, _ := strings.Cut(id, "\x00")
@@ -536,6 +563,10 @@ func appRouteID(app report.App) string {
 		return app.ID + "\x00" + app.Scope
 	}
 	return app.ID
+}
+
+func unmatchedRouteID(app report.App) string {
+	return "unmatched\x00" + app.Name + "\x00" + app.Scope + "\x00" + strings.Join(app.Sources, "\x00")
 }
 
 func (m *Model) finding(id string) *audit.Finding {

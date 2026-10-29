@@ -9,7 +9,10 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/Nomadcxx/privacybit/internal/audit"
 	"github.com/Nomadcxx/privacybit/internal/catalog"
@@ -21,6 +24,8 @@ const (
 	Schema               = 1
 	ListLimit            = 100
 	FindingLimit         = 100
+	originLimit          = 8
+	originSourceMaxBytes = 80
 	sandboxEvidenceLimit = 8
 )
 
@@ -58,16 +63,26 @@ type BuildOptions struct {
 }
 
 type App struct {
-	ID       string        `json:"id,omitempty"`
-	Name     string        `json:"name"`
-	Grade    catalog.Grade `json:"grade"`
-	Category string        `json:"category,omitempty"`
-	Family   string        `json:"family,omitempty"`
-	Scope    string        `json:"scope,omitempty"`
-	Sources  []string      `json:"sources"`
-	Why      []string      `json:"why,omitempty"`
-	Summary  string        `json:"summary,omitempty"`
-	Caveats  []string      `json:"caveats,omitempty"`
+	ID               string        `json:"id,omitempty"`
+	Name             string        `json:"name"`
+	Grade            catalog.Grade `json:"grade"`
+	Category         string        `json:"category,omitempty"`
+	Family           string        `json:"family,omitempty"`
+	Scope            string        `json:"scope,omitempty"`
+	Sources          []string      `json:"sources"`
+	Origins          []AppOrigin   `json:"origins,omitempty"`
+	OriginsShown     int           `json:"origins_shown,omitempty"`
+	OriginsTotal     int           `json:"origins_total,omitempty"`
+	OriginsTruncated bool          `json:"origins_truncated,omitempty"`
+	Why              []string      `json:"why,omitempty"`
+	Summary          string        `json:"summary,omitempty"`
+	Caveats          []string      `json:"caveats,omitempty"`
+}
+
+// AppOrigin is provenance context. It does not contribute to any grade.
+type AppOrigin struct {
+	Source   string `json:"source"`
+	Official bool   `json:"official"`
 }
 
 type Expectation struct {
@@ -349,6 +364,7 @@ func sortedCopy(values []string) []string {
 
 func groupedApps(set *catalog.Set, inventory []audit.InstalledEntry) []App {
 	groups := make(map[string]*App)
+	originSets := make(map[string]map[AppOrigin]struct{})
 	for _, item := range inventory {
 		key := item.Product
 		if key == "" {
@@ -370,9 +386,22 @@ func groupedApps(set *catalog.Set, inventory []audit.InstalledEntry) []App {
 				}
 			}
 			groups[key] = app
+			originSets[key] = make(map[AppOrigin]struct{})
 		}
 		app.Grade = catalog.Worse(app.Grade, item.Grade)
 		app.Sources = appendUnique(app.Sources, item.Observation.Kind.String())
+		if item.Observation.Origin.IsMeasured() {
+			origin := AppOrigin{
+				Source:   sanitizeOriginSource(item.Observation.Origin.Value.Source),
+				Official: item.Observation.Origin.Value.Official,
+			}
+			if origin.Source != "" {
+				if _, exists := originSets[key][origin]; !exists {
+					app.Origins = append(app.Origins, origin)
+					originSets[key][origin] = struct{}{}
+				}
+			}
+		}
 		for _, reason := range item.Findings {
 			app.Why = appendUnique(app.Why, reason)
 		}
@@ -386,9 +415,48 @@ func groupedApps(set *catalog.Set, inventory []audit.InstalledEntry) []App {
 	for _, key := range keys {
 		app := groups[key]
 		sort.Strings(app.Sources)
+		sort.Slice(app.Origins, func(i, j int) bool {
+			if app.Origins[i].Source != app.Origins[j].Source {
+				return app.Origins[i].Source < app.Origins[j].Source
+			}
+			return !app.Origins[i].Official && app.Origins[j].Official
+		})
+		app.OriginsTotal = len(app.Origins)
+		if len(app.Origins) > originLimit {
+			app.Origins = app.Origins[:originLimit]
+			app.OriginsTruncated = true
+		}
+		app.OriginsShown = len(app.Origins)
 		out = append(out, *app)
 	}
 	return out
+}
+
+func sanitizeOriginSource(source string) string {
+	var printable strings.Builder
+	for _, r := range source {
+		if unicode.IsPrint(r) {
+			printable.WriteRune(r)
+		} else {
+			printable.WriteByte(' ')
+		}
+	}
+	label := strings.Join(strings.Fields(printable.String()), " ")
+	if len(label) <= originSourceMaxBytes {
+		return label
+	}
+
+	const ellipsis = "…"
+	limit := originSourceMaxBytes - len(ellipsis)
+	var bounded strings.Builder
+	for _, r := range label {
+		if bounded.Len()+utf8.RuneLen(r) > limit {
+			break
+		}
+		bounded.WriteRune(r)
+	}
+	bounded.WriteString(ellipsis)
+	return bounded.String()
 }
 
 func appendUnique(items []string, value string) []string {
