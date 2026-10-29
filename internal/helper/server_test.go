@@ -45,6 +45,31 @@ func (r *fakeRunner) Run(_ context.Context, name string, args ...string) (string
 	}
 }
 
+func TestStatusReportsDevelopmentBuildVersionAndCatalogueRevision(t *testing.T) {
+	set := testCatalog(t)
+	var output bytes.Buffer
+	if err := Serve(context.Background(), strings.NewReader("{\"op\":\"status\"}\n"), &output, Options{Catalog: set}); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(output.String()), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("responses = %d, want ready and status: %s", len(lines), output.String())
+	}
+	var status Event
+	if err := json.Unmarshal([]byte(lines[1]), &status); err != nil {
+		t.Fatal(err)
+	}
+	if status.Type != "result" || status.Op != "status" || !status.OK {
+		t.Fatalf("status response = %+v", status)
+	}
+	if status.Version != "devel" {
+		t.Errorf("version = %q, want devel for a source build", status.Version)
+	}
+	if status.CatalogRev != set.Revision {
+		t.Errorf("catalogue revision = %q, want %q", status.CatalogRev, set.Revision)
+	}
+}
+
 func TestServeRejectsUnknownFieldBeforeExecutingAnything(t *testing.T) {
 	set := testCatalog(t)
 	runner := &fakeRunner{}
