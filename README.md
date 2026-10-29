@@ -23,14 +23,16 @@
 
 - **Installed applications.** Exact catalogue matches from pacman, dpkg,
   Flatpak, desktop entries, and selected executable paths, grouped by category.
+- **Flatpak sandbox posture.** privacybit checks each installed copy's resolved
+  permissions and grades that risk separately from the app's catalogue grade.
+  Unsupported permission types report as unknown.
 - **VPN routing.** When a VPN tunnel can be verified, privacybit checks the
   IPv4 route, resolver configuration, and IPv6 route using local system state.
 - **Missing protections.** Unmet catalogue expectations are findings. A check
   that cannot be judged stays `unknown`; it is not shown as a pass.
 
-Live telemetry endpoint attribution and effective, scope-specific Flatpak
-overrides are not implemented yet. Unsupported or unavailable inventory
-sources are reported in coverage.
+privacybit does not attribute live telemetry endpoints. Unsupported or
+unavailable inventory sources appear in coverage.
 
 ## Screenshots
 
@@ -80,9 +82,9 @@ The **Privacy audit** plugin is available in the
 Install it from sysc-shell's plugin manager. In Bar Editor, add **Privacy
 audit** to your bar. Click its shield **Review** item to open the panel. The
 Privacy page in Control Centre shows the grade and scan freshness; choose
-**Open full audit** to open the same panel. The panel lists categories,
-findings, VPN state, and coverage. **Scan now** runs a read-only audit. The
-plugin looks for `privacybit` on sysc-shell's `PATH` or at
+**Open full audit** to open the same panel. The panel lists categories, Flatpak
+sandbox posture, findings, VPN state, and coverage. **Scan now** runs a
+read-only audit. The plugin looks for `privacybit` on sysc-shell's `PATH` or at
 `~/.local/bin/privacybit`.
 
 ## Design

@@ -89,6 +89,7 @@ type CategoryResult struct {
 type Result struct {
 	Inventory  []InstalledEntry
 	Categories []CategoryResult
+	Sandbox    SandboxResult
 	Overall    catalog.Grade
 	Coverage   []SourceCoverage
 }
@@ -258,12 +259,10 @@ func flatpakScopeFindings(set *catalog.Set, inventory []InstalledEntry) []Findin
 }
 
 func flatpakScopeKey(scope string) string {
-	switch scope {
-	case "system", "user":
-		return "flatpak." + scope
-	default:
+	if scope == "" {
 		return "flatpak.unknown"
 	}
+	return "flatpak." + scope
 }
 
 func severityForGrade(grade catalog.Grade) string {
@@ -292,6 +291,7 @@ func Evaluate(set *catalog.Set, observations []detect.Observation, coverage []So
 	result := Result{
 		Inventory: make([]InstalledEntry, 0, len(observations)),
 		Coverage:  append([]SourceCoverage(nil), coverage...),
+		Sandbox:   evaluateFlatpakSandbox(observations, coverage),
 		Overall:   catalog.GradeUnknown,
 	}
 	for _, observation := range observations {
@@ -308,17 +308,26 @@ func Evaluate(set *catalog.Set, observations []detect.Observation, coverage []So
 		result.Inventory = append(result.Inventory, item)
 	}
 	if set == nil {
+		if result.Sandbox.Applicable {
+			result.Overall = result.Sandbox.Grade
+		}
 		return result
 	}
 	for _, category := range set.Categories {
 		result.Categories = append(result.Categories, evaluateCategory(set, category, result.Inventory, coverage))
 	}
 	if len(result.Categories) == 0 {
+		if result.Sandbox.Applicable {
+			result.Overall = result.Sandbox.Grade
+		}
 		return result
 	}
 	result.Overall = catalog.GradeGreen
 	for _, category := range result.Categories {
 		result.Overall = catalog.Worse(result.Overall, category.Grade)
+	}
+	if result.Sandbox.Applicable {
+		result.Overall = catalog.Worse(result.Overall, result.Sandbox.Grade)
 	}
 	return result
 }

@@ -178,10 +178,9 @@ type Observation struct {
 	// Empty where the source has no installation scopes.
 	Scope string
 
-	// Permissive summarises an app's effective sandbox permissions, obtained
-	// separately because no bulk flatpak command lists overrides. Empty means
-	// not checked, never "none".
-	Permissive string
+	// SandboxPermissions carries the effective Flatpak context returned for this
+	// installed copy. Unavailable means the query failed or was not run.
+	SandboxPermissions Signal[string]
 
 	// NetworkObservable reports whether this source can attribute a process's
 	// outbound connections to it at all. A false value means the source cannot

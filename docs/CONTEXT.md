@@ -162,9 +162,12 @@ alone, grepping binaries for "telemetry", package descriptions, and popularity.
 The v1 implementation does not deliver every accepted family. D7 §5.2 defers
 live endpoint matching because there is no reviewed endpoint catalogue or
 reliable process attribution; the report says telemetry attribution is
-unknown. Effective Flatpak sandbox posture is also unmeasured. Origin facts are
-collected by some sources but are not currently exposed as grade evidence. The
-only measured facts that can worsen an entry today are contradictions.
+unknown. privacybit now measures resolved Flatpak sandbox permissions per
+installed copy and grades that axis separately from the catalogue. Unsupported
+permission groups or missing coverage stay unknown. Origin facts are collected
+by some sources but are not currently exposed as grade evidence. Contradictions
+can worsen catalogue entry grades; sandbox evidence contributes separately to
+the overall grade.
 
 ### 3.2 Actions escalate to real privilege — and the owner insisted on it
 

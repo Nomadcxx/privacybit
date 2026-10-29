@@ -2,6 +2,7 @@ package detect
 
 import (
 	"context"
+	"fmt"
 	"strings"
 )
 
@@ -17,14 +18,11 @@ import (
 // "nothing seen" has to check it first.
 type Flatpak struct {
 	Runner Runner
-	// perms maps application id to its effective permission summary, obtained
-	// from `flatpak info --show-permissions`. Absent means not checked.
-	perms map[string]string
 }
 
 // NewFlatpak returns a flatpak source using r.
 func NewFlatpak(r Runner) *Flatpak {
-	return &Flatpak{Runner: r, perms: map[string]string{}}
+	return &Flatpak{Runner: r}
 }
 
 // Name identifies the source in coverage reporting.
@@ -47,7 +45,7 @@ func (f *Flatpak) Availability() Availability {
 	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout)
 	defer cancel()
 	out, err := f.Runner.Run(ctx, "flatpak", "list", "--app",
-		"--columns=application,version,branch,origin,installation")
+		"--columns=application,version,branch,origin,installation,arch")
 	if err != nil {
 		return NotReady("flatpak list failed: " + err.Error())
 	}
@@ -71,30 +69,31 @@ func parseColumns(line string) []string {
 // reported and the ids are left equal.
 func (f *Flatpak) Inventory(ctx context.Context) ([]Observation, error) {
 	out, err := f.Runner.Run(ctx, "flatpak", "list", "--app",
-		"--columns=application,version,branch,origin,installation")
+		"--columns=application,version,branch,origin,installation,arch")
 	if err != nil {
 		return nil, err
 	}
 	var obs []Observation
 	for _, line := range lines(out) {
 		cols := parseColumns(line)
-		if len(cols) < 5 {
-			continue
+		if len(cols) != 6 || cols[0] == "" || cols[2] == "" || cols[4] == "" || cols[5] == "" {
+			return nil, fmt.Errorf("flatpak list returned a malformed application row")
 		}
-		id, version, branch, origin, installation := cols[0], cols[1], cols[2], cols[3], cols[4]
-		scope := "system"
-		if strings.HasPrefix(installation, "user") {
-			scope = "user"
-		}
+		id, version, branch, origin, installation, arch := cols[0], cols[1], cols[2], cols[3], cols[4], cols[5]
+		scope := installation
 		official := origin == "flathub" || origin == "flathub-beta"
+		permissions := f.permissionsFor(ctx, id, scope, branch, arch)
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		obs = append(obs, Observation{
-			Name:       id,
-			Kind:       KindFlatpak,
-			Scope:      scope,
-			Version:    Observed(version),
-			Branch:     branch,
-			Origin:     Observed(Origin{Source: origin, Official: official}),
-			Permissive: f.perms[id],
+			Name:               id,
+			Kind:               KindFlatpak,
+			Scope:              scope,
+			Version:            Observed(version),
+			Branch:             branch,
+			Origin:             Observed(Origin{Source: origin, Official: official}),
+			SandboxPermissions: permissions,
 			Facts: Facts{
 				Licence:     Unavailable[string]("flatpak does not record a licence in its listing"),
 				Vendor:      Observed(origin),
@@ -107,20 +106,28 @@ func (f *Flatpak) Inventory(ctx context.Context) ([]Observation, error) {
 	return obs, nil
 }
 
-// PermissionsFor fills the per-application permission map from
-// `flatpak info --show-permissions`.
-//
-// D1 §6.4 requires effective permissions rather than declared ones, because
-// `flatpak override` mutates reality and persists invisibly. No bulk command
-// lists overrides, so this walks the known ids. That is O(applications) and it
-// is why this is a separate call from Inventory: it is the slow part, and a
-// caller that only needs presence should not pay for it.
-func (f *Flatpak) PermissionsFor(ctx context.Context, ids []string) {
-	for _, id := range ids {
-		out, err := f.Runner.Run(ctx, "flatpak", "info", "--show-permissions", id)
-		if err != nil {
-			continue
-		}
-		f.perms[id] = strings.Join(lines(out), "; ")
+func (f *Flatpak) permissionsFor(ctx context.Context, id, scope, branch, arch string) Signal[string] {
+	args := []string{"info", "--show-permissions"}
+	switch scope {
+	case "user":
+		args = append(args, "--user")
+	case "system":
+		args = append(args, "--system")
+	case "":
+		return Unavailable[string]("flatpak installation scope is missing")
+	default:
+		args = append(args, "--installation="+scope)
 	}
+	if arch != "" {
+		args = append(args, "--arch="+arch)
+	}
+	args = append(args, id, branch)
+	out, err := f.Runner.Run(ctx, "flatpak", args...)
+	if err != nil {
+		return Unavailable[string]("flatpak info --show-permissions failed: " + err.Error())
+	}
+	if strings.TrimSpace(out) == "" {
+		return Unavailable[string]("flatpak info --show-permissions returned no permissions")
+	}
+	return Observed(out)
 }

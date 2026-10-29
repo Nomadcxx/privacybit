@@ -63,6 +63,26 @@ func TestSnapshotFlagEmitsOneTerminalEvent(t *testing.T) {
 	}
 }
 
+func TestWriteHumanShowsFlatpakSandboxGradeAndCoverage(t *testing.T) {
+	snapshot := report.Snapshot{Sandbox: report.Sandbox{
+		Applicable: true, Grade: catalog.GradeAmber, AppsTotal: 2,
+		AppsChecked: 1, AppsIncomplete: 1, PartialCoverage: true,
+		Apps: []report.SandboxApp{
+			{ID: "org.example.App", Scope: "user", Grade: catalog.GradeAmber, Grants: []string{"home files"}},
+			{ID: "org.example.Other", Scope: "system", Grade: catalog.GradeUnknown, Unknown: []string{"permission query failed"}},
+		},
+	}}
+	var out bytes.Buffer
+	if err := writeHuman(&out, snapshot, "low"); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"Flatpak sandbox", "org.example.App", "user", "home files", "org.example.Other", "system", "Partial coverage"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("human output does not contain %q: %s", want, out.String())
+		}
+	}
+}
+
 func TestJSONEmitsStartAndDoneAndPassesNoNetworkScope(t *testing.T) {
 	var out bytes.Buffer
 	userFragments := false

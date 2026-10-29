@@ -193,6 +193,14 @@ of packages is slow, and D1 §6.2's two-tier cadence depends on that split.
 | apk | `apk info` | `apk info -a` | repo tag |
 | xbps | `xbps-query -l` | `xbps-query -R` | repository field |
 
+Flatpak sandbox permissions use a separate per-copy query. Enumerate each app
+with its installation, branch, and architecture, then call
+`flatpak info --show-permissions` with those selectors. Flatpak returns the
+deployed app context with the applicable global and per-app overrides already
+merged for the current user and installation. A failed query is unavailable
+evidence; the app remains in inventory. The audit only exposes classified
+grants and sanitized reasons, never the raw output or environment values.
+
 **The enrich-only-matches rule matters.** On this machine `pacman -Qq` is
 ~100 ms across 2,882 packages; running `pacman -Qi` across all of them is orders
 of magnitude slower. D1 §6.2's fast/slow split only works if the slow tier is

@@ -435,17 +435,18 @@ Flatpak is not just another package source. It carries its own trust model, and
 an audit that flattens it to "is the app installed?" throws away most of what is
 worth knowing. D1 specifies five checks; v1 does not implement all of them.
 
-**Effective permissions, not declared ones.** `flatpak info --show-permissions`
-reports what the app's *metadata* declares. `flatpak override` mutates what
-actually happens, and overrides persist invisibly — nothing in the app listing
-shows them. There is no "list all overrides" command, so the audit enumerates
-known application ids and reads `flatpak override --show` for each. Reading
-declared permissions and reporting them as effective would be a false negative.
+**Resolved permissions, with Flatpak applying its own overrides.** For every
+installed app copy, the detector calls `flatpak info --show-permissions` with
+that copy's installation, application id, branch, and architecture. Flatpak
+loads the deployed app context and merges the applicable global and per-app
+overrides for the current user and installation. privacybit must use this
+resolved output rather than reconstruct override precedence or key paths.
+Permission-query failures leave that copy's sandbox grade unknown.
 
-**V1 status:** `internal/detect.Flatpak` reads declared metadata but does not
-read or merge system- and user-scope overrides. The grader leaves sandbox
-posture unmeasured; it must not treat declared permissions as effective. See
-`HANDOVER.md` §10.1 for the current coverage gap.
+The command output also contains environment values and may contain other
+permission groups. The audit never reports the raw output: it grades only its
+recognized context keys, ignores environment values, and leaves any
+unclassified permission evidence unknown.
 
 **Installation scope, and duplicates across it.** `system` installations are
 root-owned; `user` installations are not, and for the owning user the `user`
@@ -465,6 +466,21 @@ app in a sandbox with `devices=all`, `filesystems=host` and `shared=network` has
 lost most of the containment that made it safe to run. Both facts are reported:
 the app grade and the sandbox grade, and neither is allowed to launder the
 other. A `green` app in a broken sandbox is not a green machine.
+
+The owner-approved generic risk bands are:
+
+| Grade | Evidence |
+|---|---|
+| Red | Host filesystem access, all devices, or shared networking. |
+| Amber | Bounded broad access such as home files, host configuration, X11, or USB. |
+| Green | Complete, classified permission evidence without a red or amber grant. |
+| Unknown | Missing output, a failed query, invalid output, or an unclassified permission. |
+
+The sandbox grade remains separate from the catalogue grade. The overall grade
+uses worst evidence across categories and sandbox copies. An unclassified
+permission makes that app's sandbox grade unknown, even when another grant is
+known red; the recognized grant remains visible as evidence. Unknown sandbox
+grades propagate to overall.
 
 **Network visibility is degraded inside flatpak, and that must be stated.** This
 is the important one. An app that unshares its network namespace has its
@@ -816,11 +832,8 @@ Recorded so they are decisions rather than surprises:
 - **Network visibility inside flatpak is degraded** and is reported as `unknown`
   rather than graded (§6.4). This is a permanent limitation, not a bug to be
   fixed later.
-- **Effective Flatpak permissions by install scope are unmeasured in v1.** The
-  detector reads declared metadata but does not merge system- and user-scope
-  overrides; the grader leaves sandbox posture unknown.
-- **Flatpak override enumeration is O(applications)** because flatpak offers no
-  bulk listing command.
+- **Flatpak permission inspection is O(installed app copies)** because the CLI
+  exposes resolved permissions per app ref rather than as a bulk inventory.
 - **Locale and translated metadata** are not parsed.
 - **Single-user scope.** Other users' processes and per-user installs are not
   audited. A `--all-users` mode would need root and is out of scope.

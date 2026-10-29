@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/Nomadcxx/privacybit/internal/audit"
 	"github.com/Nomadcxx/privacybit/internal/catalog"
 	"github.com/Nomadcxx/privacybit/internal/detect"
 	"github.com/Nomadcxx/privacybit/internal/network"
@@ -81,4 +82,15 @@ func TestMissingVPNExpectationRemainsJudgedWithoutTunnel(t *testing.T) {
 		}
 	}
 	t.Fatal("vpn category missing")
+}
+
+func TestNetworkRollupKeepsSandboxGradeInOverall(t *testing.T) {
+	result := audit.Result{
+		Categories: []audit.CategoryResult{{ID: "browser", Grade: catalog.GradeGreen}},
+		Sandbox:    audit.SandboxResult{Applicable: true, Grade: catalog.GradeRed},
+	}
+	applyNetwork(&catalog.Set{Categories: []*catalog.Category{{ID: "vpn"}}}, &result, network.Result{})
+	if result.Overall != catalog.GradeRed {
+		t.Fatalf("overall grade after network roll-up = %q, want red from sandbox", result.Overall)
+	}
 }
