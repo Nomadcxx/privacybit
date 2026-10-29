@@ -99,7 +99,7 @@ func TestWriteHumanShowsOriginsAsContext(t *testing.T) {
 	if err := writeHuman(&out, snapshot, "low"); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"Origin context", "Brave Origin (user)", "flathub (official)", "aur (not marked official)", "Showing 2 of 3 origins"} {
+	for _, want := range []string{"Origin context", "Brave Origin (user)", "flathub (recognized official label; configured source not verified)", "aur (not marked official)", "Showing 2 of 3 origins"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("human output does not contain %q: %s", want, out.String())
 		}

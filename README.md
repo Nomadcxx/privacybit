@@ -24,8 +24,9 @@
 - **Installed applications.** Exact catalogue matches from pacman, dpkg,
   Flatpak, desktop entries, and selected executable paths, grouped by category.
 - **Package provenance.** Reports show observed repository or remote names and
-  whether each is marked official. Provenance is context; it does not change a
-  privacy grade.
+  whether each name matches a recognized official label. privacybit does not
+  authenticate the configured repository or remote. Provenance is context; it
+  does not change a privacy grade.
 - **Flatpak sandbox posture.** privacybit checks each installed copy's resolved
   permissions and grades that risk separately from the app's catalogue grade.
   Unsupported permission types report as unknown.

@@ -510,7 +510,7 @@ func (m *Model) appView(id string) string {
 	for _, origin := range app.Origins {
 		status := "not marked official"
 		if origin.Official {
-			status = "official"
+			status = "recognized official label; configured source not verified"
 		}
 		fmt.Fprintf(&out, "Origin context: %s (%s)\n", origin.Source, status)
 	}

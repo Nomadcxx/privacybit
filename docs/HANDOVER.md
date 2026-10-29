@@ -619,6 +619,7 @@ Specific, falsifiable claims. Each is checkable.
 | 15 | **Flatpak permission evidence is resolved per installation and never leaks raw environment values.** | `TestFlatpakInventoryPreservesInstallationScope`, `TestFlatpakInventoryQueriesNamedInstallation`, `TestFlatpakSandboxBandsKeepUnknownAndUseWorstEvidence`, and `TestBuildIncludesSandboxEvidenceInOverallSnapshot`. |
 | 16 | **Sandbox coverage and panel rendering stay explicit and bounded.** | `TestFlatpakSandboxWithoutInventoryCoverageIsUnknown`, `TestBuildBoundsPerCopySandboxEvidence`, `TestParseAuditOutputBoundsFlatpakSandboxEvidence`, `TestParseAuditOutputRejectsInvalidAndFutureSnapshots`, and `TestPrivacyPanelShowsSeparateFlatpakSandboxGradesAndCoverage`. |
 | 17 | **Installer cancellation preserves the current CLI and reports partial service state.** | `TestCtrlCCancelsBuildAndReportsCLIState`, `TestCtrlCCancelsServiceSetupAndReportsPartialState`, `TestCtrlCAfterBuildCompletionDoesNotStartServices`, and `TestInstallBinaryCancellationPreservesTarget`. |
+| 18 | **Origin status reports a recognized local name without claiming source authentication.** | `TestWriteHumanShowsOriginsAsContext` in `cmd/privacybit/audit_test.go`, `TestAppViewShowsOriginContextWithoutChangingGrade` in `internal/tui/model_test.go`, and `TestPrivacyPanelShowsOriginAsContext` in sysc-plugins `plugins/privacy/view_test.go`. |
 
 §11 records the latest gate results. Earlier phase checkpoints are historical;
 use the current results when judging the tree.
@@ -671,7 +672,7 @@ two do not collide.)
 | Laptop testbench integration | Last checked over SSH on 2026-10-29 after the handshake fix. `/home/nomadx/.local/bin/privacybit` was executable and embedded `54c9fb4`; a no-network schema-1 snapshot included origin context. The privacy plugin embedded `9b44520`; `sysc-shell.service` was active and the bar placement was enabled. SSH returned `No route to host` on 2026-10-30, so deployment of the `v0.1.2` CLI and plugin remains unverified. |
 | Live telemetry endpoint attribution | Deferred by D7 §5.2: no reviewed endpoint dataset or reliable PID attribution. Snapshots report this signal as unknown. |
 | Effective Flatpak sandbox grade | Implemented in privacybit PR #16 and shown by sysc-plugins PR #259. It grades each installed copy from resolved permissions: red for host filesystem, all-device, or shared-network grants; amber for bounded broad access; green only for complete classified evidence without those grants. Missing or unclassified evidence is unknown. Privacybit `v0.1.2` includes the grade; issue #20 is closed. Plugin release `privacy-v0.1.2` includes the panel and manifest/handshake fix; catalog PR #275 merged and issue #268 is closed. |
-| Package origin context | The owner resolved privacybit issue #22: show the observed source name and official status as context, and never use origin to change a grade. Privacybit PR #23 adds bounded report fields and CLI/TUI output; sysc-plugins PR #264 adds panel context. Unmatched apps remain unrated and retain visible origin context. Privacybit `v0.1.2` includes this context; plugin release `privacy-v0.1.2` includes the panel change. |
+| Package origin context | The owner resolved privacybit issue #22: show the observed source name and whether it matches a recognized official label, and never use origin to change a grade. The match uses the name only; privacybit does not authenticate the configured repository or remote. Privacybit PR #23 adds bounded report fields and CLI/TUI output; sysc-plugins PR #264 adds panel context. Unmatched apps remain unrated and retain visible origin context. Published `v0.1.2` assets predate the unverified-label copy; privacybit issue #37 and sysc-plugins issue #276 track that clarification. |
 | dnf, zypper, apk, and xbps backends | Deferred under D6; universal sources report what they can see, with coverage caveats. |
 | Nix and Snap package-manager sources | Deferred under D6 because their models do not fit the package-manager interface. |
 | Licence | `LICENSE`, README, `PKGBUILD`, and `.SRCINFO` use GPL-3.0-or-later. The full licence text matches `/usr/share/licenses/spdx/GPL-3.0-or-later.txt`. The checked sysc-shell tree remains BSD-3-Clause and sysc-plugins remains MIT; neither was changed. |
@@ -733,6 +734,12 @@ Recorded because a future reader will trust the docs.
    context and merges applicable system/user global and per-app overrides.
    D1 and D6 now use that resolved context, while keeping raw environment
    values out of reports.
+
+10. **Origin labels were displayed as authenticated source status.** The
+    detectors only recognize local names such as `core` and `flathub`; they do
+    not verify repository servers or Flatpak remote configuration. The CLI,
+    TUI, and plugin now label a name match as recognized and say that the source
+    is not authenticated. Origin remains context and does not affect grades.
 
 ### 10.3 Implementation defects and corrections
 
@@ -816,6 +823,12 @@ Recorded because a future reader will trust the docs.
     partial. The binary installer checks cancellation immediately before
     atomic replacement, preserving the prior executable when cancellation
     arrives before that point.
+
+17. **Origin copy implied source authentication.** Pacman and Flatpak expose
+    local repository or remote names. The report now says when a name matches
+    a recognized official label and states that privacybit does not
+    authenticate the configured source. Issues #37 and sysc-plugins #276 track
+    the CLI, TUI, and panel changes. The schema and grading rules stay unchanged.
 
 ### 10.4 Environment traps
 

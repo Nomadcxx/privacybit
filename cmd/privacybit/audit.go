@@ -286,7 +286,7 @@ func writeOriginContext(out *strings.Builder, app report.App) {
 
 func originStatus(official bool) string {
 	if official {
-		return "official"
+		return "recognized official label; configured source not verified"
 	}
 	return "not marked official"
 }

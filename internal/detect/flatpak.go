@@ -81,6 +81,8 @@ func (f *Flatpak) Inventory(ctx context.Context) ([]Observation, error) {
 		}
 		id, version, branch, origin, installation, arch := cols[0], cols[1], cols[2], cols[3], cols[4], cols[5]
 		scope := installation
+		// Flatpak reports the configured remote name. Matching a Flathub name
+		// does not verify the remote's URL or signing configuration.
 		official := origin == "flathub" || origin == "flathub-beta"
 		permissions := f.permissionsFor(ctx, id, scope, branch, arch)
 		if err := ctx.Err(); err != nil {
