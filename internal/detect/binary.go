@@ -178,14 +178,16 @@ func userPathDirs() []string {
 		if dir == "" {
 			continue
 		}
+		// Keep the Nix store check lexical so user profiles can expose selected
+		// store paths through symlinks; resolve aliases for the other system roots.
 		switch {
-		case pathWithinRoot(dir, "/usr/bin"),
-			pathWithinRoot(dir, "/bin"),
-			pathWithinRoot(dir, "/usr/sbin"),
-			pathWithinRoot(dir, "/sbin"),
-			pathWithinRoot(dir, "/usr/local/bin"),
+		case pathWithinSystemRoot(dir, "/usr/bin"),
+			pathWithinSystemRoot(dir, "/bin"),
+			pathWithinSystemRoot(dir, "/usr/sbin"),
+			pathWithinSystemRoot(dir, "/sbin"),
+			pathWithinSystemRoot(dir, "/usr/local/bin"),
 			pathWithinRoot(dir, "/nix/store"),
-			pathWithinRoot(dir, "/usr/lib"):
+			pathWithinSystemRoot(dir, "/usr/lib"):
 			continue
 		}
 		out = append(out, dir)
@@ -197,6 +199,14 @@ func userPathDirs() []string {
 func pathWithinRoot(path, root string) bool {
 	path, root = filepath.Clean(path), filepath.Clean(root)
 	return path == root || strings.HasPrefix(path, root+string(filepath.Separator))
+}
+
+func pathWithinSystemRoot(path, root string) bool {
+	if pathWithinRoot(path, root) {
+		return true
+	}
+	resolved, err := filepath.EvalSymlinks(path)
+	return err == nil && pathWithinRoot(resolved, root)
 }
 
 func countExecutables(dirs []string) int {
