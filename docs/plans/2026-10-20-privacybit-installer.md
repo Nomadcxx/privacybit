@@ -98,3 +98,23 @@ Launch it in a terminal, confirm the welcome/review screens, then quit before co
 **Step 3: Update the handover**
 
 Record the new command, tests, design/plan paths, and exact verification results. Keep the live Niri gate and other unrelated dirty work unchanged.
+
+### Follow-up: Cancel active install operations
+
+Issue #34 adds cancellation to the active build and service setup.
+
+**Files:**
+- Modify: `cmd/privacybit-install/main.go`
+- Modify: `cmd/privacybit-install/main_test.go`
+- Modify: `internal/installer/binary.go`
+- Modify: `internal/installer/binary_test.go`
+
+**Acceptance:** Ctrl+C cancels the running command and the TUI waits for its
+result. A canceled build does not replace the current CLI. Cancellation during
+service setup reports that the CLI remains installed and service state may be
+partial.
+
+**Verification:** Cover build and service cancellation, the late build-result
+race, and cancellation immediately before atomic replacement. Run focused
+tests, vet, build, and race checks for `cmd/privacybit-install` and
+`internal/installer`.

@@ -71,16 +71,26 @@ func BuildAndInstallCLI(ctx context.Context, checkout, binDir string) (string, e
 	if err != nil {
 		return "", fmt.Errorf("build privacybit offline: %w: %s", err, strings.TrimSpace(string(output)))
 	}
-	if err := ensureUserBinDir(binDir); err != nil {
-		return "", err
-	}
-	if err := InstallBinary(binary, binDir); err != nil {
+	if err := installBuiltCLI(ctx, binary, binDir); err != nil {
 		return "", fmt.Errorf("install privacybit: %w", err)
 	}
 	return filepath.Join(binDir, "privacybit"), nil
 }
 
-func InstallBinary(source, binDir string) error {
+func installBuiltCLI(ctx context.Context, binary, binDir string) error {
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("installation canceled before replacing the CLI: %w", err)
+	}
+	if err := ensureUserBinDir(binDir); err != nil {
+		return err
+	}
+	return InstallBinary(ctx, binary, binDir)
+}
+
+func InstallBinary(ctx context.Context, source, binDir string) error {
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("install binary canceled: %w", err)
+	}
 	if !filepath.IsAbs(source) || !filepath.IsAbs(binDir) {
 		return errors.New("binary source and install directory must be absolute paths")
 	}
@@ -141,6 +151,9 @@ func InstallBinary(source, binDir string) error {
 	}
 	if err := temporary.Close(); err != nil {
 		return fmt.Errorf("close temporary install file: %w", err)
+	}
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("install binary canceled: %w", err)
 	}
 	if err := os.Rename(temporaryPath, target); err != nil {
 		return fmt.Errorf("replace privacybit binary: %w", err)

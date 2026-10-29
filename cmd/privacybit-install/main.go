@@ -37,6 +37,9 @@ type serviceInstall func(context.Context, string, string) error
 
 type model struct {
 	ctx             context.Context
+	cancelOperation context.CancelFunc
+	canceling       bool
+	cancelledDuring step
 	installCLI      cliInstall
 	installServices serviceInstall
 	step            step
@@ -103,7 +106,9 @@ func run() error {
 		}
 		return installer.Install(ctx, configHome, path, mode, nil)
 	}
-	program := tea.NewProgram(newModel(context.Background(), installCLI, installServices), tea.WithAltScreen())
+	model := newModel(context.Background(), installCLI, installServices)
+	defer model.stopOperation()
+	program := tea.NewProgram(model, tea.WithAltScreen())
 	_, err = program.Run()
 	return err
 }
@@ -133,24 +138,39 @@ func (m *model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		if message.err != nil {
 			m.problem = message.err.Error()
 			m.step = stepFailed
+			m.stopOperation()
 			return m, nil
 		}
 		m.installedPath = message.path
+		if m.canceling {
+			m.step = stepFailed
+			m.stopOperation()
+			return m, nil
+		}
 		m.step = stepServices
-		mode := serviceModes[m.selected].name
+		ctx, path, mode := m.ctx, message.path, serviceModes[m.selected].name
 		return m, func() tea.Msg {
-			return servicesResult{err: m.installServices(m.ctx, message.path, mode)}
+			return servicesResult{err: m.installServices(ctx, path, mode)}
 		}
 	case servicesResult:
 		if message.err != nil {
 			m.problem = message.err.Error()
 			m.step = stepFailed
+			m.stopOperation()
 			return m, nil
 		}
 		m.step = stepDone
+		m.stopOperation()
 		return m, nil
 	case tea.KeyMsg:
 		if m.step == stepBuilding || m.step == stepServices {
+			if message.String() == "ctrl+c" && !m.canceling {
+				m.canceling = true
+				m.cancelledDuring = m.step
+				if m.cancelOperation != nil {
+					m.cancelOperation()
+				}
+			}
 			return m, nil
 		}
 		switch m.step {
@@ -177,8 +197,12 @@ func (m *model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				m.step = stepChoose
 			case "enter":
 				m.step = stepBuilding
+				ctx, cancel := context.WithCancel(m.ctx)
+				m.ctx = ctx
+				m.cancelOperation = cancel
+				m.canceling = false
 				return m, func() tea.Msg {
-					path, err := m.installCLI(m.ctx)
+					path, err := m.installCLI(ctx)
 					return cliResult{path: path, err: err}
 				}
 			}
@@ -242,14 +266,23 @@ func (m *model) View() string {
 		content.WriteString("  Background activity: " + serviceModes[m.selected].label + "\n\n")
 		content.WriteString(mutedStyle.Render("Enter install   Esc back"))
 	case stepBuilding:
-		content.WriteString("Building privacybit offline, then installing the CLI...\n")
-		content.WriteString(mutedStyle.Render("This can take a few seconds."))
-	case stepServices:
-		content.WriteString("CLI installed at:\n  " + m.installedPath + "\n\n")
-		if serviceModes[m.selected].name == "none" {
-			content.WriteString("Disabling any existing privacybit watcher or timer...")
+		if m.canceling {
+			content.WriteString("Canceling the build...")
 		} else {
-			content.WriteString("Configuring user " + serviceModes[m.selected].label + "...")
+			content.WriteString("Building privacybit offline, then installing the CLI...\n")
+			content.WriteString(mutedStyle.Render("This can take a few seconds. Press Ctrl+C to cancel."))
+		}
+	case stepServices:
+		if m.canceling {
+			content.WriteString("Canceling service setup...")
+		} else {
+			content.WriteString("CLI installed at:\n  " + m.installedPath + "\n\n")
+			if serviceModes[m.selected].name == "none" {
+				content.WriteString("Disabling any existing privacybit watcher or timer...\n")
+			} else {
+				content.WriteString("Configuring user " + serviceModes[m.selected].label + "...\n")
+			}
+			content.WriteString(mutedStyle.Render("Press Ctrl+C to cancel."))
 		}
 	case stepDone:
 		content.WriteString(selectStyle.Render("Install complete") + "\n\n")
@@ -262,7 +295,20 @@ func (m *model) View() string {
 		content.WriteString("Run it with ~/.local/bin/privacybit, or add ~/.local/bin to PATH.\n")
 		content.WriteString("\n" + mutedStyle.Render("Enter or q to exit"))
 	case stepFailed:
-		if m.installedPath != "" {
+		if m.canceling {
+			switch m.cancelledDuring {
+			case stepBuilding:
+				if m.installedPath == "" {
+					content.WriteString(errorStyle.Render("Build canceled before the new CLI was installed.") + "\n")
+				} else {
+					content.WriteString("CLI installed at:\n  " + m.installedPath + "\n")
+					content.WriteString(errorStyle.Render("Background service setup did not start.") + "\n")
+				}
+			case stepServices:
+				content.WriteString("CLI installed at:\n  " + m.installedPath + "\n")
+				content.WriteString(errorStyle.Render("Service setup was canceled; service state may be partial.") + "\n")
+			}
+		} else if m.installedPath != "" {
 			content.WriteString("privacybit installed at:\n  " + m.installedPath + "\n\n")
 			if serviceModes[m.selected].name == "none" {
 				content.WriteString(errorStyle.Render("Could not disable existing privacybit background work.") + "\n")
@@ -276,4 +322,11 @@ func (m *model) View() string {
 		content.WriteString(mutedStyle.Render("Enter or q to exit"))
 	}
 	return frameStyle.Width(width - 4).BorderForeground(lipgloss.AdaptiveColor{Light: "#4C9B78", Dark: "#63C99A"}).Render(content.String())
+}
+
+func (m *model) stopOperation() {
+	if m.cancelOperation != nil {
+		m.cancelOperation()
+		m.cancelOperation = nil
+	}
 }
