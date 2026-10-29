@@ -176,6 +176,22 @@ func writeHuman(w io.Writer, snapshot report.Snapshot, severity string) error {
 			fmt.Fprintf(&out, "    Showing %d of %d installed apps.\n", category.InstalledShown, category.InstalledTotal)
 		}
 	}
+	unmatchedWithOrigins := 0
+	for _, app := range snapshot.Unmatched {
+		if len(app.Origins) > 0 || app.OriginsTruncated {
+			unmatchedWithOrigins++
+		}
+	}
+	if unmatchedWithOrigins > 0 {
+		fmt.Fprintln(&out, "\nUnmatched apps (Unrated):")
+		for _, app := range snapshot.Unmatched {
+			if len(app.Origins) == 0 && !app.OriginsTruncated {
+				continue
+			}
+			fmt.Fprintf(&out, "  %s\n", app.Name)
+			writeOriginContext(&out, app)
+		}
+	}
 	fmt.Fprintf(&out, "\nFlatpak sandbox: %s\n", gradeCell(snapshot.Sandbox.Grade))
 	if snapshot.Sandbox.Reason != "" {
 		fmt.Fprintf(&out, "  %s\n", snapshot.Sandbox.Reason)

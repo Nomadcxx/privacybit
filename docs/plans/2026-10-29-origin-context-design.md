@@ -24,9 +24,11 @@ is collapsed, and labels stop at 80 UTF-8 bytes without splitting a rune.
 
 The human CLI, TUI app detail, and sysc-plugins panel show the origin and label
 whether the source is official or not marked official. Each UI calls this
-"origin context" so users do not read it as grade evidence. The plugin applies
-the same bounds and sanitization when decoding input. Missing origin fields
-remain valid, keeping older privacybit snapshots readable.
+"origin context" so users do not read it as grade evidence. Unmatched apps stay
+unknown; their measured origins appear in the CLI, TUI unmatched details, and a
+capped plugin section. The plugin applies the same bounds and sanitization when
+decoding input. Missing origin and unmatched fields remain valid, keeping older
+privacybit snapshots readable.
 
 The audit grader will stop treating a contradicted origin signal as a grade
 input. Other contradiction signals keep their existing monotone behavior.

@@ -467,6 +467,12 @@ App records may also carry an optional bounded origin list. The panel shows the
 source and whether it is marked official as context; origin does not affect
 grades. Older snapshots without origin fields remain readable.
 
+Snapshots may carry a bounded `unmatched` list for apps without a catalogue
+match. The panel shows those apps in a separate **Unmatched apps** section as
+**Unrated**, with any observed origin shown as context. Unmatched apps do not
+contribute to category or overall grades. Older snapshots without this list
+remain readable.
+
 The plugin still runs with the same user privileges as sysc-shell. The panel
 cannot reach root, remove software, execute suggested remediation or act on
 findings. GPL-3.0-or-later applies to the plugin's source, UI and packaged

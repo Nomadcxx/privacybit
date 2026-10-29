@@ -128,6 +128,29 @@ func TestBuildPreservesDeduplicatedOriginContextByAppAndFlatpakScope(t *testing.
 	}
 }
 
+func TestBuildPreservesOriginContextForUnmatchedApps(t *testing.T) {
+	set, err := catalog.Load(catalog.LoadOptions{UserFragments: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := audit.Result{
+		Overall: catalog.GradeUnknown,
+		Inventory: []audit.InstalledEntry{{
+			Observation: detect.Observation{Name: "mystery-browser", Kind: detect.KindPackage,
+				Origin: detect.Observed(detect.Origin{Source: "community"})},
+			Grade: catalog.GradeUnknown,
+		}},
+	}
+	snapshot := Build(set, result, nil, network.UnknownResult("not checked"), nil, time.Now(), 0, BuildOptions{})
+	if snapshot.Overall.Grade != catalog.GradeUnknown || len(snapshot.Unmatched) != 1 {
+		t.Fatalf("unmatched result = %+v, want one unrated app", snapshot)
+	}
+	app := snapshot.Unmatched[0]
+	if app.Grade != catalog.GradeUnknown || len(app.Origins) != 1 || app.Origins[0] != (AppOrigin{Source: "community"}) {
+		t.Fatalf("unmatched app = %+v, want unchanged unrated grade and origin context", app)
+	}
+}
+
 func TestBuildSanitizesAndBoundsOriginContext(t *testing.T) {
 	set, err := catalog.Load(catalog.LoadOptions{UserFragments: false})
 	if err != nil {

@@ -43,9 +43,9 @@
 - Modify `internal/tui/model_test.go`
 
 **Steps:**
-1. Add failing CLI and TUI cases requiring origin context and official status to render, including a truncation note.
+1. Add failing CLI and TUI cases requiring origin context and official status to render for catalogue apps and unmatched apps.
 2. Run `go test ./cmd/privacybit ./internal/tui -run Origin` and confirm the new cases fail.
-3. Render origin labels and status in the existing app detail rows; leave grade output unchanged.
+3. Render origin labels and status in existing app details, and show unmatched origin context without changing unknown grades.
 4. Run the focused command and TUI tests.
 
 ### Task 4: Carry origin context through the plugin
@@ -59,9 +59,9 @@
 - Modify `plugins/privacy/view_test.go`
 
 **Steps:**
-1. Add a failing parser test for bounded origin context, control-character sanitation, truncation, and a legacy snapshot without origins.
+1. Add failing parser and panel tests for bounded origin context on catalogue and unmatched apps, control-character sanitation, truncation, and a legacy snapshot without origins.
 2. Add a failing panel test requiring source name and official status to display as context.
-3. Extend the optional app snapshot fields and sanitize/cap them during decoding; render provenance in each app card.
+3. Extend the optional app and unmatched snapshot fields, sanitize/cap them during decoding, and render provenance in the panel.
 4. Run `go test ./plugins/privacy ./cmd/sysc-plugin-privacy` and build the privacy plugin.
 
 ### Task 5: Reconcile design and handover documents

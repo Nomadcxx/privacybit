@@ -137,6 +137,28 @@ func TestAppViewShowsOriginContextWithoutChangingGrade(t *testing.T) {
 	}
 }
 
+func TestUnmatchedAppDetailsShowOriginContext(t *testing.T) {
+	model := NewModel(context.Background(), nil)
+	model.snapshot = ptr(testSnapshot())
+	model.snapshot.Unmatched = []report.App{{
+		Name: "Mystery browser", Grade: catalog.GradeUnknown, Scope: "user", Sources: []string{"flatpak"},
+		Origins: []report.AppOrigin{{Source: "community"}}, OriginsShown: 1, OriginsTotal: 1,
+	}}
+	model.snapshot.UnmatchedTotal = 1
+	model.stack = []Route{{Screen: ScreenUnmatched}}
+	model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	route := model.stack[len(model.stack)-1]
+	if route.Screen != ScreenApp {
+		t.Fatalf("selected unmatched app opened %q, want app details", route.Screen)
+	}
+	view := model.View()
+	for _, want := range []string{"Mystery browser", "Unrated", "Origin context: community (not marked official)"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("unmatched app view missing %q:\n%s", want, view)
+		}
+	}
+}
+
 func TestPurgeKeyLaunchesHelperFlowOnlyForRedCatalogueApps(t *testing.T) {
 	model := NewModel(context.Background(), nil)
 	model.snapshot = ptr(testSnapshot())
