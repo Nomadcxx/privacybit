@@ -179,18 +179,24 @@ func userPathDirs() []string {
 			continue
 		}
 		switch {
-		case strings.HasPrefix(dir, "/usr/bin"),
-			strings.HasPrefix(dir, "/bin"),
-			strings.HasPrefix(dir, "/usr/sbin"),
-			strings.HasPrefix(dir, "/sbin"),
-			strings.HasPrefix(dir, "/usr/local/bin"),
-			strings.HasPrefix(dir, "/nix/store/"),
-			strings.HasPrefix(dir, "/usr/lib/"):
+		case pathWithinRoot(dir, "/usr/bin"),
+			pathWithinRoot(dir, "/bin"),
+			pathWithinRoot(dir, "/usr/sbin"),
+			pathWithinRoot(dir, "/sbin"),
+			pathWithinRoot(dir, "/usr/local/bin"),
+			pathWithinRoot(dir, "/nix/store"),
+			pathWithinRoot(dir, "/usr/lib"):
 			continue
 		}
 		out = append(out, dir)
 	}
 	return out
+}
+
+// ponytail: This compares lexical paths; resolve PATH symlinks if aliases to system roots cause duplicate scans.
+func pathWithinRoot(path, root string) bool {
+	path, root = filepath.Clean(path), filepath.Clean(root)
+	return path == root || strings.HasPrefix(path, root+string(filepath.Separator))
 }
 
 func countExecutables(dirs []string) int {
