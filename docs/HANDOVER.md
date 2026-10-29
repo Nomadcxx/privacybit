@@ -836,7 +836,7 @@ Recorded because a future reader will trust the docs.
 
 | Repository | Automated checks | Result |
 |---|---|---|
-| privacybit | `.github/workflows/ci.yml`: formatting, `go test -count=1 -p 2 ./...`, `go vet -p 2 ./...`, and `go build -p 2 ./...` | PR #25 merged at `aa8163b`; its pull request checks and main-branch run `40871202870` passed. The first CI run exposed a host-dependent pacman availability fixture; PR #25 made the fixture explicit. PR #19's `makepkg --printsrcinfo | cmp - .SRCINFO` passed. |
+| privacybit | `.github/workflows/ci.yml`: formatting, `go test -count=1 -p 2 ./...`, `go vet -p 2 ./...`, and `go build -p 2 ./...` | PR #29 merged at `8ac3514`; its pull request check and post-merge main run `40875290019` passed. It limits pacman official status to recognized Arch repository labels; issue #28 is closed. PR #25's pull request checks and main-branch run `40871202870` passed after its pacman fixture fix. PR #19's `makepkg --printsrcinfo | cmp - .SRCINFO` passed. |
 | sysc-plugins | PR #259 adds the Flatpak sandbox grade; PR #262 fixes contrast; PR #264 shows origin context; PR #265 publishes `privacy-v0.1.1`; PR #267 fixes handshake identity | PR #267 merged at `9b44520`; `test`, `govulncheck`, and `verify` passed. The current catalog points to `privacy-v0.1.1`, whose amd64 asset embeds pre-fix revision `01a4c7f8`; issue #268 tracks a corrected release. |
 | sysc-shell | PR #436 adds the original summary; PR #437 routes it to the plugin panel | Both PRs are merged and their GitHub `test` checks passed. The current upstream main is `11d6325`; the testbench service runs shell revision `ca3c988`, and the privacy plugin process runs revision `9b44520` with its bar placement configured. |
 
