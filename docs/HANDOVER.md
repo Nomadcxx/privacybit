@@ -92,13 +92,13 @@ matters so much.
 
 | Absolute path | What it is | State |
 |---|---|---|
-| `/home/nomadx/privacy-bit` | **This project.** Canonical checkout on branch `main`. | Upstream main before this documentation refresh was `6c40182` (2026-10-29). The primary checkout contains unrelated untracked `.commandcode/` data. Leave it untouched and use a clean worktree from `origin/main`. Privacybit `v0.1.2` at `7c63797` includes the Flatpak sandbox grade and package-origin context. Issue #20 is closed. |
+| `/home/nomadx/privacy-bit` | **This project.** Canonical checkout on branch `main`. | Upstream main is `70c8161` after PR #42. The primary checkout contains unrelated untracked `.commandcode/` data; leave it untouched and use a clean worktree from `origin/main`. Public privacybit `v0.1.2` at `7c63797` remains current; PR #42 updates the AUR recipe for `0.1.3`. Issue #20 is closed. |
 | `/home/nomadx/worktrees/privacybit-origin-context` | Historical privacybit issue #22 worktree. | Branch `feat/origin-context` at `54c9fb4`; privacybit PR #23 merged the context-only origin implementation. |
 | `/home/nomadx/sysc-plugins/.worktrees/privacybit-origin-context` | Historical sysc-plugins issue #22 worktree. | Branch `feat/privacybit-origin-context`; sysc-plugins PR #264 merged the panel integration and refreshed screenshot and thumbnail. |
 | `/home/nomadx/privacy-bit/docs/plans/` | Seven original design documents plus follow-on designs and implementation plans. | D1–D7 record the approved design. Phase 3, 4, 8, and 9 plans remain as audit history. |
-| `Nomadcxx/sysc-plugins` `main` | Upstream revision `890a178` (2026-10-29). | PR #277 updated the privacy panel's origin wording; PR #279 makes the plugin wait for Docker workers on shutdown. Issues #276 and #278 are closed. Release `privacy-v0.1.2` still points to tested commit `21b4944`. Catalog PR #275 merged at `2f67de4`; its amd64 and arm64 assets have verified SHA-256 digests, and issue #268 is closed. A disposable sysc-shell store install resolved and installed version `0.1.2`. |
+| `Nomadcxx/sysc-plugins` `main` | Upstream revision `4adfa32` after PR #281. | PR #277 updated the privacy panel's origin wording; PR #279 makes the plugin wait for Docker workers on shutdown; PR #281 prepares manifest version `0.1.3`. Issues #276 and #278 are closed. Release `privacy-v0.1.2` still points to tested commit `21b4944`. Catalog PR #275 merged at `2f67de4`; its amd64 and arm64 assets have verified SHA-256 digests, and issue #268 is closed. Release rehearsal run `40934309464` passed both architecture builds; its manual run skipped publication and catalog changes. |
 | `Nomadcxx/sysc-shell` `main` | Upstream revision `b306ac2` (2026-10-30). | PRs #436 and #437 add the Control Centre summary and route `Open full audit` to the plugin panel. |
-| `nomadx@192.168.0.64:7777` laptop testbench | Plugin worktree `/home/nomadx/worktrees/privacybit-plugin-testbench-20261023`. | Last checked over SSH on 2026-10-29. The installed `privacybit` embeds privacybit `54c9fb4`; the plugin embeds sysc-plugins `9b44520`; `sysc-shell.service` is active and its bar placement is enabled. On 2026-10-30, SSH returned `No route to host`; redeployment of privacybit `v0.1.2` and plugin `0.1.2` remains unverified. |
+| `nomadx@192.168.0.64:7777` laptop testbench | Plugin worktree `/home/nomadx/worktrees/privacybit-plugin-testbench-20261023`. | Last successful check over SSH was 2026-10-29. The installed `privacybit` embeds privacybit `54c9fb4`; the plugin embeds sysc-plugins `9b44520`; `sysc-shell.service` is active and its bar placement is enabled. SSH returned `No route to host` on 2026-10-30, including a later retry; the v0.1.2 redeployment remains unverified. |
 | `/home/nomadx/sysc-plugins` | Primary plugin checkout. | Branch `fix/kdeconnect-pairing-card-routing` has independent dirty changes, including an untracked `plugins/privacy`. Do not clean or repurpose it; upstream `main` is the source of truth for the published plugin. |
 | `/home/nomadx/sysc-shell` | Primary shell checkout. | Branch `audit/toasthost-wayland-crash` is behind upstream and has independent dirty changes and Beads state. Do not clean or deploy it; upstream `main` is the source of truth for the merged integration. |
 | `/home/nomadx/sysc-plugins/cmd/sysc-plugin-calendar/main.go` | The precedent to copy for the plugin. | Reference only. |
@@ -127,8 +127,7 @@ limits. It treats stale and unavailable snapshots as unrated. The Control
 Centre no longer launches scans or reads the saved report; both the bar and its
 `Open full audit` action open the plugin panel. The last testbench check on
 2026-10-29 found the plugin at `9b44520` with its `bar` widget and `panel`
-entry enabled. The `0.1.2` CLI and plugin releases still need redeployment; SSH
-was unreachable from this environment on 2026-10-30.
+entry enabled. The later SSH retry on 2026-10-30 returned `No route to host`.
 
 Privacybit PR #16 adds the per-copy Flatpak sandbox grade, and PR #23 adds
 package-origin context without changing grades. sysc-plugins PR #259 displays
@@ -136,10 +135,13 @@ sandbox grades, and PR #264 displays origin context. Privacybit `v0.1.2`
 includes both changes. Privacybit PR #38 clarifies that recognized source
 labels are not authenticated; sysc-plugins PR #277 carries that wording into
 the panel. The published `v0.1.2` CLI and plugin assets predate that correction.
-Plugin release `privacy-v0.1.2` fixes the manifest and handshake version at
-`0.1.2`; catalog PR #275 merged its URLs and checksums. Issues #20, #37, #268,
-and #276 are closed. A disposable sysc-shell store install resolved the live
-catalog, verified the amd64 asset and manifest, and recorded version `0.1.2`.
+Privacybit PR #42 updates the AUR recipe for `v0.1.3`; sysc-plugins PR #281
+bumps the plugin manifest to `0.1.3`. Both PRs merged, but their release tags
+and AUR publication remain pending owner approval. Plugin release
+`privacy-v0.1.2` fixes the manifest and handshake version at `0.1.2`; catalog
+PR #275 merged its URLs and checksums. Issues #20, #37, #268, and #276 are
+closed. A disposable sysc-shell store install resolved the live catalog,
+verified the amd64 asset and manifest, and recorded version `0.1.2`.
 
 ---
 
@@ -540,11 +542,12 @@ is offline.
 
 ### 6.7 Arch package preparation
 
-`packaging/aur/PKGBUILD` and `.SRCINFO` target `0.1.2`, matching the public AUR
-package `privacybit 0.1.2-1`. PR #33 updated both files; `makepkg --printsrcinfo
-| cmp - .SRCINFO` passed before merge. The package installs the CLI, root
-helper, and user-service installer under `/usr/bin`; it does not enable units
-or include the checkout-only TUI installer. GitHub release `v0.1.2` at
+`packaging/aur/PKGBUILD` and `.SRCINFO` target `0.1.3`; PR #42 merged the change.
+`makepkg --printsrcinfo | cmp - .SRCINFO` passes, and the CLI, helper, and
+installer cross-build for Linux amd64 and arm64. The public AUR package remains
+`privacybit 0.1.2-1` until the `v0.1.3` release. The package installs the CLI,
+root helper, and user-service installer under `/usr/bin`; it does not enable
+units or include the checkout-only TUI installer. GitHub release `v0.1.2` at
 `7c63797` includes the Flatpak sandbox grade and package-origin context. Issue
 #20 is closed. The README declares GPL-3.0-or-later, and the package installs
 the verbatim `LICENSE` file at `/usr/share/licenses/privacybit/LICENSE`.
@@ -671,6 +674,7 @@ two do not collide.)
 
 | Item | State |
 |---|---|
+| v0.1.3 release preparation | Privacybit PR #42 updates the AUR metadata; sysc-plugins PR #281 bumps the plugin manifest. Both merged after their checks passed. Local builds succeeded for the privacybit CLI, helper, and installer on amd64 and arm64. Release rehearsal run `40934309464` passed the gate, vulnerability scan, tests, race checks, manifest/catalog validation, and both plugin builds. Downloaded archives contain version `0.1.3` and protocol `1.8`; their SHA-256 digests are `ec05b2d53a631992077082a9ad80329d2db8675da0697150f58dc4aeb76808e2` (amd64) and `4800b42d450e7d624cb405f69dc6d89ae3ce9d45c0be565336af94de83dd752d` (arm64). The manual run skipped release publication and catalog changes. Issues #41 and #280 track the coordinated release; wait for owner approval before tagging. |
 | Laptop testbench integration | Last checked over SSH on 2026-10-29 after the handshake fix. `/home/nomadx/.local/bin/privacybit` was executable and embedded `54c9fb4`; a no-network schema-1 snapshot included origin context. The privacy plugin embedded `9b44520`; `sysc-shell.service` was active and the bar placement was enabled. SSH returned `No route to host` on 2026-10-30, so deployment of the `v0.1.2` CLI and plugin remains unverified. |
 | Live telemetry endpoint attribution | Deferred by D7 §5.2: no reviewed endpoint dataset or reliable PID attribution. Snapshots report this signal as unknown. |
 | Effective Flatpak sandbox grade | Implemented in privacybit PR #16 and shown by sysc-plugins PR #259. It grades each installed copy from resolved permissions: red for host filesystem, all-device, or shared-network grants; amber for bounded broad access; green only for complete classified evidence without those grants. Missing or unclassified evidence is unknown. Privacybit `v0.1.2` includes the grade; issue #20 is closed. Plugin release `privacy-v0.1.2` includes the panel and manifest/handshake fix; catalog PR #275 merged and issue #268 is closed. |
@@ -680,7 +684,7 @@ two do not collide.)
 | Licence | `LICENSE`, README, `PKGBUILD`, and `.SRCINFO` use GPL-3.0-or-later. The full licence text matches `/usr/share/licenses/spdx/GPL-3.0-or-later.txt`. The checked sysc-shell tree remains BSD-3-Clause and sysc-plugins remains MIT; neither was changed. |
 | Panel scans and report actions | The plugin panel runs `privacybit audit --snapshot` as the current user and renders the bounded snapshot. The Control Centre routes to that panel; it does not scan or read the saved report. |
 | sysc-plugins store entry | Release `privacy-v0.1.2` is published from tested commit `21b4944`; both architecture bundles contain manifest and handshake version `0.1.2` and have verified SHA-256 digests. Catalog PR #275 merged at `2f67de4`. A disposable sysc-shell store install resolved the live catalog and installed the amd64 bundle; issue #268 is closed. |
-| Release and AUR package | GitHub release [`v0.1.2`](https://github.com/Nomadcxx/privacybit/releases/tag/v0.1.2) and AUR package [`privacybit 0.1.2-1`](https://aur.archlinux.org/packages/privacybit) are published. Tag `v0.1.2` points to `7c63797`; PR #33 updated the AUR recipe, and issue #20 is closed. |
+| Release and AUR package | GitHub release [`v0.1.2`](https://github.com/Nomadcxx/privacybit/releases/tag/v0.1.2) and AUR package [`privacybit 0.1.2-1`](https://aur.archlinux.org/packages/privacybit) remain the published versions. Tag `v0.1.2` points to `7c63797`; PR #42 prepares `0.1.3` metadata, while issues #41 and #280 track the release gate. |
 
 ### 10.2 Design corrections and open conflicts
 
@@ -871,8 +875,8 @@ Recorded because a future reader will trust the docs.
 
 | Repository | Automated checks | Result |
 |---|---|---|
-| privacybit | `.github/workflows/ci.yml`: formatting, `go test -count=1 -p 2 ./...`, `go vet -p 2 ./...`, and `go build -p 2 ./...` | PR #38's CI check run `40927043758` passed; it clarifies recognized source labels and merged at `6c40182`. The published `v0.1.2` assets predate this wording change. PR #35's focused installer tests, vet, build, and race checks passed. Earlier checks include PR #29's pacman label fix, PR #25's pacman fixture fix, and PR #19's `makepkg --printsrcinfo | cmp - .SRCINFO`. |
-| sysc-plugins | PR #259 adds the Flatpak sandbox grade; PR #262 fixes contrast; PR #264 shows origin context; PR #273 prepares `privacy-v0.1.2`; PR #275 updates the catalog; PR #277 clarifies origin labels; PR #279 joins Docker workers on shutdown | PR #279's `test`, `govulncheck`, and `verify` checks passed; it merged at `890a178` and closed issue #278. PR #277's checks passed and it merged at `3578127`. Release workflow run `40920475913` passed its gate, vulnerability scan, tests, race checks, both architecture builds, and catalog validation. PR #275's checks passed and it merged at `2f67de4`. A disposable store install verified the amd64 asset. |
+| privacybit | `.github/workflows/ci.yml`: formatting, `go test -count=1 -p 2 ./...`, `go vet -p 2 ./...`, and `go build -p 2 ./...` | PR #42's CI passed; the PR updates the AUR recipe and `.SRCINFO` for `0.1.3`. `makepkg --printsrcinfo | cmp - .SRCINFO` and Linux amd64/arm64 builds of the CLI, helper, and installer passed. The published `v0.1.2` assets still predate PR #38's source-origin clarification. |
+| sysc-plugins | PR #259 adds the Flatpak sandbox grade; PR #262 fixes contrast; PR #264 shows origin context; PR #273 prepares `privacy-v0.1.2`; PR #275 updates the catalog; PR #277 clarifies origin labels; PR #279 joins Docker workers on shutdown; PR #281 prepares `privacy-v0.1.3` | PR #281's `test`, `govulncheck`, and `verify` checks passed; it merged at `4adfa32`. Release rehearsal run `40934309464` passed its gate, vulnerability scan, tests, race checks, validation, and both architecture builds; the manual run skipped release and catalog jobs. PR #279's checks passed; it merged at `890a178` and closed issue #278. PR #277's checks passed and it merged at `3578127`. Release workflow run `40920475913` passed its gate, vulnerability scan, tests, race checks, both architecture builds, and catalog validation. PR #275's checks passed and it merged at `2f67de4`. A disposable store install verified the amd64 asset. |
 | sysc-shell | PR #436 adds the original summary; PR #437 routes it to the plugin panel | Both PRs are merged. Upstream main is `b306ac2`; the testbench service still embeds shell revision `ca3c988`, and the privacy plugin last checked there embeds revision `9b44520`. |
 
 The live review's evidence is also recorded in sysc-shell issue `sysc-1444`.
