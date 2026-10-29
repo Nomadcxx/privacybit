@@ -136,12 +136,14 @@ type Signal[T any] struct {
 ### 3.2 The invariant
 
 > **Unavailable or unset signals cannot move a grade. Contradicted evidence may
-> only worsen it.**
+> only worsen it, except packaging origin, which is context only.**
 
-Unavailable signals only reduce reported coverage. Contradicted signals contain
-a measured fact that disagrees with the catalogue and may push the grade toward
-more risk. This is D1 §3.3's monotone rule applied to measured evidence, with
-absence of evidence kept out of the grade entirely.
+Unavailable signals only reduce reported coverage. A contradicted signal from a
+grade-bearing metadata field contains a measured fact that disagrees with the
+catalogue and may push the grade toward more risk. Packaging origin remains
+provenance context and never moves a grade. This is D1 §3.3's monotone rule
+applied to grade-bearing evidence, with absence of evidence kept out of the
+grade entirely.
 
 The failure it prevents is concrete and would have shipped on Debian: `dpkg`
 has no licence metadata, so a package whose catalogue entry says FOSS cannot be
@@ -159,6 +161,9 @@ Four rules follow:
    lift it. This is D1 §3.3, unchanged.
 4. **Insufficient coverage to judge means `unknown`, not `green`.** Absence of
    evidence is a reportable state, never a passing one.
+5. **Packaging origin is context only.** Reports may show its source and
+   official status, but it never changes a grade. The owner resolved the D1/D6
+   conflict this way in issue #22.
 
 ### 3.3 Availability means data, not binary
 

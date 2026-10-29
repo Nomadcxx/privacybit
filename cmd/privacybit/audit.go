@@ -169,6 +169,12 @@ func writeHuman(w io.Writer, snapshot report.Snapshot, severity string) error {
 			fmt.Fprint(&out, " — partial coverage")
 		}
 		fmt.Fprintln(&out)
+		for _, app := range category.Installed {
+			writeOriginContext(&out, app)
+		}
+		if category.InstalledTruncated {
+			fmt.Fprintf(&out, "    Showing %d of %d installed apps.\n", category.InstalledShown, category.InstalledTotal)
+		}
 	}
 	fmt.Fprintf(&out, "\nFlatpak sandbox: %s\n", gradeCell(snapshot.Sandbox.Grade))
 	if snapshot.Sandbox.Reason != "" {
@@ -240,4 +246,28 @@ func writeHuman(w io.Writer, snapshot report.Snapshot, severity string) error {
 	}
 	_, err := io.WriteString(w, out.String())
 	return err
+}
+
+func writeOriginContext(out *strings.Builder, app report.App) {
+	if len(app.Origins) == 0 && !app.OriginsTruncated {
+		return
+	}
+	fmt.Fprintf(out, "    Origin context for %s", app.Name)
+	if app.Scope != "" {
+		fmt.Fprintf(out, " (%s)", app.Scope)
+	}
+	fmt.Fprintln(out, ":")
+	for _, origin := range app.Origins {
+		fmt.Fprintf(out, "      %s (%s)\n", origin.Source, originStatus(origin.Official))
+	}
+	if app.OriginsTruncated {
+		fmt.Fprintf(out, "      Showing %d of %d origins.\n", app.OriginsShown, app.OriginsTotal)
+	}
+}
+
+func originStatus(official bool) string {
+	if official {
+		return "official"
+	}
+	return "not marked official"
 }

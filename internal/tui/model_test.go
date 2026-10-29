@@ -117,6 +117,26 @@ func TestAppRouteKeepsFlatpakScope(t *testing.T) {
 	}
 }
 
+func TestAppViewShowsOriginContextWithoutChangingGrade(t *testing.T) {
+	model := NewModel(context.Background(), nil)
+	model.snapshot = ptr(testSnapshot())
+	model.snapshot.Categories[0].Installed = []report.App{{
+		ID: "browser", Name: "Browser", Grade: catalog.GradeGreen,
+		Origins:      []report.AppOrigin{{Source: "flathub", Official: true}, {Source: "community"}},
+		OriginsShown: 2, OriginsTotal: 3, OriginsTruncated: true,
+	}}
+	model.stack = []Route{{Screen: ScreenApp, ID: "browser"}}
+	view := model.appView("browser")
+	for _, want := range []string{"Origin context: flathub (official)", "Origin context: community (not marked official)", "Showing 2 of 3 origins"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("app view missing %q: %s", want, view)
+		}
+	}
+	if !strings.Contains(view, "Good") || model.snapshot.Categories[0].Installed[0].Grade != catalog.GradeGreen {
+		t.Errorf("origin context changed the app grade: %s", view)
+	}
+}
+
 func TestPurgeKeyLaunchesHelperFlowOnlyForRedCatalogueApps(t *testing.T) {
 	model := NewModel(context.Background(), nil)
 	model.snapshot = ptr(testSnapshot())

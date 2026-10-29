@@ -173,7 +173,9 @@ could quietly under-report, so it is stated in the wire contract:
   },
   "categories": [
     { "id": "browser", "name": "Browser", "grade": "red",
-      "installed": [{"id":"chrome", "name":"Google Chrome", "grade":"red"}],
+      "installed": [{"id":"chrome", "name":"Google Chrome", "grade":"red",
+        "origins":[{"source":"aur", "official":false}],
+        "origins_shown":1, "origins_total":1, "origins_truncated":false}],
       "installed_shown": 1, "installed_total": 4,
       "installed_truncated": true,
       "worst": { "id": "chrome", "name": "Google Chrome", "grade": "red" } }
@@ -460,6 +462,10 @@ recognized grants, and unclassified evidence. When the visible app list is
 capped, the highest-risk copies appear first, with ID and scope as stable
 tie-breakers, so the evidence behind the aggregate grade stays visible. Older
 snapshots without the field omit the section and remain readable.
+
+App records may also carry an optional bounded origin list. The panel shows the
+source and whether it is marked official as context; origin does not affect
+grades. Older snapshots without origin fields remain readable.
 
 The plugin still runs with the same user privileges as sysc-shell. The panel
 cannot reach root, remove software, execute suggested remediation or act on

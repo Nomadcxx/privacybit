@@ -154,9 +154,11 @@ The owner's reasoning was direct: **under-grading is the one unacceptable
 error.** Everything else in this project is recoverable; a false green is not
 detectable by the user and destroys trust in every other claim.
 
-Four evidence families were accepted for the design: live connections to known
-telemetry endpoints, packaging origin, sandbox posture, and catalogue/package
-metadata mismatch. Four signals were rejected as too noisy: licence string
+Three evidence families were accepted as grade inputs: live connections to
+known telemetry endpoints, sandbox posture, and catalogue/package metadata
+mismatch. Packaging origin is retained as provenance context. In issue #22 the
+owner chose to show its source name and official status without letting it
+change any grade. Four signals were rejected as too noisy: licence string
 alone, grepping binaries for "telemetry", package descriptions, and popularity.
 
 The v1 implementation does not deliver every accepted family. D7 §5.2 defers
@@ -164,10 +166,11 @@ live endpoint matching because there is no reviewed endpoint catalogue or
 reliable process attribution; the report says telemetry attribution is
 unknown. privacybit now measures resolved Flatpak sandbox permissions per
 installed copy and grades that axis separately from the catalogue. Unsupported
-permission groups or missing coverage stay unknown. Origin facts are collected
-by some sources but are not currently exposed as grade evidence. Contradictions
-can worsen catalogue entry grades; sandbox evidence contributes separately to
-the overall grade.
+permission groups or missing coverage stay unknown. Reports expose origin facts
+from sources that can provide them, with source and official status as context.
+Origin never affects grades. Contradictions in other grade-bearing metadata can
+worsen catalogue entry grades; sandbox evidence contributes separately to the
+overall grade.
 
 ### 3.2 Actions escalate to real privilege — and the owner insisted on it
 

@@ -83,6 +83,25 @@ func TestContradictedEvidenceWorsensTheCatalogueGradeByOne(t *testing.T) {
 	}
 }
 
+func TestPackageOriginIsContextOnly(t *testing.T) {
+	set := loadCatalogue(t)
+	entry := set.Entry("brave-origin")
+	if entry == nil || entry.Grade != catalog.GradeGreen {
+		t.Fatalf("test entry = %+v, want green Brave Origin", entry)
+	}
+
+	result := Evaluate(set, []detect.Observation{{
+		Name: "brave-origin", Kind: detect.KindPackage,
+		Origin: detect.Contradicted(detect.Origin{Source: "custom"}, "origin differs from catalogue"),
+	}}, completeCoverage())
+	if got := result.Inventory[0].Grade; got != catalog.GradeGreen {
+		t.Fatalf("contradicted origin changed grade to %q, want catalogue grade green", got)
+	}
+	if got := result.Inventory[0].Findings; len(got) != 0 {
+		t.Fatalf("origin-only finding = %v, want no grade finding", got)
+	}
+}
+
 func TestEveryCatalogueEntryAndSignalStateObeysTheGradeRule(t *testing.T) {
 	set := loadCatalogue(t)
 	fields := []struct {
@@ -90,7 +109,6 @@ func TestEveryCatalogueEntryAndSignalStateObeysTheGradeRule(t *testing.T) {
 		apply func(*detect.Observation, detect.SignalState)
 	}{
 		{"version", func(o *detect.Observation, s detect.SignalState) { o.Version = testSignal[string](s) }},
-		{"origin", func(o *detect.Observation, s detect.SignalState) { o.Origin = testSignal[detect.Origin](s) }},
 		{"licence", func(o *detect.Observation, s detect.SignalState) { o.Facts.Licence = testSignal[string](s) }},
 		{"vendor", func(o *detect.Observation, s detect.SignalState) { o.Facts.Vendor = testSignal[string](s) }},
 		{"explicit", func(o *detect.Observation, s detect.SignalState) { o.Facts.Explicit = testSignal[bool](s) }},
@@ -294,9 +312,11 @@ func TestBuildFindingsKeepsNamedFlatpakInstallationsSeparate(t *testing.T) {
 	set := loadCatalogue(t)
 	observations := []detect.Observation{
 		{Name: "org.freetube.FreeTube", Kind: detect.KindFlatpak, Scope: "portable-a",
-			Origin: detect.Contradicted(detect.Origin{Source: "custom"}, "origin mismatch in portable-a")},
+			Origin:  detect.Contradicted(detect.Origin{Source: "custom"}, "origin mismatch in portable-a"),
+			Version: detect.Contradicted("1.0", "version mismatch in portable-a")},
 		{Name: "org.freetube.FreeTube", Kind: detect.KindFlatpak, Scope: "portable-b",
-			Origin: detect.Contradicted(detect.Origin{Source: "custom"}, "origin mismatch in portable-b")},
+			Origin:  detect.Contradicted(detect.Origin{Source: "custom"}, "origin mismatch in portable-b"),
+			Version: detect.Contradicted("1.0", "version mismatch in portable-b")},
 	}
 	result := Evaluate(set, observations, completeCoverage())
 	findings := BuildFindings(set, result, "arch")
@@ -304,6 +324,9 @@ func TestBuildFindingsKeepsNamedFlatpakInstallationsSeparate(t *testing.T) {
 		finding := findingByID(t, findings, "entry.freetube.flatpak."+scope)
 		if !strings.Contains(finding.Detail, "Installed at "+scope+" scope") {
 			t.Errorf("finding for %s = %+v, want that installation scope in its evidence", scope, finding)
+		}
+		if strings.Contains(finding.Detail, "origin mismatch") {
+			t.Errorf("origin context became a grade finding: %+v", finding)
 		}
 	}
 }

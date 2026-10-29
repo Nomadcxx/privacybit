@@ -503,6 +503,16 @@ func (m *Model) appView(id string) string {
 	if app.Scope != "" {
 		fmt.Fprintf(&out, "Scope: %s\n", app.Scope)
 	}
+	for _, origin := range app.Origins {
+		status := "not marked official"
+		if origin.Official {
+			status = "official"
+		}
+		fmt.Fprintf(&out, "Origin context: %s (%s)\n", origin.Source, status)
+	}
+	if app.OriginsTruncated {
+		fmt.Fprintf(&out, "Showing %d of %d origins.\n", app.OriginsShown, app.OriginsTotal)
+	}
 	for _, why := range app.Why {
 		fmt.Fprintf(&out, "\nWhy: %s\n", why)
 	}
