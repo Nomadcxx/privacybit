@@ -127,7 +127,7 @@ func TestAppViewShowsOriginContextWithoutChangingGrade(t *testing.T) {
 	}}
 	model.stack = []Route{{Screen: ScreenApp, ID: "browser"}}
 	view := model.appView("browser")
-	for _, want := range []string{"Origin context: flathub (official)", "Origin context: community (not marked official)", "Showing 2 of 3 origins"} {
+	for _, want := range []string{"Origin context: flathub (recognized official label; configured source not verified)", "Origin context: community (not marked official)", "Showing 2 of 3 origins"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("app view missing %q: %s", want, view)
 		}

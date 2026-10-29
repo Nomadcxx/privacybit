@@ -133,9 +133,9 @@ type Origin struct {
 	// Source is the distribution or remote name, e.g. "core", "extra",
 	// "aur", "flathub".
 	Source string
-	// Official marks origins the distribution or a vetted remote. A third
-	// party origin is a supply-chain signal feeding maturity, never the
-	// privacy grade.
+	// Official is true when Source matches a recognized official label. The
+	// detector does not authenticate the configured repository or remote.
+	// Origin is context only and never changes a privacy grade.
 	Official bool
 }
 

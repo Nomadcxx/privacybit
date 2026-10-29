@@ -81,8 +81,10 @@ type App struct {
 
 // AppOrigin is provenance context. It does not contribute to any grade.
 type AppOrigin struct {
-	Source   string `json:"source"`
-	Official bool   `json:"official"`
+	Source string `json:"source"`
+	// Official records whether Source matches a recognized official label. It
+	// does not verify the source itself.
+	Official bool `json:"official"`
 }
 
 type Expectation struct {

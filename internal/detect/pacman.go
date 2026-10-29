@@ -150,8 +150,8 @@ func (p *Pacman) enrich(ctx context.Context, o *Observation) error {
 	return nil
 }
 
-// pacmanOrigin classifies known Arch repository names. Repository names are
-// configurable, so an unrecognized name does not establish an official source.
+// pacmanOrigin recognizes known Arch repository labels. The label comes from
+// pacman metadata; this does not authenticate the configured server.
 func pacmanOrigin(f map[string]string) Origin {
 	repo := f["Repository"]
 	if repo == "" {
