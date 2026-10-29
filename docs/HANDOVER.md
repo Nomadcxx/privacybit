@@ -1,6 +1,6 @@
 # privacybit — project handover
 
-**Written:** 2026-10-29
+**Written:** 2026-10-30
 **This file's absolute path:** `/home/nomadx/privacy-bit/docs/HANDOVER.md`
 **Repository:** `https://github.com/Nomadcxx/privacybit` (branch `main`)
 **Module:** `github.com/Nomadcxx/privacybit` (Go 1.26.4)
@@ -517,7 +517,10 @@ The approved installer design and implementation plan are in §3.4. The
 access disabled, installs it to the current user's `~/.local/bin`, and offers
 no background work, the watcher, or the monthly timer. It refuses root and
 requires confirmation before writing. The no-background choice disables any
-existing privacybit user units.
+existing privacybit user units. Ctrl+C cancels the active build or service
+command and keeps the TUI open until it returns. Cancellation before the atomic
+binary replacement preserves the current CLI; cancellation during service
+setup reports that the installed CLI remains and service state may be partial.
 
 `internal/installer/binary.go` validates ownership and file types, writes a
 temporary executable in the destination directory, syncs it, and atomically
@@ -613,6 +616,7 @@ Specific, falsifiable claims. Each is checkable.
 | 14 | **Debian inventory and availability include only installed packages.** | `TestDpkgInventoryIncludesOnlyInstalledPackages` and `TestDpkgAvailabilityTreatsConfigFilesOnlyAsEmpty` in `internal/detect/detect_test.go`. |
 | 15 | **Flatpak permission evidence is resolved per installation and never leaks raw environment values.** | `TestFlatpakInventoryPreservesInstallationScope`, `TestFlatpakInventoryQueriesNamedInstallation`, `TestFlatpakSandboxBandsKeepUnknownAndUseWorstEvidence`, and `TestBuildIncludesSandboxEvidenceInOverallSnapshot`. |
 | 16 | **Sandbox coverage and panel rendering stay explicit and bounded.** | `TestFlatpakSandboxWithoutInventoryCoverageIsUnknown`, `TestBuildBoundsPerCopySandboxEvidence`, `TestParseAuditOutputBoundsFlatpakSandboxEvidence`, `TestParseAuditOutputRejectsInvalidAndFutureSnapshots`, and `TestPrivacyPanelShowsSeparateFlatpakSandboxGradesAndCoverage`. |
+| 17 | **Installer cancellation preserves the current CLI and reports partial service state.** | `TestCtrlCCancelsBuildAndReportsCLIState`, `TestCtrlCCancelsServiceSetupAndReportsPartialState`, `TestCtrlCAfterBuildCompletionDoesNotStartServices`, and `TestInstallBinaryCancellationPreservesTarget`. |
 
 §11 records the latest gate results. Earlier phase checkpoints are historical;
 use the current results when judging the tree.
@@ -804,6 +808,13 @@ Recorded because a future reader will trust the docs.
     reflects pacman's local label; it does not authenticate the configured
     server. Origin remains context and does not affect grades.
 
+16. **The installer ignored Ctrl+C during build and service setup.** Each run
+    now passes a cancellable context to those operations. The TUI waits for the
+    result and reports whether the CLI was installed and service setup may be
+    partial. The binary installer checks cancellation immediately before
+    atomic replacement, preserving the prior executable when cancellation
+    arrives before that point.
+
 ### 10.4 Environment traps
 
 - **`: ` inside an unquoted multi-line YAML plain scalar is a parse error** —
@@ -842,7 +853,7 @@ Recorded because a future reader will trust the docs.
 
 | Repository | Automated checks | Result |
 |---|---|---|
-| privacybit | `.github/workflows/ci.yml`: formatting, `go test -count=1 -p 2 ./...`, `go vet -p 2 ./...`, and `go build -p 2 ./...` | PR #29 merged at `8ac3514`; its pull request check and post-merge main run `40875290019` passed. It limits pacman official status to recognized Arch repository labels; issue #28 is closed. PR #25's pull request checks and main-branch run `40871202870` passed after its pacman fixture fix. PR #19's `makepkg --printsrcinfo | cmp - .SRCINFO` passed. |
+| privacybit | `.github/workflows/ci.yml`: formatting, `go test -count=1 -p 2 ./...`, `go vet -p 2 ./...`, and `go build -p 2 ./...` | PR #29 merged at `8ac3514`; its pull request check and post-merge main run `40875290019` passed. It limits pacman official status to recognized Arch repository labels; issue #28 is closed. PR #25's pull request checks and main-branch run `40871202870` passed after its pacman fixture fix. PR #19's `makepkg --printsrcinfo | cmp - .SRCINFO` passed. PR #35's focused installer tests, vet, build, and race checks passed. |
 | sysc-plugins | PR #259 adds the Flatpak sandbox grade; PR #262 fixes contrast; PR #264 shows origin context; PR #265 publishes `privacy-v0.1.1`; PR #267 fixes handshake identity | PR #267 merged at `9b44520`; `test`, `govulncheck`, and `verify` passed. The current catalog points to `privacy-v0.1.1`, whose amd64 asset embeds pre-fix revision `01a4c7f8`; issue #268 tracks a corrected release. |
 | sysc-shell | PR #436 adds the original summary; PR #437 routes it to the plugin panel | Both PRs are merged and their GitHub `test` checks passed. The current upstream main is `11d6325`; the testbench service runs shell revision `ca3c988`, and the privacy plugin process runs revision `9b44520` with its bar placement configured. |
 
