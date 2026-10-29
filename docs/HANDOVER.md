@@ -823,6 +823,12 @@ Recorded because a future reader will trust the docs.
 - **Go 1.26 uses `GOTMPDIR` for `t.TempDir()`.** Keep build files in the
   required cache path, then run test binaries with a short `GOTMPDIR` through
   `go test -exec` so Unix socket fixtures stay below Linux's path limit.
+- **Go 1.26.4 can fail VCS stamping in linked worktrees.** The nested build in
+  `TestBuildAndInstallCLIInstallsRunnableBinaryOffline` reports
+  `error obtaining VCS status: exit status 128` when the test runs from a
+  linked Git worktree. The test passes in the primary checkout, and the full
+  suite passes in a clean clone and GitHub CI. Run exact Go 1.26.4 tests from a
+  normal checkout; keep VCS stamping enabled.
 - **`go mod tidy -diff` is not currently an offline check.** The local module
   cache lacks transitive `golang.org/x/exp/maps` and `slices` test packages.
   Bubble Tea and Lipgloss are direct dependencies; do not run tidy with network
