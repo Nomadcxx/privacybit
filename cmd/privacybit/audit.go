@@ -160,7 +160,7 @@ func writeHuman(w io.Writer, snapshot report.Snapshot, severity string) error {
 	var out strings.Builder
 	fmt.Fprintf(&out, "Overall: %s\n", gradeCell(snapshot.Overall.Grade))
 	if snapshot.Overall.Score != nil {
-		fmt.Fprintf(&out, "Progress: %d/100 (not a privacy quality score)\n", *snapshot.Overall.Score)
+		fmt.Fprintf(&out, "Category progress: %d/100 (not an overall privacy score)\n", *snapshot.Overall.Score)
 	}
 	fmt.Fprintln(&out, "\nCategories:")
 	for _, category := range snapshot.Categories {
@@ -169,6 +169,36 @@ func writeHuman(w io.Writer, snapshot report.Snapshot, severity string) error {
 			fmt.Fprint(&out, " — partial coverage")
 		}
 		fmt.Fprintln(&out)
+	}
+	fmt.Fprintf(&out, "\nFlatpak sandbox: %s\n", gradeCell(snapshot.Sandbox.Grade))
+	if snapshot.Sandbox.Reason != "" {
+		fmt.Fprintf(&out, "  %s\n", snapshot.Sandbox.Reason)
+	}
+	if snapshot.Sandbox.Applicable {
+		if snapshot.Sandbox.AppsTotal > 0 {
+			fmt.Fprintf(&out, "  Permission queries: %d of %d; %d incomplete\n", snapshot.Sandbox.AppsChecked, snapshot.Sandbox.AppsTotal, snapshot.Sandbox.AppsIncomplete)
+		}
+		if snapshot.Sandbox.PartialCoverage {
+			fmt.Fprintln(&out, "  Partial coverage: some permission evidence is unknown or unclassified.")
+		}
+		for _, app := range snapshot.Sandbox.Apps {
+			fmt.Fprintf(&out, "  %s (%s): %s\n", app.ID, app.Scope, gradeCell(app.Grade))
+			if len(app.Grants) > 0 {
+				fmt.Fprintf(&out, "    Grants: %s\n", strings.Join(app.Grants, ", "))
+			}
+			if app.GrantsTruncated {
+				fmt.Fprintf(&out, "    Showing %d of %d recognized grants.\n", app.GrantsShown, app.GrantsTotal)
+			}
+			if len(app.Unknown) > 0 {
+				fmt.Fprintf(&out, "    Unknown: %s\n", strings.Join(app.Unknown, "; "))
+			}
+			if app.UnknownTruncated {
+				fmt.Fprintf(&out, "    Showing %d of %d unclassified items.\n", app.UnknownShown, app.UnknownTotal)
+			}
+		}
+		if snapshot.Sandbox.AppsTruncated {
+			fmt.Fprintf(&out, "  Showing %d of %d Flatpak copies.\n", snapshot.Sandbox.AppsShown, snapshot.Sandbox.AppsTotal)
+		}
 	}
 
 	fmt.Fprintf(&out, "\nVPN: %s", snapshot.Network.VPN.State)

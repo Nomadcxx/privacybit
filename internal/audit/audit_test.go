@@ -290,6 +290,74 @@ func TestBuildFindingsReportsKnownFlatpakCopiesAtBothScopesWithoutRegrading(t *t
 	}
 }
 
+func TestBuildFindingsKeepsNamedFlatpakInstallationsSeparate(t *testing.T) {
+	set := loadCatalogue(t)
+	observations := []detect.Observation{
+		{Name: "org.freetube.FreeTube", Kind: detect.KindFlatpak, Scope: "portable-a",
+			Origin: detect.Contradicted(detect.Origin{Source: "custom"}, "origin mismatch in portable-a")},
+		{Name: "org.freetube.FreeTube", Kind: detect.KindFlatpak, Scope: "portable-b",
+			Origin: detect.Contradicted(detect.Origin{Source: "custom"}, "origin mismatch in portable-b")},
+	}
+	result := Evaluate(set, observations, completeCoverage())
+	findings := BuildFindings(set, result, "arch")
+	for _, scope := range []string{"portable-a", "portable-b"} {
+		finding := findingByID(t, findings, "entry.freetube.flatpak."+scope)
+		if !strings.Contains(finding.Detail, "Installed at "+scope+" scope") {
+			t.Errorf("finding for %s = %+v, want that installation scope in its evidence", scope, finding)
+		}
+	}
+}
+
+func TestFlatpakSandboxWithoutInventoryCoverageIsUnknown(t *testing.T) {
+	result := Evaluate(nil, nil, nil)
+	if result.Overall != catalog.GradeUnknown || !result.Sandbox.Applicable || !result.Sandbox.PartialCoverage {
+		t.Fatalf("missing Flatpak coverage = overall %q, sandbox %+v; want unknown partial coverage", result.Overall, result.Sandbox)
+	}
+	if result.Sandbox.AppsTotal != 0 || result.Sandbox.AppsIncomplete != 0 {
+		t.Fatalf("unknown inventory must not invent app counts: %+v", result.Sandbox)
+	}
+}
+
+func TestFlatpakSandboxEmptyInventoryIsNotAnUnknownCoverageGap(t *testing.T) {
+	coverage := []SourceCoverage{{Name: "flatpak", Type: catalog.DetectFlatpak, Availability: detect.Availability{Ready: true, Empty: true}}}
+	result := Evaluate(nil, nil, coverage)
+	if result.Overall != catalog.GradeUnknown || result.Sandbox.Applicable || result.Sandbox.PartialCoverage {
+		t.Fatalf("known empty Flatpak inventory = overall %q, sandbox %+v; want sandbox not applicable", result.Overall, result.Sandbox)
+	}
+}
+
+func TestUnclassifiedFlatpakPermissionMakesGradeUnknownWithRedGrant(t *testing.T) {
+	coverage := []SourceCoverage{{Name: "flatpak", Type: catalog.DetectFlatpak, Availability: detect.Available()}}
+	result := Evaluate(nil, []detect.Observation{{
+		Name: "com.example.App", Kind: detect.KindFlatpak, Scope: "user",
+		SandboxPermissions: detect.Observed("[Context]\ndevices=all;\nfeatures=devel;\n"),
+	}}, coverage)
+	app := result.Sandbox.Apps[0]
+	if result.Sandbox.Grade != catalog.GradeUnknown || app.Grade != catalog.GradeUnknown || !result.Sandbox.PartialCoverage || len(app.Unknown) == 0 {
+		t.Fatalf("red grant with unclassified evidence = sandbox %+v, app %+v; want unknown", result.Sandbox, app)
+	}
+	if len(app.Grants) != 1 || app.Grants[0] != "all devices" {
+		t.Fatalf("recognized red grant was dropped from unknown result: %+v", app)
+	}
+}
+
+func TestFlatpakSandboxOrdersWorstEvidenceFirst(t *testing.T) {
+	coverage := []SourceCoverage{{Name: "flatpak", Type: catalog.DetectFlatpak, Availability: detect.Available()}}
+	result := Evaluate(nil, []detect.Observation{
+		{Name: "com.example.Green", Kind: detect.KindFlatpak, Scope: "user", SandboxPermissions: detect.Observed("[Context]\nshared=ipc;\n")},
+		{Name: "com.example.Red", Kind: detect.KindFlatpak, Scope: "user", SandboxPermissions: detect.Observed("[Context]\ndevices=all;\n")},
+		{Name: "com.example.Unknown", Kind: detect.KindFlatpak, Scope: "user", SandboxPermissions: detect.Observed("[Context]\nfeatures=devel;\n")},
+	}, coverage)
+	if result.Sandbox.Grade != catalog.GradeUnknown {
+		t.Fatalf("sandbox grade = %q, want unknown", result.Sandbox.Grade)
+	}
+	for i, want := range []string{"com.example.Unknown", "com.example.Red", "com.example.Green"} {
+		if got := result.Sandbox.Apps[i].ID; got != want {
+			t.Fatalf("sandbox app %d = %q, want %q", i, got, want)
+		}
+	}
+}
+
 func findingByID(t *testing.T, findings []Finding, id string) Finding {
 	t.Helper()
 	for _, finding := range findings {

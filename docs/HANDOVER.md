@@ -93,7 +93,7 @@ matters so much.
 | Absolute path | What it is | State |
 |---|---|---|
 | `/home/nomadx/privacy-bit` | **This project.** Branch `main`; release tag `v0.1.0` points to `fae52ba`, which is now an ancestor of `main`. | PRs #2 and #5 are merged. The installer path fix, ANSI wordmark, README update, and runner descendant-exit test are on `main`. The unrelated untracked `.commandcode/` data is untouched. |
-| `/home/nomadx/privacy-bit/docs/plans/` | Seven design documents and implementation plans. | D1–D7 record the approved design. Phase 3, 4, 8, and 9 plans remain as audit history. |
+| `/home/nomadx/privacy-bit/docs/plans/` | Seven original design documents plus follow-on designs and implementation plans. | D1–D7 record the approved design. Phase 3, 4, 8, and 9 plans remain as audit history. |
 | `Nomadcxx/sysc-plugins` `main` | Upstream revision `e542651b` (2026-10-23). | PRs #207 and #208 are merged. The catalog contains `org.sysc.privacy`; release `privacy-v0.1.0` provides Linux amd64 and arm64 assets. The manifest declares a bar widget and plugin panel. |
 | `Nomadcxx/sysc-shell` `main` | Upstream revision `72caa273` (2026-10-23). | PRs #436 and #437 are merged. The Control Centre keeps its capture card, displays a compact audit summary, and routes `Open full audit` to the plugin panel. |
 | `nomadx@192.168.0.64:7777` laptop testbench | Plugin worktree `/home/nomadx/worktrees/privacybit-plugin-testbench-20261023` at `e542651b`. | The plugin binary is executable; `~/.local/bin/privacybit` is runnable; `~/.local/bin/sysc-shell` embeds revision `72caa273` with `vcs.modified=false`. `config.json` enables the plugin and places its `bar` widget as `privacybit-testbench`. |
@@ -140,14 +140,14 @@ inventory. The phase map in §11 lists the added subsystems.
 | Lines | Absolute path | Purpose |
 |---|---|---|
 | 289 | `/home/nomadx/privacy-bit/internal/catalog/catalog.go` | `Grade`, `Risk()`/`Worse()`, `Word()`/`Glyph()`/`ASCII()`, exact detect rules and lookup, `Entry`, `Expectation`, `Category`, `Set` |
-| 484 | `/home/nomadx/privacy-bit/internal/audit/audit.go` | Inventory evaluator, measured-signal grading, findings, tier 0/3 actions, expectation and coverage roll-up |
+| 493 | `/home/nomadx/privacy-bit/internal/audit/audit.go` | Inventory evaluator, measured-signal grading, findings, tier 0/3 actions, expectation and coverage roll-up |
 | 287 | `/home/nomadx/privacy-bit/internal/catalog/load.go` | `//go:embed data/*.yaml`, `Load()`, strict one-document parsing, fragment merge, effective-catalogue revision, index |
 | 254 | `/home/nomadx/privacy-bit/internal/catalog/validate.go` | `Problem`/`Problems.Err()`, `(s *Set) validate()`, `ids()`, `categoryNames()` |
-| 238 | `/home/nomadx/privacy-bit/internal/detect/detect.go` | `Signal[T]` (including measured-state helpers), `Availability`, `Capabilities`, `Origin`, `Facts`, scoped `Observation`, `Source` interface |
+| 237 | `/home/nomadx/privacy-bit/internal/detect/detect.go` | `Signal[T]` (including measured-state helpers), `Availability`, `Capabilities`, `Origin`, `Facts`, scoped `Observation`, `Source` interface |
 | 103 | `/home/nomadx/privacy-bit/internal/detect/runner.go` | `Runner` interface, `ExecRunner`, `MapRunner` for tests, `commandTimeout = 20s` |
 | 199 | `/home/nomadx/privacy-bit/internal/detect/pacman.go` | `Pacman` — enriches catalogue matches only; retains a package if enrichment fails |
 | 150 | `/home/nomadx/privacy-bit/internal/detect/dpkg.go` | `Dpkg` — the I2 reference case |
-| 126 | `/home/nomadx/privacy-bit/internal/detect/flatpak.go` | `Flatpak` — preserves duplicate scopes; permission inspection still reads declared permissions and drops scope |
+| 133 | `/home/nomadx/privacy-bit/internal/detect/flatpak.go` | `Flatpak` — preserves installation copies and queries resolved permissions by exact ref and scope |
 | 185 | `/home/nomadx/privacy-bit/internal/detect/desktop.go` | `Desktop` — universal `.desktop` scan |
 | 210 | `/home/nomadx/privacy-bit/internal/detect/binary.go` | `Binary` — universal PATH/opt scan, nix-store exclusion |
 | 102 | `/home/nomadx/privacy-bit/internal/render/install.go` | D6 per-family install command and HTTPS upstream rendering |
@@ -162,8 +162,8 @@ inventory. The phase map in §11 lists the added subsystems.
 | Lines | Absolute path | Tests |
 |---|---|---|
 | 207 | `/home/nomadx/privacy-bit/internal/catalog/load_test.go` | 9 — see §8 |
-| 428 | `/home/nomadx/privacy-bit/internal/detect/detect_test.go` | 19 — see §8 |
-| 399 | `/home/nomadx/privacy-bit/internal/audit/audit_test.go` | Grading, coverage, findings, actions and Flatpak scope reporting |
+| 516 | `/home/nomadx/privacy-bit/internal/detect/detect_test.go` | Detection, failure, cancellation, Flatpak ref and installation coverage |
+| 467 | `/home/nomadx/privacy-bit/internal/audit/audit_test.go` | Grading, coverage, findings, actions and Flatpak scope reporting |
 | 85 | `/home/nomadx/privacy-bit/internal/render/install_test.go` | Distribution commands, HTTPS fallback, unsafe route rejection and shipped route checks |
 
 Command tests now cover audit snapshots, purge plans, scheduling, and TUI startup.
@@ -195,23 +195,25 @@ ignored typo.
 
 | Lines | Absolute path |
 |---|---|
-| 871 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-design.md` (**D1** — engine) |
+| 889 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-design.md` (**D1** — engine) |
 | 333 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-cli-design.md` (**D2** — CLI) |
 | 283 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-tui-design.md` (**D3** — TUI) |
 | 427 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-helper-design.md` (**D4** — root helper) |
-| 429 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-plugin-design.md` (**D5** — plugin + host) |
-| 391 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-sources-design.md` (**D6** — multi-distro sources) |
+| 467 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-plugin-design.md` (**D5** — plugin + host) |
+| 410 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-sources-design.md` (**D6** — multi-distro sources) |
 | 262 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-daemon-design.md` (**D7** — daemon) |
 | 73 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-phase-3-audit-grader.md` (Phase 3 implementation plan) |
 | 46 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-phase-4-findings-actions-design.md` (Phase 4 approved design) |
 | 67 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-phase-4-findings-actions-plan.md` (Phase 4 implementation plan) |
 | — | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-phase-8-helper-plan.md` (Phase 8 implementation plan) |
 | — | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-phase-9-daemon-plan.md` (Phase 9 implementation plan) |
-| 71 | `/home/nomadx/privacy-bit/README.md` |
+| 67 | `/home/nomadx/privacy-bit/docs/plans/2026-10-23-flatpak-sandbox-grade-design.md` (Issue #13 approved design) |
+| 90 | `/home/nomadx/privacy-bit/docs/plans/2026-10-23-flatpak-sandbox-grade-plan.md` (Issue #13 implementation plan) |
+| 100 | `/home/nomadx/privacy-bit/README.md` |
 | — | `/home/nomadx/privacy-bit/docs/screenshots/privacybit-overview.png` (synthetic report view) |
 | — | `/home/nomadx/privacy-bit/docs/screenshots/privacybit-categories.png` (synthetic category view) |
-| — | `/home/nomadx/sysc-plugins/.worktrees/privacybit-plugin-20261022/plugins/privacy/screenshot.png` (synthetic native Privacy page) |
-| — | `/home/nomadx/sysc-plugins/.worktrees/privacybit-plugin-20261022/plugins/privacy/thumbnail.webp` (generated catalog thumbnail) |
+| — | `/home/nomadx/sysc-plugins/.worktrees/privacybit-panel-20261023/plugins/privacy/screenshot.png` (synthetic native Privacy page) |
+| — | `/home/nomadx/sysc-plugins/.worktrees/privacybit-panel-20261023/plugins/privacy/thumbnail.webp` (generated catalog thumbnail) |
 | — | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-installer-design.md` |
 | — | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-privacybit-installer.md` |
 | — | `/home/nomadx/sysc-shell/docs/plans/2026-10-20-privacybit-control-centre-scan.md` (Phase 12 integration plan) |
@@ -228,6 +230,7 @@ The rest as you reach it.
 | `/home/nomadx/privacy-bit/.gitignore` | Excludes audit output — it fingerprints what a user runs |
 | `/home/nomadx/privacy-bit/cmd/privacybit-install/` | Unprivileged TUI application installer |
 | `/home/nomadx/privacy-bit/internal/installer/binary.go` | Offline build and atomic install to `~/.local/bin` |
+| `/home/nomadx/privacy-bit/internal/audit/flatpak.go` | Effective permission classification, generic risk bands, and Flatpak coverage roll-up |
 | `/home/nomadx/privacy-bit/packaging/aur/` | `PKGBUILD` and generated `.SRCINFO` for the first Arch package |
 
 There is **no `testdata/` directory** anywhere in the repo. `internal/detect`
@@ -451,9 +454,9 @@ unrunnable one.
   vendor, origin, reverse dependencies, and signature state remain unavailable
   with stated reasons.
 - `flatpak.go` — `Observation.NetworkObservable` carries D1 §6.4 in the **type
-  system**, not a comment. Reports system and user installations of the same id
-  as **two observations**, not deduplicated: two copies at two privilege levels
-  is a real finding, and the user copy shadows the system one.
+  system**, not a comment. Reports each installation separately and queries
+  `flatpak info --show-permissions` with its exact installation, app id, branch,
+  and architecture. Flatpak resolves applicable overrides for that copy.
 - `desktop.go`, `binary.go` — universal sources. `.desktop` `Version` is
   `Unavailable` because that key is the *specification* version, not the app's;
   reporting "1.5" would be a confidently wrong fact. `binary.go` excludes
@@ -481,8 +484,12 @@ source coverage without running commands:
 
 `internal/engine` and the audit CLI connect the sources to the grader. A
 contradicted measured signal can worsen an entry; zero and unavailable signals
-cannot change it. Effective Flatpak sandbox posture remains unknown until the
-detector reads effective, scope-specific permissions.
+cannot change it. Flatpak permissions are graded separately from the catalogue:
+red covers host filesystem, all-device, or shared-network grants; amber covers
+bounded broad access such as home files, host configuration, X11, and USB; green requires complete,
+classified evidence. Failed, missing, malformed, and unclassified evidence
+stays unknown. Category and overall roll-ups use worst supported evidence,
+including sandbox copies.
 
 The owner approved worst-evidence roll-up: unmet high expectations are red,
 unmet medium/low expectations are amber, and an unknown category makes the
@@ -590,6 +597,8 @@ Specific, falsifiable claims. Each is checkable.
 | 12 | **Opening a stored report does not silently replace it with a fresh scan.** | `TestStoredSnapshotOpensWithoutScanningAndRefreshesOnRequest` in `internal/tui/model_test.go`; `Init` returns no scan command when a snapshot is present. |
 | 13 | **Debian explicit-install state reflects apt marks, distinguishes architectures, and remains unavailable when apt-mark fails.** | `TestDpkgUsesAptMarkForExplicitInstallState`, `TestDpkgMatchesAptMarksByArchitectureQualifiedName`, and `TestDpkgKeepsInventoryWhenAptMarkFails` in `internal/detect/detect_test.go`. |
 | 14 | **Debian inventory and availability include only installed packages.** | `TestDpkgInventoryIncludesOnlyInstalledPackages` and `TestDpkgAvailabilityTreatsConfigFilesOnlyAsEmpty` in `internal/detect/detect_test.go`. |
+| 15 | **Flatpak permission evidence is resolved per installation and never leaks raw environment values.** | `TestFlatpakInventoryPreservesInstallationScope`, `TestFlatpakInventoryQueriesNamedInstallation`, `TestFlatpakSandboxBandsKeepUnknownAndUseWorstEvidence`, and `TestBuildIncludesSandboxEvidenceInOverallSnapshot`. |
+| 16 | **Sandbox coverage and panel rendering stay explicit and bounded.** | `TestFlatpakSandboxWithoutInventoryCoverageIsUnknown`, `TestBuildBoundsPerCopySandboxEvidence`, `TestParseAuditOutputBoundsFlatpakSandboxEvidence`, `TestParseAuditOutputRejectsInvalidAndFutureSnapshots`, and `TestPrivacyPanelShowsSeparateFlatpakSandboxGradesAndCoverage`. |
 
 §11 records the latest gate results. Earlier phase checkpoints are historical;
 use the current results when judging the tree.
@@ -641,7 +650,7 @@ two do not collide.)
 |---|---|
 | Laptop testbench integration | Checked over SSH on 2026-10-23. The plugin link resolves to worktree `e542651b`; `plugins/privacy/bin/sysc-plugin-privacy` is executable and its process is running. The active `sysc-shell.service` embeds `72caa273` with `vcs.modified=false`; config enables `org.sysc.privacy` and places its bar entry as `privacybit-testbench`. `/home/nomadx/.local/bin/privacybit --help` runs. |
 | Live telemetry endpoint attribution | Deferred by D7 §5.2: no reviewed endpoint dataset or reliable PID attribution. Snapshots report this signal as unknown. |
-| Effective Flatpak permissions by installation scope | Deferred. Current detector reads declared permissions, so the grader leaves sandbox posture unmeasured. |
+| Effective Flatpak sandbox grade (issue #13) | Implementation is in review: per-copy resolved permissions, generic risk bands, bounded snapshot data, and a separate plugin panel section. |
 | dnf, zypper, apk, and xbps backends | Deferred under D6; universal sources report what they can see, with coverage caveats. |
 | Nix and Snap package-manager sources | Deferred under D6 because their models do not fit the package-manager interface. |
 | Licence | `LICENSE`, README, `PKGBUILD`, and `.SRCINFO` use GPL-3.0-or-later. The full licence text matches `/usr/share/licenses/spdx/GPL-3.0-or-later.txt`. The checked sysc-shell tree remains BSD-3-Clause and sysc-plugins remains MIT; neither was changed. |
@@ -697,6 +706,12 @@ Recorded because a future reader will trust the docs.
    Centre keeps a compact summary and routes `Open full audit` to that panel.
    The plugin protocol remains unchanged.
 
+9. **D1 described `flatpak info --show-permissions` as metadata-only.** Review
+   of Flatpak 1.18.4's implementation showed that it loads the deployed app
+   context and merges applicable system/user global and per-app overrides.
+   D1 and D6 now use that resolved context, while keeping raw environment
+   values out of reports.
+
 ### 10.3 Implementation defects and corrections
 
 1. **`Load` originally panicked on a malformed shipped file.** With ten
@@ -722,11 +737,11 @@ Recorded because a future reader will trust the docs.
    forgotten the day someone refactors the caller. It is a real field now, with
    a zero value of `false` so a source that forgets to set it is conservative.
 
-6. **Flatpak permission inspection does not meet D1 §6.4.** `PermissionsFor`
-   calls `flatpak info --show-permissions`, which reports declared metadata,
-   and stores the result by application id without installation scope. It does
-   not inspect scope-specific overrides. Do not grade sandbox posture from this
-   field until effective-permission semantics are implemented and tested.
+6. **Flatpak permission inspection originally ignored installation scope and
+   overrides.** The detector now queries each exact app ref with its installation
+   selector; Flatpak returns the deployed app context with applicable overrides
+   merged. The audit stores only recognized grants and short unknown reasons,
+   keeping environment values out of the report.
 
 7. **Pacman previously dropped a matched package when `pacman -Qi` failed.** It
    now retains the package with enrichment facts marked unavailable.

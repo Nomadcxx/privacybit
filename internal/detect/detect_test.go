@@ -2,6 +2,7 @@ package detect
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -232,7 +233,7 @@ func TestDpkgInventoryIncludesOnlyInstalledPackages(t *testing.T) {
 
 func TestDpkgAvailabilityTreatsConfigFilesOnlyAsEmpty(t *testing.T) {
 	r := MapRunner{Output: map[string]string{
-		"dpkg-query": "",
+		"dpkg-query":                             "",
 		"dpkg-query -W -f=${db:Status-Status}\n": "config-files\n",
 	}}
 	got := NewDpkg(r).Availability()
@@ -245,7 +246,7 @@ func TestDpkgAvailabilityIsNotTheSameAsTheBinaryExisting(t *testing.T) {
 	// dpkg-query is installed on this machine's Arch system and manages
 	// nothing. Reporting that as a coverage gap would be wrong.
 	empty := MapRunner{Output: map[string]string{
-		"dpkg-query": "",
+		"dpkg-query":                             "",
 		"dpkg-query -W -f=${db:Status-Status}\n": "",
 	}}
 	a := NewDpkg(empty).Availability()
@@ -254,7 +255,7 @@ func TestDpkgAvailabilityIsNotTheSameAsTheBinaryExisting(t *testing.T) {
 	}
 
 	installed := MapRunner{Output: map[string]string{
-		"dpkg-query": "",
+		"dpkg-query":                             "",
 		"dpkg-query -W -f=${db:Status-Status}\n": "installed\n",
 	}}
 	if a := NewDpkg(installed).Availability(); !a.Ready || a.Empty {
@@ -269,11 +270,13 @@ func TestDpkgAvailabilityIsNotTheSameAsTheBinaryExisting(t *testing.T) {
 }
 
 func TestFlatpakInventoryPreservesInstallationScope(t *testing.T) {
-	listing := "com.example.App\t1.0\tstable\tflathub\tsystem\n" +
-		"com.example.App\t1.0\tstable\tflathub\tuser\n"
-	r := MapRunner{Output: map[string]string{
-		"flatpak list --app --columns=application,version,branch,origin,installation": listing,
-	}}
+	listing := "com.example.App\t1.0\tstable\tflathub\tsystem\tx86_64\n" +
+		"com.example.App\t1.0\tstable\tflathub\tuser\tx86_64\n"
+	r := &recordingRunner{Runner: MapRunner{Output: map[string]string{
+		"flatpak list --app --columns=application,version,branch,origin,installation,arch": listing,
+		"flatpak info --show-permissions --system --arch=x86_64 com.example.App stable":    "[Context]\ndevices=all;\n",
+		"flatpak info --show-permissions --user --arch=x86_64 com.example.App stable":      "[Context]\nfilesystems=home;\n",
+	}}}
 	obs, err := NewFlatpak(r).Inventory(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -287,11 +290,55 @@ func TestFlatpakInventoryPreservesInstallationScope(t *testing.T) {
 	if obs[0].Scope != "system" || obs[1].Scope != "user" {
 		t.Fatalf("installation scopes = %q, %q, want system, user", obs[0].Scope, obs[1].Scope)
 	}
+	if got := obs[0].SandboxPermissions; got.State != StateObserved || !strings.Contains(got.Value, "devices=all") {
+		t.Fatalf("system permission evidence = %+v, want its own devices=all output", got)
+	}
+	if got := obs[1].SandboxPermissions; got.State != StateObserved || !strings.Contains(got.Value, "filesystems=home") {
+		t.Fatalf("user permission evidence = %+v, want its own filesystems=home output", got)
+	}
+	for _, want := range []string{
+		"flatpak info --show-permissions --system --arch=x86_64 com.example.App stable",
+		"flatpak info --show-permissions --user --arch=x86_64 com.example.App stable",
+	} {
+		if !strings.Contains(strings.Join(r.calls, "\n"), want) {
+			t.Errorf("Flatpak did not query permissions with exact scope and ref: %q; calls = %v", want, r.calls)
+		}
+	}
+}
+
+func TestFlatpakInventoryQueriesNamedInstallation(t *testing.T) {
+	const query = "flatpak info --show-permissions --installation=portable --arch=x86_64 com.example.App stable"
+	r := MapRunner{Output: map[string]string{
+		"flatpak list --app --columns=application,version,branch,origin,installation,arch": "com.example.App\t1.0\tstable\tflathub\tportable\tx86_64\n",
+		query: "[Context]\nshared=ipc;\n",
+	}}
+	observations, err := NewFlatpak(r).Inventory(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(observations) != 1 || observations[0].Scope != "portable" || observations[0].SandboxPermissions.State != StateObserved {
+		t.Fatalf("named installation observation = %+v", observations)
+	}
+}
+
+type recordingRunner struct {
+	Runner
+	calls []string
+}
+
+func (r *recordingRunner) Run(ctx context.Context, name string, args ...string) (string, error) {
+	key := strings.Join(append([]string{name}, args...), " ")
+	r.calls = append(r.calls, key)
+	return r.Runner.Run(ctx, name, args...)
+}
+
+func (r *recordingRunner) LookPath(name string) (string, error) {
+	return r.Runner.LookPath(name)
 }
 
 func TestFlatpakInventoryDoesNotResolveProduct(t *testing.T) {
 	r := MapRunner{Output: map[string]string{
-		"flatpak list --app --columns=application,version,branch,origin,installation": "com.example.App\t1.0\tstable\tflathub\tuser\n",
+		"flatpak list --app --columns=application,version,branch,origin,installation,arch": "com.example.App\t1.0\tstable\tflathub\tuser\tx86_64\n",
 	}}
 	obs, err := NewFlatpak(r).Inventory(context.Background())
 	if err != nil {
@@ -302,6 +349,47 @@ func TestFlatpakInventoryDoesNotResolveProduct(t *testing.T) {
 	}
 	if obs[0].Product != "" {
 		t.Fatalf("flatpak source assigned catalogue Product %q; matching belongs to the audit", obs[0].Product)
+	}
+}
+
+func TestFlatpakKeepsInstalledCopyWhenPermissionQueryFails(t *testing.T) {
+	listing := "com.example.App\t1.0\tstable\tflathub\tuser\tx86_64\n"
+	query := "flatpak info --show-permissions --user --arch=x86_64 com.example.App stable"
+	r := MapRunner{
+		Output: map[string]string{
+			"flatpak list --app --columns=application,version,branch,origin,installation,arch": listing,
+		},
+		Err: map[string]error{query: errors.New("permission denied")},
+	}
+	obs, err := NewFlatpak(r).Inventory(context.Background())
+	if err != nil {
+		t.Fatalf("permission failure must not discard inventory: %v", err)
+	}
+	if len(obs) != 1 || obs[0].Name != "com.example.App" {
+		t.Fatalf("inventory = %+v, want the installed copy retained", obs)
+	}
+	if got := obs[0].SandboxPermissions; got.State != StateUnavailable || !strings.Contains(got.Why, "permission denied") {
+		t.Fatalf("permission evidence = %+v, want unavailable with the query error", got)
+	}
+}
+
+func TestFlatpakInventoryRejectsMalformedRows(t *testing.T) {
+	r := MapRunner{Output: map[string]string{
+		"flatpak list --app --columns=application,version,branch,origin,installation,arch": "com.example.App\t1.0\tstable\tflathub\tuser\n",
+	}}
+	if _, err := NewFlatpak(r).Inventory(context.Background()); err == nil {
+		t.Fatal("a row without architecture must fail inventory instead of being skipped")
+	}
+}
+
+func TestFlatpakInventoryHonorsCancellationDuringPermissionQueries(t *testing.T) {
+	r := MapRunner{Output: map[string]string{
+		"flatpak list --app --columns=application,version,branch,origin,installation,arch": "com.example.App\t1.0\tstable\tflathub\tuser\tx86_64\n",
+	}}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := NewFlatpak(r).Inventory(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancelled inventory error = %v, want context.Canceled", err)
 	}
 }
 

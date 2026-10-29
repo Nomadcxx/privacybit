@@ -143,10 +143,13 @@ func applyNetwork(set *catalog.Set, result *audit.Result, netResult network.Resu
 			result.Categories[i].Grade = catalog.Worse(result.Categories[i].Grade, catalog.GradeRed)
 		}
 	}
-	if len(result.Categories) > 0 {
+	if len(result.Categories) > 0 || result.Sandbox.Applicable {
 		result.Overall = catalog.GradeGreen
 		for _, item := range result.Categories {
 			result.Overall = catalog.Worse(result.Overall, item.Grade)
+		}
+		if result.Sandbox.Applicable {
+			result.Overall = catalog.Worse(result.Overall, result.Sandbox.Grade)
 		}
 	}
 }

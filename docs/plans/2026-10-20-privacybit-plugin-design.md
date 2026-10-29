@@ -453,6 +453,14 @@ state, missing `privacybit`, failed scan or invalid state never produces a
 green grade. Amber must not rely on `ToneWarning`, because that maps to the
 theme's tertiary token and appeared green on the laptop palette.
 
+When a schema-1 snapshot contains the optional `sandbox` object, the panel adds
+a separate **Flatpak sandbox** section after app categories. It shows the
+aggregate grade, permission-query coverage, and bounded per-copy grades,
+recognized grants, and unclassified evidence. When the visible app list is
+capped, the highest-risk copies appear first, with ID and scope as stable
+tie-breakers, so the evidence behind the aggregate grade stays visible. Older
+snapshots without the field omit the section and remain readable.
+
 The plugin still runs with the same user privileges as sysc-shell. The panel
 cannot reach root, remove software, execute suggested remediation or act on
 findings. GPL-3.0-or-later applies to the plugin's source, UI and packaged

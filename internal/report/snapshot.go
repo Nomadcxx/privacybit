@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"sort"
 	"time"
@@ -17,9 +18,10 @@ import (
 )
 
 const (
-	Schema       = 1
-	ListLimit    = 100
-	FindingLimit = 100
+	Schema               = 1
+	ListLimit            = 100
+	FindingLimit         = 100
+	sandboxEvidenceLimit = 8
 )
 
 type Overall struct {
@@ -97,6 +99,33 @@ type Network struct {
 	TelemetryConnectionsUnknown bool           `json:"telemetry_connections_unknown"`
 }
 
+type Sandbox struct {
+	Applicable      bool          `json:"applicable"`
+	Grade           catalog.Grade `json:"grade"`
+	Apps            []SandboxApp  `json:"apps"`
+	AppsShown       int           `json:"apps_shown"`
+	AppsTotal       int           `json:"apps_total"`
+	AppsTruncated   bool          `json:"apps_truncated"`
+	AppsChecked     int           `json:"apps_checked"`
+	AppsIncomplete  int           `json:"apps_incomplete"`
+	PartialCoverage bool          `json:"partial_coverage"`
+	Reason          string        `json:"reason,omitempty"`
+}
+
+type SandboxApp struct {
+	ID               string        `json:"id"`
+	Scope            string        `json:"scope"`
+	Grade            catalog.Grade `json:"grade"`
+	Grants           []string      `json:"grants,omitempty"`
+	GrantsShown      int           `json:"grants_shown,omitempty"`
+	GrantsTotal      int           `json:"grants_total,omitempty"`
+	GrantsTruncated  bool          `json:"grants_truncated,omitempty"`
+	Unknown          []string      `json:"unknown,omitempty"`
+	UnknownShown     int           `json:"unknown_shown,omitempty"`
+	UnknownTotal     int           `json:"unknown_total,omitempty"`
+	UnknownTruncated bool          `json:"unknown_truncated,omitempty"`
+}
+
 type Snapshot struct {
 	Schema             int             `json:"schema"`
 	Available          bool            `json:"available"`
@@ -105,6 +134,7 @@ type Snapshot struct {
 	CatalogRev         string          `json:"catalog_rev"`
 	Overall            Overall         `json:"overall"`
 	Network            Network         `json:"network"`
+	Sandbox            Sandbox         `json:"sandbox"`
 	Categories         []Category      `json:"categories"`
 	Unmatched          []App           `json:"unmatched,omitempty"`
 	UnmatchedTotal     int             `json:"unmatched_total,omitempty"`
@@ -153,8 +183,15 @@ func Build(set *catalog.Set, result audit.Result, findings []audit.Finding, netR
 	}
 	snapshot.Reduced = append(snapshot.Reduced,
 		Reduced{Fact: "network.telemetry", Effect: "live telemetry endpoint attribution is not implemented"},
-		Reduced{Fact: "flatpak.sandbox", Effect: "effective scope-specific Flatpak overrides are not yet graded"},
 	)
+	if result.Sandbox.Applicable && result.Sandbox.PartialCoverage {
+		effect := result.Sandbox.Reason
+		if effect == "" {
+			effect = fmt.Sprintf("permission evidence is incomplete for %d of %d installed copies", result.Sandbox.AppsIncomplete, result.Sandbox.AppsTotal)
+		}
+		snapshot.Reduced = append(snapshot.Reduced, Reduced{Fact: "flatpak.sandbox", Effect: effect})
+	}
+	snapshot.Sandbox = buildSandbox(result.Sandbox)
 
 	appsByCategory := make(map[string][]App)
 	for _, app := range groupedApps(set, result.Inventory) {
@@ -226,6 +263,36 @@ func Build(set *catalog.Set, result audit.Result, findings []audit.Finding, netR
 		snapshot.UnmatchedTruncated = true
 	}
 	return snapshot
+}
+
+func buildSandbox(source audit.SandboxResult) Sandbox {
+	out := Sandbox{
+		Applicable: source.Applicable, Grade: source.Grade,
+		AppsTotal: source.AppsTotal, AppsChecked: source.AppsChecked,
+		AppsIncomplete: source.AppsIncomplete, PartialCoverage: source.PartialCoverage,
+		Reason: source.Reason,
+	}
+	apps := make([]SandboxApp, 0, len(source.Apps))
+	for _, app := range source.Apps {
+		projected := SandboxApp{
+			ID: app.ID, Scope: app.Scope, Grade: app.Grade,
+			GrantsTotal: len(app.Grants), UnknownTotal: len(app.Unknown),
+		}
+		projected.Grants = append([]string(nil), app.Grants[:min(len(app.Grants), sandboxEvidenceLimit)]...)
+		projected.GrantsShown = len(projected.Grants)
+		projected.GrantsTruncated = projected.GrantsShown < projected.GrantsTotal
+		projected.Unknown = append([]string(nil), app.Unknown[:min(len(app.Unknown), sandboxEvidenceLimit)]...)
+		projected.UnknownShown = len(projected.Unknown)
+		projected.UnknownTruncated = projected.UnknownShown < projected.UnknownTotal
+		apps = append(apps, projected)
+	}
+	out.AppsTruncated = len(apps) > ListLimit
+	if out.AppsTruncated {
+		apps = apps[:ListLimit]
+	}
+	out.Apps = apps
+	out.AppsShown = len(apps)
+	return out
 }
 
 func filterFindings(findings []audit.Finding, opts BuildOptions) []audit.Finding {
