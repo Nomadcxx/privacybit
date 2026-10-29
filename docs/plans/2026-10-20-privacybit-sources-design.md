@@ -165,6 +165,12 @@ Four rules follow:
    official status, but it never changes a grade. The owner resolved the D1/D6
    conflict this way in issue #22.
 
+   Pacman's repository name is configurable. Mark only `core`, `extra`,
+   `multilib`, `core-testing`, `extra-testing`, and `multilib-testing` as
+   official; keep AUR, local, custom, and unknown names visible without marking
+   them official. This classification uses the local label reported by pacman
+   and does not authenticate the configured server.
+
 ### 3.3 Availability means data, not binary
 
 A presence check on `$PATH` is not availability. `dpkg-query` is installed on
