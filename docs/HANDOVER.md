@@ -1,6 +1,6 @@
 # privacybit — project handover
 
-**Written:** 2026-10-23
+**Written:** 2026-10-29
 **This file's absolute path:** `/home/nomadx/privacy-bit/docs/HANDOVER.md`
 **Repository:** `https://github.com/Nomadcxx/privacybit` (branch `main`)
 **Module:** `github.com/Nomadcxx/privacybit` (Go 1.26.4)
@@ -92,22 +92,20 @@ matters so much.
 
 | Absolute path | What it is | State |
 |---|---|---|
-| `/home/nomadx/privacy-bit` | **This project.** Branch `main`; release tag `v0.1.0` points to `fae52ba`, which is now an ancestor of `main`. | PRs #2 and #5 are merged. The installer path fix, ANSI wordmark, README update, and runner descendant-exit test are on `main`. The unrelated untracked `.commandcode/` data is untouched. |
+| `/home/nomadx/privacy-bit` | **This project.** Canonical checkout on branch `main`. | The primary checkout contains unrelated untracked `.commandcode/` data. Leave it untouched and use a clean worktree from `origin/main`. The latest tagged release is `v0.1.1` at `84b2f4f`; privacybit PR #16 added the Flatpak sandbox grade after that tag. |
 | `/home/nomadx/privacy-bit/docs/plans/` | Seven original design documents plus follow-on designs and implementation plans. | D1–D7 record the approved design. Phase 3, 4, 8, and 9 plans remain as audit history. |
-| `Nomadcxx/sysc-plugins` `main` | Upstream revision `e542651b` (2026-10-23). | PRs #207 and #208 are merged. The catalog contains `org.sysc.privacy`; release `privacy-v0.1.0` provides Linux amd64 and arm64 assets. The manifest declares a bar widget and plugin panel. |
-| `Nomadcxx/sysc-shell` `main` | Upstream revision `72caa273` (2026-10-23). | PRs #436 and #437 are merged. The Control Centre keeps its capture card, displays a compact audit summary, and routes `Open full audit` to the plugin panel. |
-| `nomadx@192.168.0.64:7777` laptop testbench | Plugin worktree `/home/nomadx/worktrees/privacybit-plugin-testbench-20261023` at `e542651b`. | The plugin binary is executable; `~/.local/bin/privacybit` is runnable; `~/.local/bin/sysc-shell` embeds revision `72caa273` with `vcs.modified=false`. `config.json` enables the plugin and places its `bar` widget as `privacybit-testbench`. |
-| Local `/home/nomadx/.config/sysc-shell/plugins/org.sysc.privacy` | Symlink to `/home/nomadx/sysc-plugins/.worktrees/privacybit-plugin-20261022/plugins/privacy`. | This local link still targets publisher-only commit `0eb063f`; it does not contain the merged bar and panel. Do not use it as current integration evidence. |
+| `Nomadcxx/sysc-plugins` `main` | Upstream revision `6e610ff` (2026-10-29). | PR #259 adds the sandbox grade to the privacy panel; PRs #207 and #208 added the catalog entry, bar widget, and panel. The catalog serves plugin version `0.1.0` from `privacy-v0.1.0`; issue #260 tracks a release with the sandbox panel. |
+| `Nomadcxx/sysc-shell` `main` | Upstream revision `b0c634c` (2026-10-29). | PRs #436 and #437 add the Control Centre summary and route `Open full audit` to the plugin panel. |
+| `nomadx@192.168.0.64:7777` laptop testbench | Plugin worktree `/home/nomadx/worktrees/privacybit-plugin-testbench-20261023` at `6e610ff`. | Checked over SSH on 2026-10-29. `~/.local/bin/privacybit` is executable and embeds privacybit `150a4de` with `vcs.modified=false`. The plugin process runs from the worktree at `6e610ff`; `sysc-shell.service` is active. The installed shell embeds `ca3c988` with `vcs.modified=false`, an ancestor of current `sysc-shell/main`. `config.json` enables `org.sysc.privacy` and places its `bar` entry as `privacybit-testbench`. |
 | `/home/nomadx/sysc-plugins` | Primary plugin checkout. | Branch `fix/kdeconnect-pairing-card-routing` has independent dirty changes, including an untracked `plugins/privacy`. Do not clean or repurpose it; upstream `main` is the source of truth for the published plugin. |
 | `/home/nomadx/sysc-shell` | Primary shell checkout. | Branch `audit/toasthost-wayland-crash` is behind upstream and has independent dirty changes and Beads state. Do not clean or deploy it; upstream `main` is the source of truth for the merged integration. |
 | `/home/nomadx/sysc-plugins/cmd/sysc-plugin-calendar/main.go` | The precedent to copy for the plugin. | Reference only. |
 | `/home/nomadx/sysc-plugins/plugins/calendar/manifest.json` | Manifest shape to copy. | Reference only. |
-| `/home/nomadx/moonbit` | Sibling project this was modelled on. 100% owned by the same author, so reuse is unrestricted. | **132 commits behind its own `origin/main`** — read `origin/main`, not the working tree. |
-| `/tmp/moonbit-header` | Detached worktree at moonbit `origin/main` (`5948bd0`). | May not survive a reboot; recreate if missing. |
+| `/home/nomadx/moonbit` | Sibling project whose helper and daemon patterns informed this design. | Check `origin/main` before reusing its current implementation. |
 
 ### 2.2 Privacybit integration files on upstream main
 
-The current implementation is merged in sysc-plugins PRs #207/#208 and
+The current implementation is merged in sysc-plugins PRs #207/#208/#259 and
 sysc-shell PRs #436/#437. The plugin owns the full audit panel and scan action;
 sysc-shell owns the Control Centre summary and route. The laptop testbench uses
 these merged revisions.
@@ -126,6 +124,11 @@ The full panel displays categories, network checks, findings, and coverage
 limits. It treats stale and unavailable snapshots as unrated. The Control
 Centre no longer launches scans or reads the saved report; both the bar and its
 `Open full audit` action open the plugin panel.
+
+Privacybit merged PR #16 for the per-copy Flatpak sandbox grade, and
+sysc-plugins merged PR #259 to display it. The published privacybit
+`v0.1.1` and sysc-plugins `privacy-v0.1.0` assets predate them. Issues #20 and
+sysc-plugins #260 track those release updates.
 
 ---
 
@@ -518,13 +521,13 @@ is offline.
 
 ### 6.7 Arch package preparation
 
-`packaging/aur/PKGBUILD` and `.SRCINFO` target version `0.1.0`. The package
-builds and installs the CLI, root helper, and user-service installer under
-`/usr/bin`; it does not enable units or include the checkout-only TUI installer.
-`makepkg --printsrcinfo` passes, and `makepkg` built a local package from the
-current source with the source URL redirected to a local archive. The public
-recipe fetches the `v0.1.0` tag. The GitHub release page shows `v0.1.0`, and the
-AUR package page lists `privacybit 0.1.0-1`. The README declares
+`packaging/aur/PKGBUILD` and `.SRCINFO` target `0.1.1`, matching the public AUR
+package `privacybit 0.1.1-1`. PR #19 updated both files; on 2026-10-29,
+`makepkg --printsrcinfo | cmp - .SRCINFO` passed. The package installs the CLI,
+root helper, and user-service installer under `/usr/bin`; it does not enable
+units or include the checkout-only TUI installer. The latest GitHub release is
+`v0.1.1` at `84b2f4f`. That tag predates the Flatpak sandbox grade merged in
+PR #16; issue #20 tracks the next release. The README declares
 GPL-3.0-or-later, and the package installs the verbatim `LICENSE` file at
 `/usr/share/licenses/privacybit/LICENSE`.
 
@@ -568,11 +571,11 @@ co-author trailers and emoji.
 rejected three legitimate commit messages. **The fix is to reword the message,
 never to weaken the hook.** Avoid the word "both" in commit bodies.
 
-The user identity may not be configured globally, so commit with:
+Set the owner's GitHub identity explicitly when committing from a clean
+worktree:
 
 ```console
-cd /home/nomadx/privacy-bit
-git -c user.name=nomadx -c user.email=nomadx@users.noreply.github.com commit -F <file>
+git -c user.name=RAMA -c user.email=143774106+Nomadcxx@users.noreply.github.com commit -F <file>
 ```
 
 ---
@@ -648,15 +651,15 @@ two do not collide.)
 
 | Item | State |
 |---|---|
-| Laptop testbench integration | Checked over SSH on 2026-10-23. The plugin link resolves to worktree `e542651b`; `plugins/privacy/bin/sysc-plugin-privacy` is executable and its process is running. The active `sysc-shell.service` embeds `72caa273` with `vcs.modified=false`; config enables `org.sysc.privacy` and places its bar entry as `privacybit-testbench`. `/home/nomadx/.local/bin/privacybit --help` runs. |
+| Laptop testbench integration | Checked over SSH on 2026-10-29. `/home/nomadx/.local/bin/privacybit` is executable and embeds `150a4de` with `vcs.modified=false`. The plugin process runs from worktree `/home/nomadx/worktrees/privacybit-plugin-testbench-20261023` at `6e610ff`; the active `sysc-shell.service` embeds `ca3c988` with `vcs.modified=false`, an ancestor of current `sysc-shell/main` (`b0c634c`). Config enables `org.sysc.privacy` and places its bar entry as `privacybit-testbench`. |
 | Live telemetry endpoint attribution | Deferred by D7 §5.2: no reviewed endpoint dataset or reliable PID attribution. Snapshots report this signal as unknown. |
-| Effective Flatpak sandbox grade (issue #13) | Implementation is in review: per-copy resolved permissions, generic risk bands, bounded snapshot data, and a separate plugin panel section. |
+| Effective Flatpak sandbox grade | Implemented in privacybit PR #16 and shown by sysc-plugins PR #259. It grades each installed copy from resolved permissions: red for host filesystem, all-device, or shared-network grants; amber for bounded broad access; green only for complete classified evidence without those grants. Missing or unclassified evidence is unknown. The `v0.1.1` CLI and `privacy-v0.1.0` plugin releases predate this work; privacybit issue #20 and sysc-plugins issue #260 track release updates. |
 | dnf, zypper, apk, and xbps backends | Deferred under D6; universal sources report what they can see, with coverage caveats. |
 | Nix and Snap package-manager sources | Deferred under D6 because their models do not fit the package-manager interface. |
 | Licence | `LICENSE`, README, `PKGBUILD`, and `.SRCINFO` use GPL-3.0-or-later. The full licence text matches `/usr/share/licenses/spdx/GPL-3.0-or-later.txt`. The checked sysc-shell tree remains BSD-3-Clause and sysc-plugins remains MIT; neither was changed. |
 | Panel scans and report actions | The plugin panel runs `privacybit audit --snapshot` as the current user and renders the bounded snapshot. The Control Centre routes to that panel; it does not scan or read the saved report. |
-| sysc-plugins store entry | `catalog.json` contains `org.sysc.privacy`. Release `privacy-v0.1.0` provides amd64 and arm64 assets; PRs #207 and #208 are merged. |
-| Release and AUR package | GitHub release [`v0.1.0`](https://github.com/Nomadcxx/privacybit/releases/tag/v0.1.0) and AUR package [`privacybit 0.1.0-1`](https://aur.archlinux.org/packages/privacybit) are published. Tag `v0.1.0` points to `fae52ba` and is an ancestor of `main`. |
+| sysc-plugins store entry | `catalog.json` contains `org.sysc.privacy` and points to version `0.1.0` and the `privacy-v0.1.0` amd64/arm64 assets. PR #259 is merged; issue #260 tracks a release that includes its sandbox panel. |
+| Release and AUR package | GitHub release [`v0.1.1`](https://github.com/Nomadcxx/privacybit/releases/tag/v0.1.1) and AUR package [`privacybit 0.1.1-1`](https://aur.archlinux.org/packages/privacybit) are published. Tag `v0.1.1` points to `84b2f4f` and predates PR #16. PR #19 updates the checked-in AUR recipe to `0.1.1`; issue #20 tracks a release with the sandbox-grade engine. |
 
 ### 10.2 Design corrections and open conflicts
 
@@ -806,7 +809,6 @@ Recorded because a future reader will trust the docs.
   access merely to rewrite the module files.
 - **`resolvectl` is in `foreign` mode on this machine** — Tailscale MagicDNS
   owns `/etc/resolv.conf`. Any future DNS work must account for that.
-- **moonbit's working tree is 132 commits behind `origin/main`.**
 
 ---
 
@@ -814,14 +816,16 @@ Recorded because a future reader will trust the docs.
 
 | Repository | Automated checks | Result |
 |---|---|---|
-| privacybit | Formatting, `git diff --check`, `go test -count=1 -p 2 ./...`, `go vet -p 2 ./...`, and `go build -p 2 ./...`; packaging checks | Go checks pass on 2026-10-23 after PR #5, including the runner descendant-exit test and installer canonical-path regression test. GPL text comparison, generated `.SRCINFO` comparison, and an isolated-HOME TUI build/install passed on 2026-10-22. |
-| sysc-plugins | PR #207 adds the catalog entry; PR #208 adds the bar widget and audit panel | Both PRs are merged. PR #207 reported no checks; PR #208's GitHub `test` check passed. Release `privacy-v0.1.0` supplies amd64 and arm64 assets. |
-| sysc-shell | PR #436 adds the original summary; PR #437 routes it to the plugin panel | Both PRs are merged and their GitHub `test` checks passed. The laptop testbench runs `72caa273`; its plugin process is running and the bar placement is configured. |
+| privacybit | Formatting, `git diff --check`, `go test -count=1 -p 2 ./...`, `go vet -p 2 ./...`, and `go build -p 2 ./...`; packaging metadata | The full Go suite, vet, and build passed after PR #16 on 2026-10-29. PR #19's `makepkg --printsrcinfo | cmp - .SRCINFO` and `git diff --check` passed. Earlier verification covered GPL text, generated package metadata, and an isolated-HOME TUI install. |
+| sysc-plugins | PR #259 adds the Flatpak sandbox grade to the privacy panel | PR #259 merged at `6e610ff`; `test`, `govulncheck`, and `verify` passed. The catalog serves release `privacy-v0.1.0`, which predates this change. |
+| sysc-shell | PR #436 adds the original summary; PR #437 routes it to the plugin panel | Both PRs are merged and their GitHub `test` checks passed. The testbench service runs shell revision `ca3c988`; the plugin process runs revision `6e610ff`, and its bar placement is configured. |
 
 The live review's evidence is also recorded in sysc-shell issue `sysc-1444`.
-The primary checkout's Beads export has independent changes; inspect it before
-exporting any tracker update. The deployed screenshot remains in the local
-cache and is not part of the plugin's synthetic catalog screenshot.
+The sysc-plugins and sysc-shell primary checkouts contain independent changes,
+including `.beads/issues.jsonl`. Keep those changes out of privacybit work and
+use clean worktrees for cross-repository changes. The deployed screenshot
+remains in the local cache and is not part of the plugin's synthetic catalog
+screenshot.
 
 The environment guard blocked `go test -race ./...` because the repository-wide
 race run has repeatedly hard-locked this zram-only machine. Race checks were
