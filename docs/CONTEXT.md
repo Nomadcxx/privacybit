@@ -318,12 +318,14 @@ existing result fields.
 ## 4. What is built
 
 Delivery phases 0–12 are implemented across privacybit, sysc-plugins, and
-sysc-shell. The privacy plugin is in the published catalog and release, with a
-user-placeable bar widget and a plugin-owned audit panel. The Control Centre
-shows a compact audit summary and opens that panel. On 2026-10-23, the laptop
-testbench used the merged sysc-plugins and sysc-shell revisions, had the plugin
-bar item enabled, and had privacybit installed. See `HANDOVER.md` for revisions
-and verification evidence.
+sysc-shell. The privacy plugin has a user-placeable bar widget and a
+plugin-owned audit panel. The Control Centre shows a compact audit summary and
+opens that panel. Privacybit `v0.1.2`, plugin release `privacy-v0.1.2`, and AUR
+package `0.1.2-1` are published. Catalog PR #275 merged at `2f67de4`, and a
+disposable sysc-shell store install verified plugin `0.1.2`. The laptop
+testbench was last checked on 2026-10-29; SSH returned `No route to host` on
+2026-10-30, so deployment of the new releases remains unverified. See
+`HANDOVER.md` for revisions and verification evidence.
 
 ---
 
@@ -332,9 +334,10 @@ and verification evidence.
 The owner approved GPL-3.0-or-later for privacybit and, in D5 §11 on
 2026-10-23, a plugin-owned bar widget and audit panel. The panel runs
 `privacybit audit --snapshot` as the current user. It refreshes the bounded
-snapshot without writing a saved report or invoking privileged actions. The
-plugin release and catalog entry are published; the AUR package is also
-published.
+snapshot without writing a saved report or invoking privileged actions. Plugin
+release `privacy-v0.1.2` fixes the manifest and handshake at version `0.1.2`.
+Catalog PR #275 merged at `2f67de4`, and a disposable sysc-shell store install
+verified the release; the AUR package is `0.1.2-1`.
 
 ---
 
@@ -359,16 +362,17 @@ or reads the saved report. Its capture activity card remains unchanged.
 
 ## 7. Remaining non-phase work
 
-- **Live Niri verification** of the earlier host-rendered audit card passed on
-  2026-10-22; its screenshot stays in the local cache because it contains real
-  inventory. On 2026-10-23, the laptop testbench confirmed the merged plugin
-  and shell revisions, an active plugin process, installed privacybit, and the
-  bar placement.
-- **Publication** is complete: privacybit `v0.1.0`, the privacy plugin release
-  and catalog entry, and the AUR package are published.
-- Additional package-manager backends and effective, scope-specific Flatpak
-  permission inspection remain explicit D6 follow-up work. Coverage stays
-  unknown or caveated where those capabilities are unavailable.
+- **Live testbench verification** confirmed the merged plugin and shell, an
+  active plugin process, installed privacybit, and bar placement on 2026-10-29.
+  The laptop could not be reached on 2026-10-30, so the `0.1.2` releases still
+  need deployment there.
+- **Publication** is complete through privacybit `v0.1.2`, plugin release
+  `privacy-v0.1.2`, catalog entry `0.1.2`, and AUR package `0.1.2-1`. A
+  disposable sysc-shell store install verified the amd64 release. The laptop
+  testbench still needs redeployment.
+- Additional package-manager backends remain deferred under D6. Flatpak's
+  resolved permissions are graded per installed copy; unsupported permission
+  groups and missing coverage remain unknown.
 - Live telemetry endpoint attribution remains deferred under D7 §5.2; v1
   reports it as unknown rather than claiming no connections were found.
 
