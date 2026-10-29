@@ -213,6 +213,8 @@ ignored typo.
 | 67 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-phase-4-findings-actions-plan.md` (Phase 4 implementation plan) |
 | — | `/home/nomadx/privacy-bit/docs/plans/2026-10-29-origin-context-design.md` (Issue #22 approved design) |
 | — | `/home/nomadx/privacy-bit/docs/plans/2026-10-29-origin-context-plan.md` (Issue #22 implementation plan) |
+| 24 | `/home/nomadx/privacy-bit/docs/plans/2026-10-29-privacybit-ci-design.md` (Issue #24 CI design) |
+| 35 | `/home/nomadx/privacy-bit/docs/plans/2026-10-29-privacybit-ci-plan.md` (Issue #24 implementation plan) |
 | — | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-phase-8-helper-plan.md` (Phase 8 implementation plan) |
 | — | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-phase-9-daemon-plan.md` (Phase 9 implementation plan) |
 | 67 | `/home/nomadx/privacy-bit/docs/plans/2026-10-23-flatpak-sandbox-grade-design.md` (Issue #13 approved design) |
@@ -240,6 +242,7 @@ The rest as you reach it.
 | `/home/nomadx/privacy-bit/internal/installer/binary.go` | Offline build and atomic install to `~/.local/bin` |
 | `/home/nomadx/privacy-bit/internal/audit/flatpak.go` | Effective permission classification, generic risk bands, and Flatpak coverage roll-up |
 | `/home/nomadx/privacy-bit/packaging/aur/` | `PKGBUILD` and generated `.SRCINFO` for the first Arch package |
+| `/home/nomadx/privacy-bit/.github/workflows/ci.yml` | Pull request and main-branch formatting, test, vet, and build checks |
 
 There is **no `testdata/` directory** anywhere in the repo. `internal/detect`
 fixtures are inline string literals in `detect_test.go`; `internal/catalog`
@@ -823,7 +826,7 @@ Recorded because a future reader will trust the docs.
 
 | Repository | Automated checks | Result |
 |---|---|---|
-| privacybit | Formatting, `git diff --check`, `go test -count=1 -p 2 ./...`, `go vet -p 2 ./...`, and `go build -p 2 ./...`; packaging metadata | The full Go suite, vet, and build passed after PR #16 on 2026-10-29 and again for PR #23. This repository has no GitHub workflow checks configured. PR #19's `makepkg --printsrcinfo | cmp - .SRCINFO` and `git diff --check` passed. Earlier verification covered GPL text, generated package metadata, and an isolated-HOME TUI install. |
+| privacybit | `.github/workflows/ci.yml`: formatting, `go test -count=1 -p 2 ./...`, `go vet -p 2 ./...`, and `go build -p 2 ./...` | The full Go suite, vet, and build passed after PR #16 on 2026-10-29, for PR #23, and while adding CI for issue #24. GitHub Actions runs these checks on pull requests and pushes to `main`. PR #19's `makepkg --printsrcinfo | cmp - .SRCINFO` and `git diff --check` passed. Earlier verification covered GPL text, generated package metadata, and an isolated-HOME TUI install. |
 | sysc-plugins | PR #259 adds the Flatpak sandbox grade; PR #262 fixes contrast; PR #264 shows origin context | PR #259 merged at `6e610ff`; PR #262 at `657c8f5`; PR #264 at `6986ea0`. PR #264's `test`, `govulncheck`, and `verify` checks passed. The catalog serves release `privacy-v0.1.0`, which predates these changes; issue #260 tracks the next release. |
 | sysc-shell | PR #436 adds the original summary; PR #437 routes it to the plugin panel | Both PRs are merged and their GitHub `test` checks passed. The testbench service runs shell revision `ca3c988`; the plugin process runs revision `6e610ff`, and its bar placement is configured. |
 
