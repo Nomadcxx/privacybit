@@ -31,5 +31,6 @@
 1. Validate the workflow syntax with `actionlint` when available.
 2. Run `test -z "$(gofmt -l .)"`.
 3. Run `go test -count=1 -p 2 ./...`, `go vet -p 2 ./...`, and `go build -p 2 ./...`.
-4. Confirm the GitHub Actions checks pass on the pull request.
-5. Update the handover with the workflow and check results.
+4. Make test fixtures declare their command availability so checks do not depend on runner-installed tools.
+5. Confirm the GitHub Actions checks pass on the pull request.
+6. Update the handover with the workflow and check results.

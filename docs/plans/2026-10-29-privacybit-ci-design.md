@@ -15,7 +15,8 @@ Run formatting, tests, vet, and build in one Ubuntu job:
 - `go vet -p 2 ./...` checks every package.
 - `go build -p 2 ./...` compiles every package.
 
-Keep the checks sequential so one runner uses bounded resources. The workflow
+Keep the checks sequential so one runner uses bounded resources. Cancel
+superseded pull request runs and let each push to `main` finish. The workflow
 does not publish releases or request write permissions.
 
 ## Acceptance
