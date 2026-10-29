@@ -637,6 +637,7 @@ Specific, falsifiable claims. Each is checkable.
 | 17 | **Installer cancellation preserves the current CLI and reports partial service state.** | `TestCtrlCCancelsBuildAndReportsCLIState`, `TestCtrlCCancelsServiceSetupAndReportsPartialState`, `TestCtrlCAfterBuildCompletionDoesNotStartServices`, and `TestInstallBinaryCancellationPreservesTarget`. |
 | 18 | **Origin status reports a recognized local name without claiming source authentication.** | `TestWriteHumanShowsOriginsAsContext` in `cmd/privacybit/audit_test.go`, `TestAppViewShowsOriginContextWithoutChangingGrade` in `internal/tui/model_test.go`, and `TestPrivacyPanelShowsOriginAsContext` in sysc-plugins `plugins/privacy/view_test.go`. |
 | 19 | **Source capability gaps reach the report without changing grades.** | `TestCapabilitiesFactsUseStableNamesAndOrder`, `TestRunReportsSourceFactsAndUnsupportedCoverage`, `TestWriteHumanShowsSupportedAndReducedFacts`, `TestCoverageViewShowsSupportedAndReducedFacts`, `TestParseAuditOutputProjectsBoundedReducedSources`, and `TestPrivacyPanelShowsSourcesBehindReducedCoverage`. |
+| 20 | **PATH exclusions match directory boundaries.** | `TestUserPathDirsUsePathComponentBoundaries` in `internal/detect/detect_test.go` keeps adjacent paths visible while excluding system roots and their descendants, including the Nix store. |
 
 §11 records the latest gate results. Earlier phase checkpoints are historical;
 use the current results when judging the tree.
@@ -859,6 +860,11 @@ Recorded because a future reader will trust the docs.
     `engine.Run` now passes each capability declaration into the schema-1
     report. The CLI and TUI list supported facts; the plugin lists sources that
     cannot provide each fact. Origin remains context only, and no grade changes.
+
+19. **Binary inventory used string prefixes to filter PATH.** That skipped
+    adjacent directories such as `/usr/bin-extra` and included exact roots such
+    as `/nix/store` and `/usr/lib`. `userPathDirs` now compares cleaned path
+    components; its test covers roots, descendants, and adjacent names.
 
 ### 10.4 Environment traps
 

@@ -499,6 +499,26 @@ func TestDesktopVersionIsUnavailable(t *testing.T) {
 	}
 }
 
+func TestUserPathDirsUsePathComponentBoundaries(t *testing.T) {
+	paths := []string{
+		"/usr/bin", "/usr/bin/", "/usr/bin/apps", "/usr/bin-extra",
+		"/bin", "/bin-local", "/usr/sbin/tools", "/usr/sbin2",
+		"/sbin", "/sbin-tools", "/usr/local/bin", "/usr/local/bin2",
+		"/nix/store", "/nix/store/hash/bin", "/nix/storehouse/bin",
+		"/usr/lib", "/usr/libexec", "/opt/tools",
+	}
+	t.Setenv("PATH", strings.Join(paths, string(os.PathListSeparator)))
+
+	got := strings.Join(userPathDirs(), "\n")
+	want := strings.Join([]string{
+		"/usr/bin-extra", "/bin-local", "/usr/sbin2", "/sbin-tools",
+		"/usr/local/bin2", "/nix/storehouse/bin", "/usr/libexec", "/opt/tools",
+	}, "\n")
+	if got != want {
+		t.Fatalf("userPathDirs() = %q, want %q", got, want)
+	}
+}
+
 func TestBinaryExcludesNixStoreAndSharedLibraries(t *testing.T) {
 	dir := t.TempDir()
 	makeExec := func(name string) {
