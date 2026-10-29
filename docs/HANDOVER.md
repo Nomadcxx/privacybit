@@ -797,6 +797,13 @@ Recorded because a future reader will trust the docs.
     test observe the child before it exited. The test now waits for process
     exit with a one-second deadline.
 
+15. **Pacman origin marked every non-AUR repository official.** Repository
+    names are configurable, so a custom or local source could appear official
+    in reports. Issue #28 narrows the marker to recognized Arch repository
+    labels and leaves unknown names visible as not marked official. The marker
+    reflects pacman's local label; it does not authenticate the configured
+    server. Origin remains context and does not affect grades.
+
 ### 10.4 Environment traps
 
 - **`: ` inside an unquoted multi-line YAML plain scalar is a parse error** —

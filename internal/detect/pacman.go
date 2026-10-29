@@ -150,23 +150,19 @@ func (p *Pacman) enrich(ctx context.Context, o *Observation) error {
 	return nil
 }
 
-// pacmanOrigin classifies the repository field.
-//
-// AUR is the third-party case on Arch and is a supply-chain finding feeding
-// maturity. The official repositories carry numeric prefixes in pacman's
-// output, so "extra" is official and "aur" is not.
+// pacmanOrigin classifies known Arch repository names. Repository names are
+// configurable, so an unrecognized name does not establish an official source.
 func pacmanOrigin(f map[string]string) Origin {
-	repo, ok := f["Repository"]
-	if !ok || repo == "" {
-		return Origin{Source: "none", Official: false}
+	repo := f["Repository"]
+	if repo == "" {
+		repo = "none"
 	}
-	o := Origin{Source: repo}
-	if repo == "aur" || strings.HasPrefix(repo, "aur/") {
-		o.Official = false
-		return o
+	switch repo {
+	case "core", "extra", "multilib", "core-testing", "extra-testing", "multilib-testing":
+		return Origin{Source: repo, Official: true}
+	default:
+		return Origin{Source: repo}
 	}
-	o.Official = true
-	return o
 }
 
 // fields parses pacman -Qi output into a label to value map. Records are

@@ -105,6 +105,31 @@ func TestAvailabilitySeparatesEmptyFromMissing(t *testing.T) {
 	}
 }
 
+func TestPacmanMarksOnlyRecognizedRepositoriesOfficial(t *testing.T) {
+	for _, tc := range []struct {
+		repository string
+		official   bool
+	}{
+		{"core", true},
+		{"extra", true},
+		{"multilib", true},
+		{"core-testing", true},
+		{"extra-testing", true},
+		{"multilib-testing", true},
+		{"aur", false},
+		{"chaotic-aur", false},
+		{"local", false},
+		{"custom", false},
+	} {
+		t.Run(tc.repository, func(t *testing.T) {
+			got := pacmanOrigin(map[string]string{"Repository": tc.repository})
+			if got.Source != tc.repository || got.Official != tc.official {
+				t.Fatalf("pacmanOrigin(%q) = %+v, want official=%t", tc.repository, got, tc.official)
+			}
+		})
+	}
+}
+
 func TestPacmanKeepsPackageWhenEnrichmentFails(t *testing.T) {
 	r := MapRunner{Output: map[string]string{"pacman -Qq": "brave\n"}}
 	p := NewPacman(r, func(name string) bool { return name == "brave" })
