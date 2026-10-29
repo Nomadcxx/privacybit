@@ -10,6 +10,20 @@ import (
 	"testing"
 )
 
+type cancelAfterSecondErrCheck struct {
+	context.Context
+	cancel context.CancelFunc
+	checks int
+}
+
+func (c *cancelAfterSecondErrCheck) Err() error {
+	c.checks++
+	if c.checks == 2 {
+		c.cancel()
+	}
+	return c.Context.Err()
+}
+
 func TestInstallBinaryReplacesOwnedExecutable(t *testing.T) {
 	root := t.TempDir()
 	binDir := filepath.Join(root, "bin")
@@ -25,7 +39,7 @@ func TestInstallBinaryReplacesOwnedExecutable(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := InstallBinary(source, binDir); err != nil {
+	if err := InstallBinary(context.Background(), source, binDir); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(target)
@@ -62,7 +76,7 @@ func TestInstallBinaryRejectsSymlinkTarget(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := InstallBinary(source, binDir); err == nil {
+	if err := InstallBinary(context.Background(), source, binDir); err == nil {
 		t.Fatal("symlink target was accepted")
 	}
 	data, err := os.ReadFile(referent)
@@ -71,6 +85,69 @@ func TestInstallBinaryRejectsSymlinkTarget(t *testing.T) {
 	}
 	if string(data) != "keep me" {
 		t.Fatalf("symlink referent changed to %q", data)
+	}
+}
+
+func TestInstallBinaryCancellationPreservesTarget(t *testing.T) {
+	root := t.TempDir()
+	binDir := filepath.Join(root, "bin")
+	if err := os.Mkdir(binDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	source := filepath.Join(root, "built-privacybit")
+	if err := os.WriteFile(source, []byte("new executable"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(binDir, "privacybit")
+	if err := os.WriteFile(target, []byte("existing install"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	baseCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ctx := &cancelAfterSecondErrCheck{Context: baseCtx, cancel: cancel}
+
+	if err := InstallBinary(ctx, source, binDir); err == nil {
+		t.Fatal("install completed after cancellation before replacing the CLI")
+	}
+	if ctx.checks < 2 {
+		t.Fatalf("install checked cancellation %d times, want a check before replacement", ctx.checks)
+	}
+	data, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "existing install" {
+		t.Fatalf("canceled install changed the CLI to %q", data)
+	}
+}
+
+func TestInstallBuiltCLICancellationPreservesExistingBinary(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	binDir := filepath.Join(home, ".local", "bin")
+	if err := os.MkdirAll(binDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	source := filepath.Join(t.TempDir(), "built-privacybit")
+	if err := os.WriteFile(source, []byte("new executable"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(binDir, "privacybit")
+	if err := os.WriteFile(target, []byte("existing install"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if err := installBuiltCLI(ctx, source, binDir); err == nil {
+		t.Fatal("canceled install unexpectedly replaced the CLI")
+	}
+	data, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "existing install" {
+		t.Fatalf("canceled install changed the CLI to %q", data)
 	}
 }
 
