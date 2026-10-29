@@ -28,9 +28,9 @@ func NewFlatpak(r Runner) *Flatpak {
 // Name identifies the source in coverage reporting.
 func (f *Flatpak) Name() string { return "flatpak" }
 
-// Capabilities reports what flatpak can answer. It reports a version and an
-// origin. It reports no licence, no vendor and no signature state, because
-// flatpak records none of those in a way that maps onto a package fact.
+// Capabilities reports which facts Flatpak can supply. It reports a version
+// and origin, but not a licence, vendor, explicit-install state, reverse
+// dependencies or per-application signature state.
 func (f *Flatpak) Capabilities() Capabilities {
 	return Capabilities{Version: true, Origin: true}
 }
@@ -98,8 +98,8 @@ func (f *Flatpak) Inventory(ctx context.Context) ([]Observation, error) {
 			SandboxPermissions: permissions,
 			Facts: Facts{
 				Licence:     Unavailable[string]("flatpak does not record a licence in its listing"),
-				Vendor:      Observed(origin),
-				Explicit:    Observed(true),
+				Vendor:      Unavailable[string]("flatpak reports a remote name, not an application vendor"),
+				Explicit:    Unavailable[bool]("flatpak does not report whether an application was explicitly installed"),
 				ReverseDeps: Unavailable[[]string]("flatpak has no reverse dependency model"),
 				Signed:      Unavailable[bool]("flatpak records signature state per remote, not per application"),
 			},
