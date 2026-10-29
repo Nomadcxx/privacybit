@@ -92,13 +92,13 @@ matters so much.
 
 | Absolute path | What it is | State |
 |---|---|---|
-| `/home/nomadx/privacy-bit` | **This project.** Canonical checkout on branch `main`. | The primary checkout contains unrelated untracked `.commandcode/` data. Leave it untouched and use a clean worktree from `origin/main`. The latest tagged release is `v0.1.1` at `84b2f4f`; privacybit PR #16 added the Flatpak sandbox grade after that tag. |
+| `/home/nomadx/privacy-bit` | **This project.** Canonical checkout on branch `main`. | Upstream main is `aa8163b` (2026-10-29). The primary checkout contains unrelated untracked `.commandcode/` data. Leave it untouched and use a clean worktree from `origin/main`. The latest tagged release is `v0.1.1` at `84b2f4f`; privacybit PR #16 added the Flatpak sandbox grade after that tag. |
 | `/home/nomadx/worktrees/privacybit-origin-context` | Privacybit issue #22 worktree. | Branch `feat/origin-context`, based on `origin/main` at `11f70fc`, with the approved context-only origin implementation and documentation. |
 | `/home/nomadx/sysc-plugins/.worktrees/privacybit-origin-context` | sysc-plugins issue #22 worktree. | Branch `feat/privacybit-origin-context`, based on `origin/main` at `657c8f5`, with the panel integration and refreshed screenshot and thumbnail. |
 | `/home/nomadx/privacy-bit/docs/plans/` | Seven original design documents plus follow-on designs and implementation plans. | D1–D7 record the approved design. Phase 3, 4, 8, and 9 plans remain as audit history. |
-| `Nomadcxx/sysc-plugins` `main` | Upstream revision `6986ea0` (2026-10-29). | PR #264 adds package-origin context; PR #262 fixes text contrast; PR #259 adds the sandbox grade; PRs #207 and #208 added the catalog entry, bar widget, and panel. The catalog serves plugin version `0.1.0` from `privacy-v0.1.0`; issue #260 tracks the next release. |
-| `Nomadcxx/sysc-shell` `main` | Upstream revision `b0c634c` (2026-10-29). | PRs #436 and #437 add the Control Centre summary and route `Open full audit` to the plugin panel. |
-| `nomadx@192.168.0.64:7777` laptop testbench | Plugin worktree `/home/nomadx/worktrees/privacybit-plugin-testbench-20261023` at `6e610ff`. | Checked over SSH on 2026-10-29. `~/.local/bin/privacybit` is executable and embeds privacybit `150a4de` with `vcs.modified=false`. The plugin process runs from the worktree at `6e610ff`; `sysc-shell.service` is active. The installed shell embeds `ca3c988` with `vcs.modified=false`, an ancestor of current `sysc-shell/main`. `config.json` enables `org.sysc.privacy` and places its `bar` entry as `privacybit-testbench`. |
+| `Nomadcxx/sysc-plugins` `main` | Upstream revision `9b44520` (2026-10-29). | PR #265 publishes `privacy-v0.1.1`; PR #267 fixes the manifest/handshake mismatch. The catalog serves `0.1.1`, but the published amd64 asset embeds pre-fix revision `01a4c7f8`, where the manifest says `0.1.1` and the handshake says `0.1.0`. Issue #268 tracks a corrected release. |
+| `Nomadcxx/sysc-shell` `main` | Upstream revision `11d6325` (2026-10-29). | PRs #436 and #437 add the Control Centre summary and route `Open full audit` to the plugin panel. |
+| `nomadx@192.168.0.64:7777` laptop testbench | Plugin worktree `/home/nomadx/worktrees/privacybit-plugin-testbench-20261023` at `9b44520`. | Checked over SSH on 2026-10-29. `~/.local/bin/privacybit` is executable and embeds privacybit `54c9fb4` with `vcs.modified=false`. The rebuilt plugin embeds sysc-plugins `9b44520` with `vcs.modified=false`; `sysc-shell.service` is active and the privacy plugin process runs. The installed shell embeds `ca3c988` with `vcs.modified=false`. `config.json` enables `org.sysc.privacy` in the bar; the plugin manifest declares both its `bar` widget and `panel`. |
 | `/home/nomadx/sysc-plugins` | Primary plugin checkout. | Branch `fix/kdeconnect-pairing-card-routing` has independent dirty changes, including an untracked `plugins/privacy`. Do not clean or repurpose it; upstream `main` is the source of truth for the published plugin. |
 | `/home/nomadx/sysc-shell` | Primary shell checkout. | Branch `audit/toasthost-wayland-crash` is behind upstream and has independent dirty changes and Beads state. Do not clean or deploy it; upstream `main` is the source of truth for the merged integration. |
 | `/home/nomadx/sysc-plugins/cmd/sysc-plugin-calendar/main.go` | The precedent to copy for the plugin. | Reference only. |
@@ -107,10 +107,10 @@ matters so much.
 
 ### 2.2 Privacybit integration files on upstream main
 
-The current implementation is merged in sysc-plugins PRs #207/#208/#259 and
-sysc-shell PRs #436/#437. The plugin owns the full audit panel and scan action;
-sysc-shell owns the Control Centre summary and route. The laptop testbench uses
-these merged revisions.
+sysc-plugins merged PRs #207/#208/#259/#264/#265/#267, and sysc-shell merged
+PRs #436/#437. The plugin owns the full audit panel and scan action; sysc-shell
+owns the Control Centre summary and route. The laptop testbench uses these
+merged revisions.
 
 | File | Role |
 |---|---|
@@ -125,13 +125,16 @@ these merged revisions.
 The full panel displays categories, network checks, findings, and coverage
 limits. It treats stale and unavailable snapshots as unrated. The Control
 Centre no longer launches scans or reads the saved report; both the bar and its
-`Open full audit` action open the plugin panel. At the latest testbench check,
-the plugin still ran at `6e610ff`, before PRs #262 and #264.
+`Open full audit` action open the plugin panel. The testbench now runs the
+rebuilt plugin at `9b44520`; its `bar` widget and `panel` entry are enabled.
 
-Privacybit merged PR #16 for the per-copy Flatpak sandbox grade, and
-sysc-plugins merged PR #259 to display it. The published privacybit
-`v0.1.1` and sysc-plugins `privacy-v0.1.0` assets predate them. Issues #20 and
-sysc-plugins #260 track those release updates.
+Privacybit PR #16 adds the per-copy Flatpak sandbox grade, and PR #23 adds
+package-origin context. sysc-plugins PR #259 displays sandbox grades, and
+PR #264 displays origin context. The privacybit `v0.1.1` binary predates both
+privacybit changes. The plugin `privacy-v0.1.1` release includes the sandbox
+panel, but predates origin context and the handshake fix. Privacybit issue #20
+tracks the CLI release; sysc-plugins issue #268 tracks the corrected plugin
+release.
 
 ---
 
@@ -213,8 +216,8 @@ ignored typo.
 | 67 | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-phase-4-findings-actions-plan.md` (Phase 4 implementation plan) |
 | — | `/home/nomadx/privacy-bit/docs/plans/2026-10-29-origin-context-design.md` (Issue #22 approved design) |
 | — | `/home/nomadx/privacy-bit/docs/plans/2026-10-29-origin-context-plan.md` (Issue #22 implementation plan) |
-| 24 | `/home/nomadx/privacy-bit/docs/plans/2026-10-29-privacybit-ci-design.md` (Issue #24 CI design) |
-| 35 | `/home/nomadx/privacy-bit/docs/plans/2026-10-29-privacybit-ci-plan.md` (Issue #24 implementation plan) |
+| 25 | `/home/nomadx/privacy-bit/docs/plans/2026-10-29-privacybit-ci-design.md` (Issue #24 CI design) |
+| 36 | `/home/nomadx/privacy-bit/docs/plans/2026-10-29-privacybit-ci-plan.md` (Issue #24 implementation plan) |
 | — | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-phase-8-helper-plan.md` (Phase 8 implementation plan) |
 | — | `/home/nomadx/privacy-bit/docs/plans/2026-10-20-phase-9-daemon-plan.md` (Phase 9 implementation plan) |
 | 67 | `/home/nomadx/privacy-bit/docs/plans/2026-10-23-flatpak-sandbox-grade-design.md` (Issue #13 approved design) |
@@ -659,15 +662,15 @@ two do not collide.)
 
 | Item | State |
 |---|---|
-| Laptop testbench integration | Checked over SSH on 2026-10-29. `/home/nomadx/.local/bin/privacybit` is executable and embeds `150a4de` with `vcs.modified=false`. The plugin process runs from worktree `/home/nomadx/worktrees/privacybit-plugin-testbench-20261023` at `6e610ff`; the active `sysc-shell.service` embeds `ca3c988` with `vcs.modified=false`, an ancestor of current `sysc-shell/main` (`b0c634c`). Config enables `org.sysc.privacy` and places its bar entry as `privacybit-testbench`. |
+| Laptop testbench integration | Checked over SSH on 2026-10-29 after the handshake fix. `/home/nomadx/.local/bin/privacybit` is executable and embeds `54c9fb4` with `vcs.modified=false`. The privacy plugin process runs from `/home/nomadx/worktrees/privacybit-plugin-testbench-20261023` at `9b44520`; `sysc-shell.service` is active and its binary embeds `ca3c988` with `vcs.modified=false`. Config enables `org.sysc.privacy` in the bar. The plugin manifest declares `bar` and `panel`, and a no-network snapshot returned schema 1 with origin context. |
 | Live telemetry endpoint attribution | Deferred by D7 §5.2: no reviewed endpoint dataset or reliable PID attribution. Snapshots report this signal as unknown. |
-| Effective Flatpak sandbox grade | Implemented in privacybit PR #16 and shown by sysc-plugins PR #259. It grades each installed copy from resolved permissions: red for host filesystem, all-device, or shared-network grants; amber for bounded broad access; green only for complete classified evidence without those grants. Missing or unclassified evidence is unknown. The `v0.1.1` CLI and `privacy-v0.1.0` plugin releases predate this work; privacybit issue #20 and sysc-plugins issue #260 track release updates. |
-| Package origin context | The owner resolved privacybit issue #22: show the observed source name and official status as context, and never use origin to change a grade. Privacybit PR #23 adds bounded report fields and CLI/TUI output; sysc-plugins PR #264 merged at `6986ea0` and displays context in the panel. Unmatched apps remain unrated and retain visible origin context. Release assets have not been updated. |
+| Effective Flatpak sandbox grade | Implemented in privacybit PR #16 and shown by sysc-plugins PR #259. It grades each installed copy from resolved permissions: red for host filesystem, all-device, or shared-network grants; amber for bounded broad access; green only for complete classified evidence without those grants. Missing or unclassified evidence is unknown. The privacybit `v0.1.1` CLI predates PR #16; issue #20 tracks its release. The plugin release `privacy-v0.1.1` includes the sandbox panel, but its manifest says `0.1.1` while its handshake says `0.1.0`; sysc-plugins issue #268 tracks the corrected release. |
+| Package origin context | The owner resolved privacybit issue #22: show the observed source name and official status as context, and never use origin to change a grade. Privacybit PR #23 adds bounded report fields and CLI/TUI output; sysc-plugins PR #264 adds panel context. Unmatched apps remain unrated and retain visible origin context. The privacybit `v0.1.1` CLI and plugin `privacy-v0.1.1` asset predate these changes; privacybit issue #20 and sysc-plugins issue #268 track corrected releases. |
 | dnf, zypper, apk, and xbps backends | Deferred under D6; universal sources report what they can see, with coverage caveats. |
 | Nix and Snap package-manager sources | Deferred under D6 because their models do not fit the package-manager interface. |
 | Licence | `LICENSE`, README, `PKGBUILD`, and `.SRCINFO` use GPL-3.0-or-later. The full licence text matches `/usr/share/licenses/spdx/GPL-3.0-or-later.txt`. The checked sysc-shell tree remains BSD-3-Clause and sysc-plugins remains MIT; neither was changed. |
 | Panel scans and report actions | The plugin panel runs `privacybit audit --snapshot` as the current user and renders the bounded snapshot. The Control Centre routes to that panel; it does not scan or read the saved report. |
-| sysc-plugins store entry | `catalog.json` contains `org.sysc.privacy` and points to version `0.1.0` and the `privacy-v0.1.0` amd64/arm64 assets. PR #259 is merged; issue #260 tracks a release that includes its sandbox panel. |
+| sysc-plugins store entry | `catalog.json` contains `org.sysc.privacy` and points to version `0.1.1` and the `privacy-v0.1.1` amd64/arm64 assets. PR #265 published the sandbox panel. The amd64 asset embeds pre-fix revision `01a4c7f8`; PR #267 fixed main, and issue #268 tracks a corrected release. |
 | Release and AUR package | GitHub release [`v0.1.1`](https://github.com/Nomadcxx/privacybit/releases/tag/v0.1.1) and AUR package [`privacybit 0.1.1-1`](https://aur.archlinux.org/packages/privacybit) are published. Tag `v0.1.1` points to `84b2f4f` and predates PR #16. PR #19 updates the checked-in AUR recipe to `0.1.1`; issue #20 tracks a release with the sandbox-grade engine. |
 
 ### 10.2 Design corrections and open conflicts
@@ -826,9 +829,9 @@ Recorded because a future reader will trust the docs.
 
 | Repository | Automated checks | Result |
 |---|---|---|
-| privacybit | `.github/workflows/ci.yml`: formatting, `go test -count=1 -p 2 ./...`, `go vet -p 2 ./...`, and `go build -p 2 ./...` | The full Go suite, vet, and build passed after PR #16 on 2026-10-29, for PR #23, and while adding CI for issue #24. The first CI run exposed a host-dependent pacman availability fixture; the test now declares the executable explicitly. GitHub Actions runs these checks on pull requests and pushes to `main`, and lets main-branch runs finish. PR #19's `makepkg --printsrcinfo | cmp - .SRCINFO` and `git diff --check` passed. Earlier verification covered GPL text, generated package metadata, and an isolated-HOME TUI install. |
-| sysc-plugins | PR #259 adds the Flatpak sandbox grade; PR #262 fixes contrast; PR #264 shows origin context | PR #259 merged at `6e610ff`; PR #262 at `657c8f5`; PR #264 at `6986ea0`. PR #264's `test`, `govulncheck`, and `verify` checks passed. The catalog serves release `privacy-v0.1.0`, which predates these changes; issue #260 tracks the next release. |
-| sysc-shell | PR #436 adds the original summary; PR #437 routes it to the plugin panel | Both PRs are merged and their GitHub `test` checks passed. The testbench service runs shell revision `ca3c988`; the plugin process runs revision `6e610ff`, and its bar placement is configured. |
+| privacybit | `.github/workflows/ci.yml`: formatting, `go test -count=1 -p 2 ./...`, `go vet -p 2 ./...`, and `go build -p 2 ./...` | PR #25 merged at `aa8163b`; its pull request checks and main-branch run `40871202870` passed. The first CI run exposed a host-dependent pacman availability fixture; PR #25 made the fixture explicit. PR #19's `makepkg --printsrcinfo | cmp - .SRCINFO` passed. |
+| sysc-plugins | PR #259 adds the Flatpak sandbox grade; PR #262 fixes contrast; PR #264 shows origin context; PR #265 publishes `privacy-v0.1.1`; PR #267 fixes handshake identity | PR #267 merged at `9b44520`; `test`, `govulncheck`, and `verify` passed. The current catalog points to `privacy-v0.1.1`, whose amd64 asset embeds pre-fix revision `01a4c7f8`; issue #268 tracks a corrected release. |
+| sysc-shell | PR #436 adds the original summary; PR #437 routes it to the plugin panel | Both PRs are merged and their GitHub `test` checks passed. The current upstream main is `11d6325`; the testbench service runs shell revision `ca3c988`, and the privacy plugin process runs revision `9b44520` with its bar placement configured. |
 
 The live review's evidence is also recorded in sysc-shell issue `sysc-1444`.
 The sysc-plugins and sysc-shell primary checkouts contain independent changes,
