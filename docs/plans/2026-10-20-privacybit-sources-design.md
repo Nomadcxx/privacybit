@@ -349,24 +349,61 @@ cannot know which names exist.
 
 ## 10. Coverage reporting
 
-Coverage is a first-class output, not a debug affordance. The snapshot grows a
-per-source entry, and D2's human output renders it.
+Coverage is a first-class output, not a debug affordance. The schema-1
+snapshot reports each active source and its supported facts, and D2's human
+output renders them. The excerpt uses counts that vary by machine.
 
 ```json
 {
-  "coverage": {
-    "distribution": { "id": "arch", "id_like": ["arch"] },
-    "sources": [
-      { "name": "pacman",    "state": "ready", "observed": 2882, "facts": ["explicit","licence","origin","reverse_deps","signed","vendor","version"] },
-      { "name": "flatpak",   "state": "ready", "observed": 5,    "facts": ["origin","version"] },
-      { "name": "desktop",   "state": "ready", "observed": 497,  "facts": [] },
-      { "name": "binary",    "state": "ready", "observed": 61,   "facts": [] },
-      { "name": "dpkg",      "state": "empty", "observed": 0,    "facts": [] },
-      { "name": "nix",       "state": "unavailable", "why": "no nix source in v1" },
-      { "name": "snap",      "state": "unavailable", "why": "snap not installed" }
-    ],
-    "reduced": [ { "fact": "licence", "sources": ["desktop","binary"], "effect": "catalogue grades uncorroborated on these observations" } ]
-  }
+  "coverage": [
+    {
+      "name": "pacman",
+      "type": "package",
+      "ready": true,
+      "observed": 2882,
+      "facts": ["explicit", "licence", "origin", "reverse_deps", "signed", "vendor", "version"]
+    },
+    {
+      "name": "dpkg",
+      "type": "package",
+      "ready": true,
+      "empty": true,
+      "observed": 0,
+      "facts": []
+    },
+    {
+      "name": "flatpak",
+      "type": "flatpak",
+      "ready": true,
+      "observed": 5,
+      "facts": ["origin", "version"]
+    },
+    {
+      "name": "desktop",
+      "type": "desktop",
+      "ready": true,
+      "observed": 497,
+      "facts": []
+    },
+    {
+      "name": "binary",
+      "type": "binary",
+      "ready": true,
+      "observed": 61,
+      "facts": []
+    }
+  ],
+  "reduced": [
+    {
+      "fact": "licence",
+      "effect": "not supported by the listed sources",
+      "sources": ["binary", "desktop", "flatpak"]
+    },
+    {
+      "fact": "network.telemetry",
+      "effect": "live telemetry endpoint attribution is not implemented"
+    }
+  ]
 }
 ```
 
