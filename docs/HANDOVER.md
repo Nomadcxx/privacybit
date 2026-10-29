@@ -92,7 +92,7 @@ matters so much.
 
 | Absolute path | What it is | State |
 |---|---|---|
-| `/home/nomadx/privacy-bit` | **This project.** Canonical checkout on branch `main`. | Upstream main is `c16dc9b` after PR #43. The primary checkout contains unrelated untracked `.commandcode/` data; leave it untouched and use a clean worktree from `origin/main`. Public privacybit `v0.1.2` at `7c63797` remains current; PR #42 updates the AUR recipe for `0.1.3`. Issue #20 is closed. |
+| `/home/nomadx/privacy-bit` | **This project.** Canonical checkout on branch `main`. | This handover snapshot was checked against upstream commit `754114d` after PR #47. The primary checkout contains unrelated untracked `.commandcode/` data; leave it untouched and use a clean worktree from `origin/main`. Public privacybit `v0.1.2` at `7c63797` remains current; PR #42 updates the AUR recipe for `0.1.3`. Issue #20 is closed. |
 | `/home/nomadx/worktrees/privacybit-origin-context` | Historical privacybit issue #22 worktree. | Branch `feat/origin-context` at `54c9fb4`; privacybit PR #23 merged the context-only origin implementation. |
 | `/home/nomadx/sysc-plugins/.worktrees/privacybit-origin-context` | Historical sysc-plugins issue #22 worktree. | Branch `feat/privacybit-origin-context`; sysc-plugins PR #264 merged the panel integration and refreshed screenshot and thumbnail. |
 | `/home/nomadx/privacy-bit/docs/plans/` | Seven original design documents plus follow-on designs and implementation plans. | D1–D7 record the approved design. Phase 3, 4, 8, and 9 plans remain as audit history. |
