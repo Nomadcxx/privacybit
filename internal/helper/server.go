@@ -31,6 +31,9 @@ const (
 	maxLine     = 64 << 10
 )
 
+// buildVersion is injected by package builds; source builds report "devel".
+var buildVersion = "devel"
+
 var packageNamePattern = regexp.MustCompile(`^[A-Za-z0-9@._+:-]+$`)
 
 type CommandRunner interface {
@@ -284,7 +287,7 @@ func handle(ctx context.Context, request Request, opts Options, pending **pendin
 	case "ping":
 		return Event{Type: "result", Op: request.Op, OK: true}, nil
 	case "status":
-		return Event{Type: "result", Op: request.Op, OK: true, Version: "0.1.0", CatalogRev: opts.Catalog.Revision}, nil
+		return Event{Type: "result", Op: request.Op, OK: true, Version: buildVersion, CatalogRev: opts.Catalog.Revision}, nil
 	case "set-unit":
 		if !opts.IsRoot() {
 			return Event{}, errors.New("set-unit requires root")

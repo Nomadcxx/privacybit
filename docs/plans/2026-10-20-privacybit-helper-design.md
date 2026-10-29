@@ -80,7 +80,7 @@ alongside the rest of the source.
 | Verb | Privileged | Effect |
 |---|---|---|
 | `ping` | no | Liveness. The `ready` handshake. |
-| `status` | no | Helper build, embedded catalogue revision. |
+| `status` | no | Helper build version, embedded catalogue revision. |
 | `apply-entry` | — | Deferred until the catalogue models a concrete reversible setting. |
 | `set-unit` | yes | Enable/disable an allowlisted systemd unit. |
 | `plan-purge` | yes | Compute a removal plan and issue a review token. Read-only. |
@@ -91,6 +91,9 @@ encryption verb. See §3.4.
 
 `apply-entry` is not an accepted v1 verb. The catalogue has no modeled
 preference-backed setting yet; a generic toggle would not be a closed set.
+
+Packaged builds report the package version. The AUR build injects `pkgver`;
+direct source builds report `devel`.
 
 ### 3.3 Unit allowlist
 
