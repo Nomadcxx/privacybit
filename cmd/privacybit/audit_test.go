@@ -83,6 +83,31 @@ func TestWriteHumanShowsFlatpakSandboxGradeAndCoverage(t *testing.T) {
 	}
 }
 
+func TestWriteHumanShowsSupportedAndReducedFacts(t *testing.T) {
+	snapshot := report.Snapshot{
+		Coverage: []report.Coverage{{
+			Name: "dpkg", Type: "package", Ready: true, Observed: 1,
+			Facts: []string{"explicit", "version"},
+		}},
+		Reduced: []report.Reduced{{
+			Fact: "licence", Effect: "not supported by the listed sources",
+			Sources: []string{"desktop", "dpkg"},
+		}},
+	}
+	var out bytes.Buffer
+	if err := writeHuman(&out, snapshot, "low"); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"dpkg (package): ready; 1 observations; facts: explicit, version",
+		"licence: not supported by the listed sources (desktop, dpkg)",
+	} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("human output does not contain %q: %s", want, out.String())
+		}
+	}
+}
+
 func TestWriteHumanShowsOriginsAsContext(t *testing.T) {
 	snapshot := report.Snapshot{
 		Overall: report.Overall{Grade: catalog.GradeGreen},

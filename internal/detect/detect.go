@@ -128,6 +128,25 @@ type Capabilities struct {
 	Signed      bool
 }
 
+// FactCapability names one fact a source may or may not provide.
+type FactCapability struct {
+	Name      string
+	Supported bool
+}
+
+// Facts returns the source's supported facts in a stable order.
+func (c Capabilities) Facts() []FactCapability {
+	return []FactCapability{
+		{Name: "explicit", Supported: c.Explicit},
+		{Name: "licence", Supported: c.Licence},
+		{Name: "origin", Supported: c.Origin},
+		{Name: "reverse_deps", Supported: c.ReverseDeps},
+		{Name: "signed", Supported: c.Signed},
+		{Name: "vendor", Supported: c.Vendor},
+		{Name: "version", Supported: c.Version},
+	}
+}
+
 // Origin is provenance: which repository, remote, or nowhere.
 type Origin struct {
 	// Source is the distribution or remote name, e.g. "core", "extra",

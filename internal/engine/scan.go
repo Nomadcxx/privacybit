@@ -59,7 +59,10 @@ func Run(ctx context.Context, set *catalog.Set, opts Options) (report.Snapshot, 
 			continue
 		}
 		status := spec.Source.Availability()
-		entry := audit.SourceCoverage{Name: spec.Source.Name(), Type: spec.Type, Availability: status}
+		entry := audit.SourceCoverage{
+			Name: spec.Source.Name(), Type: spec.Type, Availability: status,
+			Capabilities: spec.Source.Capabilities(),
+		}
 		if status.Ready && !status.Empty {
 			items, err := spec.Source.Inventory(ctx)
 			if err != nil {

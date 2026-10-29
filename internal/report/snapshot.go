@@ -37,17 +37,19 @@ type Overall struct {
 }
 
 type Coverage struct {
-	Name     string `json:"name"`
-	Type     string `json:"type"`
-	Ready    bool   `json:"ready"`
-	Empty    bool   `json:"empty,omitempty"`
-	Observed int    `json:"observed"`
-	Reason   string `json:"reason,omitempty"`
+	Name     string   `json:"name"`
+	Type     string   `json:"type"`
+	Ready    bool     `json:"ready"`
+	Empty    bool     `json:"empty,omitempty"`
+	Observed int      `json:"observed"`
+	Reason   string   `json:"reason,omitempty"`
+	Facts    []string `json:"facts"`
 }
 
 type Reduced struct {
-	Fact   string `json:"fact"`
-	Effect string `json:"effect"`
+	Fact    string   `json:"fact"`
+	Effect  string   `json:"effect"`
+	Sources []string `json:"sources,omitempty"`
 }
 
 type Scope struct {
@@ -183,14 +185,34 @@ func Build(set *catalog.Set, result audit.Result, findings []audit.Finding, netR
 	if set != nil {
 		snapshot.CatalogRev = set.Revision
 	}
+	unsupportedFacts := make(map[string][]string)
 	for _, source := range coverage {
+		facts := make([]string, 0)
+		if source.Availability.Ready && !source.Availability.Empty {
+			for _, fact := range source.Capabilities.Facts() {
+				if fact.Supported {
+					facts = append(facts, fact.Name)
+				} else {
+					unsupportedFacts[fact.Name] = appendUnique(unsupportedFacts[fact.Name], source.Name)
+				}
+			}
+		}
 		snapshot.Coverage = append(snapshot.Coverage, Coverage{
 			Name: source.Name, Type: string(source.Type), Ready: source.Availability.Ready,
 			Empty: source.Availability.Empty, Observed: source.Observed,
-			Reason: source.Availability.Reason,
+			Reason: source.Availability.Reason, Facts: facts,
 		})
 		if !source.Availability.Ready {
 			snapshot.Reduced = append(snapshot.Reduced, Reduced{Fact: string(source.Type), Effect: source.Name + ": " + source.Availability.Reason})
+		}
+	}
+	for _, fact := range (detect.Capabilities{}).Facts() {
+		sources := unsupportedFacts[fact.Name]
+		if len(sources) > 0 {
+			sort.Strings(sources)
+			snapshot.Reduced = append(snapshot.Reduced, Reduced{
+				Fact: fact.Name, Effect: "not supported by the listed sources", Sources: sources,
+			})
 		}
 	}
 	if netResult.State == network.Unknown {

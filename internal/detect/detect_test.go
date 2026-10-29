@@ -45,6 +45,22 @@ func TestSignalStatesAreDistinct(t *testing.T) {
 	}
 }
 
+func TestCapabilitiesFactsUseStableNamesAndOrder(t *testing.T) {
+	got := (Capabilities{
+		Version: true, Licence: true, Vendor: true, Explicit: true,
+		Origin: true, ReverseDeps: true, Signed: true,
+	}).Facts()
+	want := []string{"explicit", "licence", "origin", "reverse_deps", "signed", "vendor", "version"}
+	if len(got) != len(want) {
+		t.Fatalf("capabilities facts = %+v, want %v", got, want)
+	}
+	for i, fact := range got {
+		if fact.Name != want[i] || !fact.Supported {
+			t.Fatalf("capabilities fact %d = %+v, want %q supported", i, fact, want[i])
+		}
+	}
+}
+
 func TestContradictedSignalIsMeasuredEvidence(t *testing.T) {
 	if !Observed("expected value").IsMeasured() {
 		t.Fatal("an observed signal must count as measured evidence")

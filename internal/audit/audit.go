@@ -51,7 +51,8 @@ type SourceCoverage struct {
 	Type         catalog.DetectType
 	Availability detect.Availability
 	// Observed is the number of records the source returned before matching.
-	Observed int
+	Observed     int
+	Capabilities detect.Capabilities
 }
 
 // InstalledEntry is one inventory observation after catalogue matching.

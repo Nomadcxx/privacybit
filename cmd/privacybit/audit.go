@@ -255,12 +255,24 @@ func writeHuman(w io.Writer, snapshot report.Snapshot, severity string) error {
 		} else if source.Empty {
 			state = "ready, empty"
 		}
-		fmt.Fprintf(&out, "  %s (%s): %s; %d observations\n", source.Name, source.Type, state, source.Observed)
+		fmt.Fprintf(&out, "  %s (%s): %s; %d observations", source.Name, source.Type, state, source.Observed)
+		if source.Ready && !source.Empty && source.Facts != nil {
+			facts := "none"
+			if len(source.Facts) > 0 {
+				facts = strings.Join(source.Facts, ", ")
+			}
+			fmt.Fprintf(&out, "; facts: %s", facts)
+		}
+		fmt.Fprintln(&out)
 	}
 	if len(snapshot.Reduced) > 0 {
 		fmt.Fprintln(&out, "\nReduced checks:")
 		for _, reduced := range snapshot.Reduced {
-			fmt.Fprintf(&out, "  %s: %s\n", reduced.Fact, reduced.Effect)
+			fmt.Fprintf(&out, "  %s: %s", reduced.Fact, reduced.Effect)
+			if len(reduced.Sources) > 0 {
+				fmt.Fprintf(&out, " (%s)", strings.Join(reduced.Sources, ", "))
+			}
+			fmt.Fprintln(&out)
 		}
 	}
 	_, err := io.WriteString(w, out.String())
