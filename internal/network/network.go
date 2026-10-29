@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -36,14 +37,15 @@ type Defect struct {
 // Result is intentionally explicit about absent evidence. Nil booleans mean
 // that the check could not judge the condition.
 type Result struct {
-	State                 CheckState `json:"state"`
-	Client                string     `json:"client,omitempty"`
-	DefaultRouteViaTunnel *bool      `json:"default_route_via_tunnel,omitempty"`
-	DNSContained          *bool      `json:"dns_contained,omitempty"`
-	IPv6Contained         *bool      `json:"ipv6_contained,omitempty"`
-	KillSwitchNote        string     `json:"kill_switch_note,omitempty"`
-	Defects               []Defect   `json:"defects,omitempty"`
-	Coverage              []string   `json:"coverage,omitempty"`
+	State CheckState `json:"state"`
+	// Client lists verified client names in stable order when more than one is active.
+	Client                string   `json:"client,omitempty"`
+	DefaultRouteViaTunnel *bool    `json:"default_route_via_tunnel,omitempty"`
+	DNSContained          *bool    `json:"dns_contained,omitempty"`
+	IPv6Contained         *bool    `json:"ipv6_contained,omitempty"`
+	KillSwitchNote        string   `json:"kill_switch_note,omitempty"`
+	Defects               []Defect `json:"defects,omitempty"`
+	Coverage              []string `json:"coverage,omitempty"`
 }
 
 // Inspect reads routes and resolver configuration without making network
@@ -73,29 +75,30 @@ func inspect(ctx context.Context, runner detect.Runner, resolvConf string, proce
 	for _, name := range strings.Fields(wgOut) {
 		wgInterfaces[name] = true
 	}
-	tunnel, client := verifiedTunnel(links, wgInterfaces, processes)
-	if tunnel == "" {
+	tunnels := verifiedTunnels(links, wgInterfaces, processes)
+	if len(tunnels) == 0 {
 		result.Coverage = append(result.Coverage, "no tunnel could be verified from an interface and client or WireGuard state")
 		result.KillSwitchNote = "Tunnel and kill-switch state could not be verified."
 		return result
 	}
 	result.State = Connected
-	result.Client = client
+	result.Client = tunnelClients(tunnels)
 
 	route4, route4Err := routeInterface(ctx, runner, "-4", "1.1.1.1")
 	if route4Err != nil {
 		result.Coverage = append(result.Coverage, "IPv4 default route could not be judged: "+route4Err.Error())
 	} else {
-		result.DefaultRouteViaTunnel = boolPointer(route4 == tunnel)
-		if route4 != tunnel {
+		_, viaTunnel := tunnels[route4]
+		result.DefaultRouteViaTunnel = boolPointer(viaTunnel)
+		if !viaTunnel {
 			result.Defects = append(result.Defects, Defect{
-				ID: "vpn.route-bypass", Title: "Default IPv4 route is outside the tunnel",
-				Detail: fmt.Sprintf("The route to 1.1.1.1 uses %s, while the verified tunnel is %s.", route4, tunnel),
+				ID: "vpn.route-bypass", Title: "Default IPv4 route does not use a verified tunnel",
+				Detail: fmt.Sprintf("The route to 1.1.1.1 uses %s, outside the verified tunnels.", route4),
 			})
 		}
 	}
 
-	result.DNSContained = checkDNS(ctx, runner, resolvConf, tunnel, &result)
+	result.DNSContained = checkDNS(ctx, runner, resolvConf, tunnels, &result)
 	route6, route6Err := routeInterface(ctx, runner, "-6", "2606:4700:4700::1111")
 	if route6Err != nil {
 		if routeUnreachable(route6Err) {
@@ -105,11 +108,12 @@ func inspect(ctx context.Context, runner detect.Runner, resolvConf string, proce
 			result.Coverage = append(result.Coverage, "IPv6 default route could not be judged: "+route6Err.Error())
 		}
 	} else {
-		result.IPv6Contained = boolPointer(route6 == tunnel)
-		if route6 != tunnel {
+		_, viaTunnel := tunnels[route6]
+		result.IPv6Contained = boolPointer(viaTunnel)
+		if !viaTunnel {
 			result.Defects = append(result.Defects, Defect{
-				ID: "vpn.ipv6-bypass", Title: "IPv6 route is outside the tunnel",
-				Detail: fmt.Sprintf("The route to 2606:4700:4700::1111 uses %s, while the verified tunnel is %s.", route6, tunnel),
+				ID: "vpn.ipv6-bypass", Title: "IPv6 route does not use a verified tunnel",
+				Detail: fmt.Sprintf("The route to 2606:4700:4700::1111 uses %s, outside the verified tunnels.", route6),
 			})
 		}
 	}
@@ -120,7 +124,8 @@ func inspect(ctx context.Context, runner detect.Runner, resolvConf string, proce
 		outside := false
 		for _, line := range append(strings.Split(defaults, "\n"), strings.Split(defaults6, "\n")...) {
 			iface := routeDev(line)
-			if iface != "" && iface != tunnel {
+			_, viaTunnel := tunnels[iface]
+			if iface != "" && !viaTunnel {
 				outside = true
 			}
 		}
@@ -182,7 +187,7 @@ func parseLinks(output string) map[string]bool {
 	return links
 }
 
-func verifiedTunnel(links, wgInterfaces map[string]bool, processes []string) (string, string) {
+func verifiedTunnels(links, wgInterfaces map[string]bool, processes []string) map[string]string {
 	clients := make(map[string]string)
 	for _, process := range processes {
 		name := strings.ToLower(filepath.Base(strings.TrimSpace(process)))
@@ -206,9 +211,11 @@ func verifiedTunnel(links, wgInterfaces map[string]bool, processes []string) (st
 		}
 	}
 
+	tunnels := make(map[string]string)
 	for iface := range links {
 		if wgInterfaces[iface] {
-			return iface, "WireGuard"
+			tunnels[iface] = "WireGuard"
+			continue
 		}
 		prefixes := []struct{ prefix, key string }{
 			{"mullvad", "mullvad"}, {"proton", "proton"}, {"ivpn", "ivpn"},
@@ -217,14 +224,28 @@ func verifiedTunnel(links, wgInterfaces map[string]bool, processes []string) (st
 		}
 		for _, item := range prefixes {
 			if strings.HasPrefix(strings.ToLower(iface), item.prefix) && clients[item.key] != "" {
-				return iface, clients[item.key]
+				tunnels[iface] = clients[item.key]
+				break
 			}
 		}
-		if (strings.HasPrefix(iface, "tun") || strings.HasPrefix(iface, "tap")) && clients["openvpn"] != "" {
-			return iface, clients["openvpn"]
+		if tunnels[iface] == "" && (strings.HasPrefix(iface, "tun") || strings.HasPrefix(iface, "tap")) && clients["openvpn"] != "" {
+			tunnels[iface] = clients["openvpn"]
 		}
 	}
-	return "", ""
+	return tunnels
+}
+
+func tunnelClients(tunnels map[string]string) string {
+	seen := make(map[string]bool)
+	var clients []string
+	for _, client := range tunnels {
+		if !seen[client] {
+			seen[client] = true
+			clients = append(clients, client)
+		}
+	}
+	sort.Strings(clients)
+	return strings.Join(clients, ", ")
 }
 
 type resolver struct {
@@ -232,7 +253,7 @@ type resolver struct {
 	address net.IP
 }
 
-func checkDNS(ctx context.Context, runner detect.Runner, resolvConf, tunnel string, result *Result) *bool {
+func checkDNS(ctx context.Context, runner detect.Runner, resolvConf string, tunnels map[string]string, result *Result) *bool {
 	serversOut, serversErr := runner.Run(ctx, "resolvectl", "dns")
 	defaultsOut, defaultsErr := runner.Run(ctx, "resolvectl", "default-route")
 	var resolvers []resolver
@@ -279,11 +300,11 @@ func checkDNS(ctx context.Context, runner detect.Runner, resolvConf, tunnel stri
 			}
 			resolver.iface = iface
 		}
-		if resolver.iface != tunnel {
+		if _, viaTunnel := tunnels[resolver.iface]; !viaTunnel {
 			contained = false
 			result.Defects = append(result.Defects, Defect{
-				ID: "vpn.dns-leak", Title: "DNS resolver is outside the tunnel",
-				Detail: fmt.Sprintf("An active DNS resolver uses interface %s, outside verified tunnel %s.", resolver.iface, tunnel),
+				ID: "vpn.dns-leak", Title: "DNS resolver does not use a verified tunnel",
+				Detail: fmt.Sprintf("An active DNS resolver uses interface %s, outside the verified tunnels.", resolver.iface),
 			})
 			break
 		}

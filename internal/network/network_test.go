@@ -20,6 +20,39 @@ func TestTunnelInterfaceAloneDoesNotClaimConnected(t *testing.T) {
 	}
 }
 
+func TestMultipleVerifiedTunnelsAreCheckedAsASet(t *testing.T) {
+	runner := detect.MapRunner{Output: map[string]string{
+		"ip -o link":                           "1: lo: <LOOPBACK>\n2: tailscale0: <POINTOPOINT,UP>\n3: wg0: <POINTOPOINT,UP>\n",
+		"wg show interfaces":                   "wg0\n",
+		"ip -4 route get 1.1.1.1":              "1.1.1.1 dev tailscale0\n",
+		"resolvectl dns":                       "Global: 100.100.100.100\n",
+		"resolvectl default-route":             "Global: yes\n",
+		"ip route get 100.100.100.100":         "100.100.100.100 dev tailscale0\n",
+		"ip -6 route get 2606:4700:4700::1111": "2606:4700:4700::1111 dev tailscale0\n",
+		"ip route show default":                "default dev tailscale0\ndefault dev wg0\n",
+		"ip -6 route show default":             "",
+	}}
+	got := inspect(context.Background(), runner, filepath.Join(t.TempDir(), "missing"), []string{"tailscaled"})
+	if got.State != Connected || got.Client != "Tailscale, WireGuard" {
+		t.Fatalf("tunnel result = %+v, want both clients in stable order", got)
+	}
+	for name, value := range map[string]*bool{
+		"IPv4": got.DefaultRouteViaTunnel,
+		"DNS":  got.DNSContained,
+		"IPv6": got.IPv6Contained,
+	} {
+		if value == nil || !*value {
+			t.Errorf("%s containment = %v, want true", name, value)
+		}
+	}
+	if len(got.Defects) != 0 {
+		t.Errorf("defects = %+v, want no route leaks", got.Defects)
+	}
+	if got.KillSwitchNote != "No outside default route was observed; firewall rules and all traffic paths were not verified." {
+		t.Errorf("kill-switch note = %q, want only physical routes marked outside", got.KillSwitchNote)
+	}
+}
+
 func TestRouteDNSAndIPv6EscapesBecomeDefects(t *testing.T) {
 	runner := detect.MapRunner{Output: map[string]string{
 		"ip -o link":                           "1: lo: <LOOPBACK>\n2: tailscale0: <POINTOPOINT,UP>\n3: enp7s0: <BROADCAST,UP>\n",

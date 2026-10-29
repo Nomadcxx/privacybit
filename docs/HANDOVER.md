@@ -638,6 +638,7 @@ Specific, falsifiable claims. Each is checkable.
 | 18 | **Origin status reports a recognized local name without claiming source authentication.** | `TestWriteHumanShowsOriginsAsContext` in `cmd/privacybit/audit_test.go`, `TestAppViewShowsOriginContextWithoutChangingGrade` in `internal/tui/model_test.go`, and `TestPrivacyPanelShowsOriginAsContext` in sysc-plugins `plugins/privacy/view_test.go`. |
 | 19 | **Source capability gaps reach the report without changing grades.** | `TestCapabilitiesFactsUseStableNamesAndOrder`, `TestRunReportsSourceFactsAndUnsupportedCoverage`, `TestWriteHumanShowsSupportedAndReducedFacts`, `TestCoverageViewShowsSupportedAndReducedFacts`, `TestParseAuditOutputProjectsBoundedReducedSources`, and `TestPrivacyPanelShowsSourcesBehindReducedCoverage`. |
 | 20 | **PATH exclusions match directory boundaries.** | `TestUserPathDirsUsePathComponentBoundaries` in `internal/detect/detect_test.go` keeps adjacent paths visible while excluding system roots and their descendants, including the Nix store. |
+| 21 | **VPN checks treat every verified tunnel interface consistently.** | `TestMultipleVerifiedTunnelsAreCheckedAsASet` in `internal/network/network_test.go` covers stable client reporting and route, DNS, IPv6, and default-route checks with Tailscale and WireGuard. |
 
 §11 records the latest gate results. Earlier phase checkpoints are historical;
 use the current results when judging the tree.
@@ -865,6 +866,11 @@ Recorded because a future reader will trust the docs.
     adjacent directories such as `/usr/bin-extra` and included exact roots such
     as `/nix/store` and `/usr/lib`. `userPathDirs` now compares cleaned path
     components; its test covers roots, descendants, and adjacent names.
+
+20. **VPN checks selected the first tunnel from a map.** With multiple active
+    tunnel interfaces, the route checks could report one tunnel as an escape.
+    The audit now checks membership in the full verified interface set and
+    sorts client names before reporting them.
 
 ### 10.4 Environment traps
 
