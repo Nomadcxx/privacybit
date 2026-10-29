@@ -771,6 +771,11 @@ Recorded because a future reader will trust the docs.
     now reflects both sources' declared capabilities. D6 still marks Flatpak
     vendor and explicit-install state unsupported.
 
+12. **D6's coverage example still used the pre-schema-1 shape.** `Snapshot`
+    emits top-level `coverage` and `reduced` arrays with the active sources,
+    not a nested distribution object or deferred Nix/Snap rows. The example
+    now matches those report types.
+
 ### 10.3 Implementation defects and corrections
 
 1. **`Load` originally panicked on a malformed shipped file.** With ten
