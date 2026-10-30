@@ -92,7 +92,7 @@ matters so much.
 
 | Absolute path | What it is | State |
 |---|---|---|
-| `/home/nomadx/privacy-bit` | **This project.** Canonical checkout on branch `main`. | At PR #126 merge `4e34e78`, the latest code commit was PR #125 at `f93f049`. PR #126 records the 2026-10-30 testbench verification. The primary checkout still contains unrelated untracked `.commandcode/` and `docs/audits/` data; preserve them and use clean worktrees from `origin/main`. Public privacybit `v0.1.2` at `7c63797` remains current. PR #42's AUR metadata update merged; issues #41 and #280 gate the coordinated `0.1.3` publication on owner approval. Issues #104, #111, #114, and #124 are closed; #53 remains open for the metadata grading decision. |
+| `/home/nomadx/privacy-bit` | **This project.** Canonical checkout on branch `main`. | Current main includes privacybit PR #129 at `593df4e`; PR #126 records the 2026-10-30 testbench verification. The primary checkout still contains unrelated untracked `.commandcode/` and `docs/audits/` data; preserve them and use clean worktrees from `origin/main`. Public privacybit `v0.1.2` at `7c63797` remains current. PR #42's AUR metadata update merged; issues #41 and #280 gate the coordinated `0.1.3` publication on owner approval. Issues #104, #111, #114, #124, and #128 are closed; #53 remains open for the metadata grading decision. |
 | `/home/nomadx/worktrees/privacybit-origin-context` | Historical privacybit issue #22 worktree. | Branch `feat/origin-context` at `54c9fb4`; privacybit PR #23 merged the context-only origin implementation. |
 | `/home/nomadx/sysc-plugins/.worktrees/privacybit-origin-context` | Historical sysc-plugins issue #22 worktree. | Branch `feat/privacybit-origin-context`; sysc-plugins PR #264 merged the panel integration and refreshed screenshot and thumbnail. |
 | `/home/nomadx/privacy-bit/docs/plans/` | Seven original design documents plus follow-on designs and implementation plans. | D1–D7 record the approved design. Phase 3, 4, 8, and 9 plans remain as audit history. |
@@ -709,7 +709,7 @@ two do not collide.)
 | Live telemetry endpoint attribution | Deferred by D7 §5.2: no reviewed endpoint dataset or reliable PID attribution. Snapshots report this signal as unknown. |
 | Effective Flatpak sandbox grade | Implemented in privacybit PR #16 and shown by sysc-plugins PR #259. It grades each installed copy from resolved permissions: red for host filesystem, all-device, or shared-network grants; amber for bounded broad access; green only for complete classified evidence without those grants. Missing or unclassified evidence is unknown. Privacybit `v0.1.2` includes the grade; issue #20 is closed. Plugin release `privacy-v0.1.2` includes the panel and manifest/handshake fix; catalog PR #275 merged and issue #268 is closed. |
 | Package origin context | The owner resolved privacybit issue #22: show the observed source name and whether it matches a recognized official label, and never use origin to change a grade. The match uses the name only; privacybit does not authenticate the configured repository or remote. Privacybit PR #23 adds bounded report fields and CLI/TUI output; sysc-plugins PR #264 adds panel context. PRs #38 and #277 clarify that a recognized name does not authenticate the configured source; issues #37 and #276 are closed. Unmatched apps remain unrated and retain visible origin context. Published `v0.1.2` assets still predate the wording correction. |
-| TUI keyboard guidance | Privacybit issue #128 tracks the D3 §4–6 gap. The footer now lists actions for the active route and state; Help lists keyboard actions and the shared grade legend and remains available before the first scan. |
+| TUI keyboard guidance | Privacybit PR #129 closes issue #128 and fills the D3 §4–6 gap. The footer lists actions for the active route and state; Help lists keyboard actions and the shared grade legend and remains available before the first scan. |
 | Screen-reader access | The privacy plugin supplies names and roles for its bar and Scan controls, but sysc-shell does not publish them through an accessibility tree. Sysc-shell issue #290 tracks the owner decision on screen-reader support and the AT-SPI design. |
 | Metadata contradiction grading | `gradeEntry` supports test-injected contradictions for version, licence, vendor, explicit-install, reverse-dependency, and signature signals; it excludes origin. Built-in sources do not create `detect.Contradicted`, and `catalog.Entry` stores no expected metadata values. Issue #53 records the decision on curated expectations, licence-only comparison, or deferral and corrected docs. |
 | dnf, zypper, apk, and xbps backends | Deferred under D6; universal sources report what they can see, with coverage caveats. |
@@ -953,9 +953,12 @@ Recorded because a future reader will trust the docs.
   phantom applications.
 - **Test fixtures need real tabs.** `"${Package}\\t"` in Go source is a literal
   backslash-t and will not match the tab in the actual command line.
-- **Go 1.26 uses `GOTMPDIR` for `t.TempDir()`.** Keep build files in the
-  required cache path, then run test binaries with a short `GOTMPDIR` through
-  `go test -exec` so Unix socket fixtures stay below Linux's path limit.
+- **Local Go tests need both temp variables on this host.** Go 1.26 uses
+  `GOTMPDIR` for `t.TempDir()`. Tests that call `os.MkdirTemp` follow `TMPDIR`
+  and otherwise use `/tmp`, which is quota-limited here. Keep the Go command's
+  temporary files in its cache path, then set both variables for test
+  processes with `go test -exec` so installer builds avoid `/tmp` and Unix
+  socket fixtures stay below Linux's path limit.
 - **Go 1.26.4 can fail VCS stamping in linked worktrees.** The nested build in
   `TestBuildAndInstallCLIInstallsRunnableBinaryOffline` reports
   `error obtaining VCS status: exit status 128` when the test runs from a
@@ -987,7 +990,9 @@ result; CI and `govulncheck` passed, and it merged at `f8f093e`, closing issue
 module-cache lookup offline. CI and `govulncheck` passed; the change merged at
 `579b0fc`. PR #120 rejects non-finite and out-of-range installed sizes before
 conversion; helper tests, `go vet`, `checks`, and `govulncheck` passed. It
-merged at `2d356e8`, closing issue #119.
+merged at `2d356e8`, closing issue #119. PR #129 makes TUI key hints contextual,
+completes the D3 Help content, and closes issue #128; the full test suite,
+`go vet`, `go build`, CI, and `govulncheck` passed. It merged at `593df4e`.
 
 The live review's evidence is also recorded in sysc-shell issue `sysc-1444`.
 The sysc-plugins and sysc-shell primary checkouts contain independent changes,
@@ -1003,12 +1008,15 @@ suite on a GitHub-hosted runner. Race checks were run sequentially for
 
 Privacybit Go commands use `GOTMPDIR=/home/nomadx/.cache/privacybit-gotmp`; the
 sysc-shell worktree uses `GOTMPDIR=/home/nomadx/.cache/sysc-shell-gotmp`. The
-repositories use `GOMAXPROCS=4` and `-p 2` for repository-wide work. Go 1.26
-also uses `GOTMPDIR` for `t.TempDir()`. Long test paths exceed Linux's Unix
-socket limit, so this machine runs test processes with
-`-exec='env GOTMPDIR=/var/tmp/pbtt'` while the Go command keeps build files in
-the cache directory. `/tmp` hit its quota during a nested installer build; use
-the root-backed `/var/tmp` path for the test process.
+repositories use `GOMAXPROCS=4` and `-p 2` for repository-wide work. Set
+`TMPDIR=/var/tmp/pbtt` for tests that use `os.MkdirTemp`, and pass both temp
+variables to test processes to keep Unix socket paths short and nested
+installer builds out of quota-limited `/tmp`:
+
+```console
+GOTMPDIR=/home/nomadx/.cache/privacybit-gotmp TMPDIR=/var/tmp/pbtt GOMAXPROCS=4 \
+  go test -p 2 -exec='env GOTMPDIR=/var/tmp/pbtt TMPDIR=/var/tmp/pbtt' ./...
+```
 
 ---
 
