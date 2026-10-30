@@ -337,10 +337,11 @@ TUI started, so breadcrumbs and sandbox and unknown screens remain unverified
 on the testbench. The local TUI package tests passed. The testbench's
 post-disconnect service and plugin state are unknown; issue #114 remains open.
 
-GitHub reports privacybit main at `cffd3df` after PR #115, with latest code
-commit `cb87533` from PR #112; sysc-plugins main at `e01569e`; and sysc-shell
-main at `0f24b029` after PR #572 cleared a city-defined Weather place. PR #296
-changed manifest validation and publishing docs, not plugin runtime code. See
+PR #116 merged the testbench status at `e9173de`. The testbench build came from
+main `cffd3df` before that docs merge; the latest code commit there was
+`cb87533` from PR #112. Sysc-plugins main was `e01569e`, and sysc-shell main was
+`0f24b029` after PR #572 cleared a city-defined Weather place. PR #296 changed
+manifest validation and publishing docs, not plugin runtime code. See
 `HANDOVER.md` for build details and verification evidence.
 
 ---
