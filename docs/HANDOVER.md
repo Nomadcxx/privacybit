@@ -927,6 +927,12 @@ Recorded because a future reader will trust the docs.
     CI and `govulncheck` passed; PR #100 merged at `f8f093e` and closed issue
     #99.
 
+25. **Pacman size parsing could produce invalid reclaim estimates.**
+    `strconv.ParseFloat` accepts `NaN`, and `float64(math.MaxInt64)` rounds up
+    to the exclusive `2^63` limit. PR #120 rejects non-finite input and scaled
+    byte values at or above that limit. Tests cover both cases; the merge
+    closed issue #119.
+
 ### 10.4 Environment traps
 
 - **`: ` inside an unquoted multi-line YAML plain scalar is a parse error** —
@@ -975,7 +981,9 @@ snapshots; CI and `govulncheck` passed, and it merged at `eb45f2a`, closing issu
 result; CI and `govulncheck` passed, and it merged at `f8f093e`, closing issue
 #99. PR #87 forces checkout builds to the host target and keeps the
 module-cache lookup offline. CI and `govulncheck` passed; the change merged at
-`579b0fc`.
+`579b0fc`. PR #120 rejects non-finite and out-of-range installed sizes before
+conversion; helper tests, `go vet`, `checks`, and `govulncheck` passed. It
+merged at `2d356e8`, closing issue #119.
 
 The live review's evidence is also recorded in sysc-shell issue `sysc-1444`.
 The sysc-plugins and sysc-shell primary checkouts contain independent changes,
