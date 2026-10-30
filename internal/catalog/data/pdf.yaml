@@ -7,6 +7,7 @@ category:
     open external links without asking.
   expectations:
     - id: pdf.reader
+      title: No safer PDF viewer installed
       severity: low
       any_of:
         - zathura

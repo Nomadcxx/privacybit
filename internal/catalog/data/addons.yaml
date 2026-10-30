@@ -7,6 +7,7 @@ category:
     day-to-day privacy than any single browser choice.
   expectations:
     - id: addon.blocker
+      title: No content blocker installed for trackers and ads
       any_of: [ublock-origin, adblock-plus, adguard, clearurls, trackerblock]
       severity: medium
       why: >-
@@ -14,6 +15,7 @@ category:
         actually collected, which is inside the page rather than on the
         network.
     - id: addon.tracker-removal
+      title: No tracker-removal add-on installed
       any_of: [privacy-badger, clearurls, libredirect, single-file]
       severity: low
       why: >-

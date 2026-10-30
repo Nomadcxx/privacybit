@@ -7,6 +7,7 @@ category:
     and whether it phones home on open.
   expectations:
     - id: office.suite
+      title: No privacy-preserving office suite available
       severity: low
       any_of:
         - libreoffice-fresh

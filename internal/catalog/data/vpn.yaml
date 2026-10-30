@@ -8,12 +8,14 @@ category:
     not whether the words "no logs" appear on a website.
   expectations:
     - id: vpn.installed
+      title: No VPN client installed
       any_of: [mullvad-vpn, ivpn, proton-vpn, windscribe, amnezia-vpn]
       severity: low
       why: >-
         No VPN client is installed, so any public network you join exposes the
         connection to the network operator.
     - id: vpn.open-source-client
+      title: No open-source VPN client installed
       any_of: [mullvad-vpn, ivpn, proton-vpn, windscribe, amnezia-vpn]
       severity: medium
       why: >-

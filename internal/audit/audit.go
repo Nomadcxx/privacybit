@@ -154,7 +154,7 @@ func BuildFindings(set *catalog.Set, result Result, family string) []Finding {
 					Severity:     outcome.Severity,
 					Grade:        outcome.Grade,
 					Category:     category.ID,
-					Title:        category.Name + " expectation is unmet",
+					Title:        expectationTitle(category, expectation),
 					Detail:       outcome.Why,
 					Alternatives: append([]string(nil), expectation.AnyOf...),
 				}
@@ -169,6 +169,18 @@ func BuildFindings(set *catalog.Set, result Result, family string) []Finding {
 	findings = append(findings, flatpakScopeFindings(set, result.Inventory)...)
 	sort.Slice(findings, func(i, j int) bool { return findings[i].ID < findings[j].ID })
 	return findings
+}
+
+func expectationTitle(category *catalog.Category, expectation catalog.Expectation) string {
+	if title := strings.TrimSpace(expectation.Title); title != "" {
+		return title
+	}
+	suffix := strings.TrimPrefix(expectation.ID, category.ID+".")
+	suffix = strings.NewReplacer("_", " ", "-", " ").Replace(suffix)
+	if suffix == "" {
+		return category.Name + " expectation is unmet"
+	}
+	return category.Name + ": " + suffix + " expectation is unmet"
 }
 
 func installedFinding(set *catalog.Set, entry *catalog.Entry, group string, grade catalog.Grade, items []InstalledEntry, family string) Finding {
@@ -192,7 +204,7 @@ func installedFinding(set *catalog.Set, entry *catalog.Entry, group string, grad
 		Severity:     severityForGrade(grade),
 		Grade:        grade,
 		Category:     entry.Category,
-		Title:        entry.Name + " is rated " + string(grade),
+		Title:        entry.Name + " is rated " + grade.Word(),
 		Detail:       strings.Join(detail, "\n\n"),
 		Alternatives: append([]string(nil), entry.Alternatives...),
 	}

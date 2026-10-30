@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"unicode"
 )
 
 // Problem is one catalogue defect, located precisely enough that an author can
@@ -69,6 +70,8 @@ func (s *Set) ids() map[string]bool {
 //     finding as met.
 //   - Expectation severity must be high, medium or low so a typo cannot change
 //     the grade the evaluator assigns to an unmet expectation.
+//   - Expectation titles are plain text because they are rendered directly in
+//     the terminal UI.
 //   - No detect key claimed by two entries. Resolution would pick one silently,
 //     so a typo becomes a confidently wrong grade.
 //   - Family values are consistent, so display grouping cannot imply a
@@ -110,6 +113,9 @@ func (s *Set) validate() error {
 				continue
 			}
 			ep = cp + "/" + ex.ID
+			if strings.IndexFunc(ex.Title, unicode.IsControl) >= 0 {
+				ps = append(ps, Problem{ep, "expectation title contains a control character"})
+			}
 			if len(ex.AnyOf) == 0 {
 				ps = append(ps, Problem{ep, "any_of is empty, so the expectation can never be unmet"})
 			}

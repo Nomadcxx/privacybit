@@ -29,6 +29,11 @@ func TestShippedCatalogueLoads(t *testing.T) {
 		if len(c.Entries) == 0 {
 			t.Errorf("category %q has no entries", c.ID)
 		}
+		for _, expectation := range c.Expectations {
+			if strings.TrimSpace(expectation.Title) == "" {
+				t.Errorf("expectation %q has no user-facing title", expectation.ID)
+			}
+		}
 		for _, e := range c.Entries {
 			if e.Category != c.ID {
 				t.Errorf("entry %q: Category = %q, want %q", e.ID, e.Category, c.ID)
@@ -176,6 +181,17 @@ func TestUserOverrideRejectsUnknownExpectationSeverity(t *testing.T) {
 	}
 	if _, err := Load(LoadOptions{UserFragments: true, Dir: dir}); err == nil || !strings.Contains(err.Error(), "invalid severity") {
 		t.Fatalf("Load error = %v, want invalid expectation severity", err)
+	}
+}
+
+func TestUserExpectationTitleRejectsTerminalControlCharacters(t *testing.T) {
+	dir := t.TempDir()
+	raw := "category:\n  id: custom\n  name: Custom\n  expectations:\n    - id: custom.check\n      title: \"\\u001b[31mInjected\"\n      any_of: [example]\n      severity: low\n      why: test\n"
+	if err := os.WriteFile(filepath.Join(dir, "custom.yaml"), []byte(raw), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(LoadOptions{UserFragments: true, Dir: dir}); err == nil || !strings.Contains(err.Error(), "title contains a control character") {
+		t.Fatalf("Load error = %v, want terminal control character rejection", err)
 	}
 }
 
