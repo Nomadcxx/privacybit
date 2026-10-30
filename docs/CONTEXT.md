@@ -326,23 +326,18 @@ plugin-owned audit panel. The Control Centre shows a compact audit summary and
 opens that panel. Privacybit `v0.1.2`, plugin release `privacy-v0.1.2`, and AUR
 package `0.1.2-1` are published. Catalog PR #275 merged at `2f67de4`, and a
 disposable sysc-shell store install verified plugin `0.1.2`. On 2026-10-30, a
-clean privacybit build from main `cffd3dfd83afa8c34088e08c04a8412b1950e135`
-replaced the testbench binary. It reports catalogue revision
-`cat-246d56808b91`, `vcs.modified=false`, and SHA-256
-`4968c5ce75927a0b547bd0966f2cb2eac7d3d99d694ae84d2b937c8787f42fa9`; the prior
-binary is backed up as `~/.local/bin/privacybit.pre-cffd3df`. Before
-replacement, the shell service and privacy plugin process were active, and the
-bar placement was configured. The SSH connection failed before the interactive
-TUI started, so breadcrumbs and sandbox and unknown screens remain unverified
-on the testbench. The local TUI package tests passed. The testbench's
-post-disconnect service and plugin state are unknown; issue #114 remains open.
-
-PR #116 merged the testbench status at `e9173de`. The testbench build came from
-main `cffd3df` before that docs merge; the latest code commit there was
-`cb87533` from PR #112. Sysc-plugins main was `e01569e`, and sysc-shell main was
-`0f24b029` after PR #572 cleared a city-defined Weather place. PR #296 changed
-manifest validation and publishing docs, not plugin runtime code. See
-`HANDOVER.md` for build details and verification evidence.
+clean build of privacybit main `f93f049` replaced the testbench binary. It
+reports catalogue revision `cat-246d56808b91` and `vcs.modified=false`.
+Sysc-shell main `98eced4c` was deployed through `scripts/deploy --host laptop`
+and is active; privacy plugin main `89ba911` is running with clean VCS
+metadata. The configured bar item displayed the shield and `Risky`, and it
+opened the live privacy panel. The installed TUI rendered a private synthetic
+report with `Browser › Google Chrome`, an unrated partial-coverage sandbox,
+and an unmatched unknown app. That fixture did not read the laptop's installed
+app inventory. PR #125 aligned the TUI grade labels and merged at `f93f049`;
+sysc-plugins main is `89ba911` after PR #301, and sysc-shell main is `98eced4c`
+after PR #580. See `HANDOVER.md` for build hashes, captures, and verification
+details. Issue #114 is closed.
 
 ---
 
@@ -379,11 +374,12 @@ or reads the saved report. Its capture activity card remains unchanged.
 
 ## 7. Remaining non-phase work
 
-- **Laptop testbench:** See §4 for the clean build from `cffd3df`. The binary
-  is installed with clean VCS metadata and a rollback copy. The SSH connection
-  failed before the interactive TUI started; issue #114 tracks the remaining
-  breadcrumb, sandbox, and unknown-screen check. Current service and plugin
-  state are unconfirmed.
+- **Laptop testbench:** On 2026-10-30, the clean privacybit build, active
+  sysc-shell service, privacy plugin process, bar item, and privacy panel were
+  verified over SSH. The TUI displayed breadcrumb navigation, sandbox coverage,
+  and an unknown app from a synthetic report. That fixture did not include the
+  laptop's installed-app inventory. Issue #114 is closed; see §4 and
+  `HANDOVER.md` for revisions and evidence.
 - **Publication** is complete through privacybit `v0.1.2`, plugin release
   `privacy-v0.1.2`, catalog entry `0.1.2`, and AUR package `0.1.2-1`. A
   disposable sysc-shell store install verified the amd64 release. Coordinated
