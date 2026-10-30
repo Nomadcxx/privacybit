@@ -2,7 +2,9 @@ package network
 
 import (
 	"context"
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -170,6 +172,85 @@ func TestUnknownResolverModeLeavesDNSUnknown(t *testing.T) {
 			t.Fatalf("status %q has no coverage note for ambiguous resolver ownership", status)
 		}
 	}
+}
+
+func TestDNSUsesResolvConfWhenResolvedSocketIsMissing(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "resolv.conf")
+	if err := os.WriteFile(path, []byte("nameserver 100.100.100.100\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	runner := detect.MapRunner{
+		Output: map[string]string{
+			"resolvectl":                   "",
+			"ip route get 100.100.100.100": "100.100.100.100 dev tailscale0\n",
+		},
+		Err: map[string]error{
+			"resolvectl status": stderrTextError{resolvedSocketMissingDiagnostic},
+		},
+	}
+
+	var result Result
+	got := checkDNS(context.Background(), runner, path, map[string]string{"tailscale0": "Tailscale"}, &result)
+	if got == nil || !*got {
+		t.Fatalf("DNS containment = %v, want configured resolver route inside the tunnel", got)
+	}
+	if len(result.Defects) != 0 {
+		t.Fatalf("defects = %+v, want none", result.Defects)
+	}
+}
+
+func TestDNSStatusFailureKeepsDNSUnknownWhenResolvedServiceMayBeActive(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "resolv.conf")
+	if err := os.WriteFile(path, []byte("nameserver 100.100.100.100\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	runner := detect.MapRunner{
+		Output: map[string]string{
+			"resolvectl":                   "",
+			"ip route get 100.100.100.100": "100.100.100.100 dev tailscale0\n",
+		},
+		Err: map[string]error{"resolvectl status": errors.New("status permission denied")},
+	}
+	var result Result
+	got := checkDNS(context.Background(), runner, path, map[string]string{"tailscale0": "Tailscale"}, &result)
+	if got != nil {
+		t.Fatalf("DNS containment = %v, want unknown for a generic status failure", got)
+	}
+	if len(result.Coverage) == 0 {
+		t.Fatal("missing resolver status failure coverage note")
+	}
+}
+
+func TestDNSStatusFailureWithExtraSocketTextRemainsUnknown(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "resolv.conf")
+	if err := os.WriteFile(path, []byte("nameserver 100.100.100.100\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	runner := detect.MapRunner{
+		Output: map[string]string{
+			"resolvectl":                   "",
+			"ip route get 100.100.100.100": "100.100.100.100 dev tailscale0\n",
+		},
+		Err: map[string]error{
+			"resolvectl status": stderrTextError{resolvedSocketMissingDiagnostic + "\nAdditional diagnostic"},
+		},
+	}
+	var result Result
+	got := checkDNS(context.Background(), runner, path, map[string]string{"tailscale0": "Tailscale"}, &result)
+	if got != nil {
+		t.Fatalf("DNS containment = %v, want unknown for non-exact socket error text", got)
+	}
+	if len(result.Coverage) == 0 {
+		t.Fatal("missing resolver status failure coverage note")
+	}
+}
+
+type stderrTextError struct{ stderr string }
+
+func (e stderrTextError) Error() string { return "status command failed" }
+
+func (e stderrTextError) Unwrap() error {
+	return &exec.ExitError{Stderr: []byte(e.stderr)}
 }
 
 func TestNoNetworkIsUnknown(t *testing.T) {
