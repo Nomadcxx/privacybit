@@ -11,6 +11,8 @@ import (
 	"github.com/Nomadcxx/privacybit/internal/network"
 	"github.com/Nomadcxx/privacybit/internal/report"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 )
 
 func testSnapshot() report.Snapshot {
@@ -121,6 +123,53 @@ func TestHeaderKeepsUsefulRootTitles(t *testing.T) {
 		if !strings.Contains(header, "privacybit  "+screen.want) {
 			t.Errorf("root header = %q, want title %q", header, screen.want)
 		}
+	}
+}
+
+func TestGradeLabelsAlignAndOverallUsesGradeColor(t *testing.T) {
+	profile := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.ANSI)
+	t.Cleanup(func() { lipgloss.SetColorProfile(profile) })
+
+	snapshot := testSnapshot()
+	snapshot.Overall.Grade = catalog.GradeRed
+	snapshot.Categories = []report.Category{
+		{ID: "good", Name: "Good row", Grade: catalog.GradeGreen},
+		{ID: "review", Name: "Review row", Grade: catalog.GradeAmber},
+		{ID: "risky", Name: "Risky row", Grade: catalog.GradeRed},
+		{ID: "unknown", Name: "Unknown row", Grade: catalog.GradeUnknown},
+	}
+	model := NewModel(context.Background(), nil)
+	model.snapshot = ptr(snapshot)
+	model.width, model.height = 120, 36
+	route := Route{Screen: ScreenOverview}
+	model.stack = []Route{route}
+
+	var positions []int
+	list := model.listView(Route{Screen: ScreenCategories})
+	for _, name := range []string{"Good row", "Review row", "Risky row", "Unknown row"} {
+		found := false
+		for _, line := range strings.Split(list, "\n") {
+			if index := strings.Index(line, name); index >= 0 {
+				positions = append(positions, lipgloss.Width(line[:index]))
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("list is missing %q:\n%s", name, list)
+		}
+	}
+	for _, position := range positions[1:] {
+		if position != positions[0] {
+			t.Errorf("grade labels start names at columns %v, want one aligned column", positions)
+			break
+		}
+	}
+
+	header := model.header(route)
+	if !strings.Contains(header, "\x1b[31m■ Risky") {
+		t.Errorf("overall grade has no shared red grade color: %q", header)
 	}
 }
 
