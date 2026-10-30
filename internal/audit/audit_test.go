@@ -234,6 +234,9 @@ func TestBuildFindingsIncludesNonGreenEntriesAndTierThreeAlternatives(t *testing
 	if finding.Grade != catalog.GradeRed || finding.Severity != "high" || finding.Category != "browser" {
 		t.Fatalf("Chrome finding = %+v, want red/high/browser", finding)
 	}
+	if finding.Title != "Google Chrome is rated Risky" {
+		t.Fatalf("Chrome title = %q, want shared grade word", finding.Title)
+	}
 	if !strings.Contains(finding.Detail, "Google's browser") || !strings.Contains(finding.Detail, "Manifest V3") || !strings.Contains(finding.Detail, "package metadata contradicts the catalogue") {
 		t.Fatalf("Chrome finding detail omits catalogue rationale: %q", finding.Detail)
 	}
@@ -278,6 +281,61 @@ func TestBuildFindingsUsesJudgedExpectationSeverityAndOmitsUnknowns(t *testing.T
 		if strings.HasPrefix(finding.ID, "expectation.") && finding.ID == "expectation.passwords.present" {
 			t.Fatalf("unjudged expectation created a finding: %+v", finding)
 		}
+	}
+}
+
+func TestBuildFindingsUseDistinctExpectationTitlesAndPreserveEvidence(t *testing.T) {
+	set := loadCatalogue(t)
+	result := Evaluate(set, nil, completeCoverage())
+	findings := BuildFindings(set, result, "arch")
+
+	tests := []struct {
+		id    string
+		title string
+	}{
+		{"expectation.browser.present", "No web browser detected"},
+		{"expectation.browser.adblocking", "No browser content blocker installed"},
+	}
+	for _, test := range tests {
+		finding := findingByID(t, findings, test.id)
+		if finding.Title != test.title {
+			t.Errorf("%s title = %q, want %q", test.id, finding.Title, test.title)
+		}
+
+		var outcome ExpectationResult
+		foundOutcome := false
+		for _, category := range result.Categories {
+			for _, candidate := range category.Expectations {
+				if "expectation."+candidate.ID == test.id {
+					outcome = candidate
+					foundOutcome = true
+				}
+			}
+		}
+		if !foundOutcome {
+			t.Fatalf("%s has no matching evaluated expectation", test.id)
+		}
+		if finding.ID != test.id || finding.Category != "browser" || finding.Severity != outcome.Severity || finding.Grade != outcome.Grade || finding.Detail != outcome.Why {
+			t.Errorf("%s changed stable evidence fields: finding=%+v outcome=%+v", test.id, finding, outcome)
+		}
+	}
+}
+
+func TestBuildFindingsHumanizeExpectationIDWhenTitleIsMissing(t *testing.T) {
+	set := loadCatalogue(t)
+	set.Category("browser").Expectations[0].ID = "browser.private_dns"
+	set.Category("browser").Expectations[0].Title = ""
+	result := Result{Categories: []CategoryResult{{
+		ID: "browser",
+		Expectations: []ExpectationResult{{
+			ID: "browser.private_dns", Severity: "high", Judged: true,
+			Grade: catalog.GradeRed, Why: "No browser was detected.",
+		}},
+	}}}
+
+	finding := findingByID(t, BuildFindings(set, result, "arch"), "expectation.browser.private_dns")
+	if finding.Title != "Browser: private dns expectation is unmet" {
+		t.Fatalf("fallback title = %q, want a humanized expectation id", finding.Title)
 	}
 }
 

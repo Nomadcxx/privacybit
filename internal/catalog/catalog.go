@@ -196,7 +196,9 @@ type Entry struct {
 // is a finding in its own right: absence is a finding, not a pass. A machine
 // with no password manager is red, not empty.
 type Expectation struct {
-	ID       string   `yaml:"id" json:"id"`
+	ID string `yaml:"id" json:"id"`
+	// Title is a concise user-facing title for the unmet expectation.
+	Title    string   `yaml:"title" json:"title,omitempty"`
 	AnyOf    []string `yaml:"any_of" json:"any_of"`
 	Severity string   `yaml:"severity" json:"severity"`
 	Why      string   `yaml:"why" json:"why"`

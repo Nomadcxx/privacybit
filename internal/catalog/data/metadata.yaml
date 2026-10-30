@@ -7,6 +7,7 @@ category:
     one is about what a file carries after it has been shared.
   expectations:
     - id: metadata.removal
+      title: No metadata-removal tool available
       severity: medium
       any_of:
         - mat2

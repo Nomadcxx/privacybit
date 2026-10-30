@@ -7,6 +7,7 @@ category:
     local.
   expectations:
     - id: media.player
+      title: No local media player installed
       severity: low
       any_of:
         - mpv

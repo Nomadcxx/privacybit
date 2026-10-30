@@ -17,10 +17,12 @@ category:
 
   expectations:
     - id: browser.present
+      title: No web browser detected
       any_of: [firefox, chromium, brave, brave-origin, librewolf, mullvad-browser, tor-browser, waterfox, falkon, konqueror, zen-browser, floorp, ungoogled-chromium, vivaldi, opera, epiphany, epiphany-browser, midori, qutebrowser, surf, otter-browser, netfox, ghost, nimblecollect, cbird, icecat, google-chrome, google-chrome-stable, microsoft-edge-stable, chromium]
       severity: high
       why: Nothing on this machine appears to be a web browser.
     - id: browser.adblocking
+      title: No browser content blocker installed
       any_of: [ublock-origin, adblock-plus, adguard, trackerblock]
       severity: medium
       why: >-

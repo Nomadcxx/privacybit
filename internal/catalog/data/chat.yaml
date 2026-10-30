@@ -8,12 +8,14 @@ category:
     account you do not control.
   expectations:
     - id: chat.encrypted
+      title: No encrypted chat client installed
       any_of: [signal, simplex-chat, deltachat, tox, hexchat, weechat, irssi, pidgin, gajim, dino, element, matrix-apps-for-desktop]
       severity: medium
       why: >-
         Nothing is carrying your conversations over an encrypted channel you
         control rather than one you merely log in to.
     - id: chat.nonproprietary
+      title: No non-proprietary chat client installed
       any_of: [hexchat, weechat, irssi, pidgin, gajim, dino, deltachat, tox, simplex-chat, element, matrix-apps-for-desktop]
       severity: low
       why: >-
