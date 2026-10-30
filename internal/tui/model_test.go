@@ -482,6 +482,119 @@ func TestLongDetailViewWrapsAndScrolls(t *testing.T) {
 	}
 }
 
+func TestFooterMatchesTheCurrentScreen(t *testing.T) {
+	tests := []struct {
+		name    string
+		stack   []Route
+		prepare func(*Model)
+		want    []string
+		avoid   []string
+	}{
+		{
+			name:  "root list",
+			stack: []Route{{Screen: ScreenOverview}},
+			want:  []string{"Enter open", "/ filter", "q quit", "r refresh"},
+			avoid: []string{"Esc back", "PgUp/PgDn page", "p purge plan"},
+		},
+		{
+			name:  "nested detail",
+			stack: []Route{{Screen: ScreenOverview}, {Screen: ScreenFinding, ID: "missing"}},
+			want:  []string{"↑/↓ scroll", "PgUp/PgDn page", "Esc back", "q back"},
+			avoid: []string{"Enter open", "/ filter", "p purge plan"},
+		},
+		{
+			name:  "red app",
+			stack: []Route{{Screen: ScreenOverview}, {Screen: ScreenApp, ID: "chrome"}},
+			prepare: func(model *Model) {
+				model.snapshot.Categories[0].Installed = []report.App{{ID: "chrome", Name: "Google Chrome", Grade: catalog.GradeRed}}
+			},
+			want: []string{"p purge plan"},
+		},
+		{
+			name:  "amber app",
+			stack: []Route{{Screen: ScreenOverview}, {Screen: ScreenApp, ID: "chrome"}},
+			prepare: func(model *Model) {
+				model.snapshot.Categories[0].Installed = []report.App{{ID: "chrome", Name: "Google Chrome", Grade: catalog.GradeAmber}}
+			},
+			avoid: []string{"p purge plan"},
+		},
+		{
+			name:  "help",
+			stack: []Route{{Screen: ScreenOverview}, {Screen: ScreenHelp}},
+			avoid: []string{"? help", "Enter open", "/ filter"},
+		},
+		{
+			name:  "filter input",
+			stack: []Route{{Screen: ScreenOverview}, {Screen: ScreenCategories, Filtering: true}},
+			want:  []string{"Type to filter", "Enter apply", "Esc clear"},
+			avoid: []string{"r refresh", "? help", "/ filter"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model := NewModelWithSnapshot(context.Background(), testSnapshot(), nil)
+			model.stack = tt.stack
+			model.width, model.height = 120, 36
+			if tt.prepare != nil {
+				tt.prepare(model)
+			}
+			view := model.View()
+			for _, want := range tt.want {
+				if !strings.Contains(view, want) {
+					t.Errorf("view is missing %q:\n%s", want, view)
+				}
+			}
+			for _, avoid := range tt.avoid {
+				if strings.Contains(view, avoid) {
+					t.Errorf("view contains inapplicable hint %q:\n%s", avoid, view)
+				}
+			}
+		})
+	}
+}
+
+func TestHelpListsKeyboardBindingsAndGradeLegend(t *testing.T) {
+	model := NewModel(context.Background(), nil)
+	model.stack = []Route{{Screen: ScreenOverview}, {Screen: ScreenHelp}}
+	model.width, model.height = 120, 40
+
+	view := model.View()
+	for _, want := range []string{
+		"● Good", "▲ Review", "■ Risky", "? Unrated",
+		"↑/↓, j/k", "Enter, →, l", "Esc, ←, h", "q",
+		"PgUp/PgDn", "Home/End", "Refresh the audit", "network checks", "coverage",
+		"Review a purge plan", "Open Help from another screen",
+	} {
+		if !strings.Contains(view, want) {
+			t.Errorf("help view is missing %q:\n%s", want, view)
+		}
+	}
+}
+
+func TestHelpKeyDoesNotStackAnotherHelpScreen(t *testing.T) {
+	model := NewModelWithSnapshot(context.Background(), testSnapshot(), nil)
+	model.stack = []Route{{Screen: ScreenOverview}, {Screen: ScreenHelp}}
+	model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
+	if len(model.stack) != 2 {
+		t.Fatalf("Help key added another route: %+v", model.stack)
+	}
+}
+
+func TestScreenShortcutsDoNotStackTheCurrentRoute(t *testing.T) {
+	for _, tt := range []struct {
+		screen Screen
+		key    rune
+	}{{screen: ScreenNetwork, key: 'n'}, {screen: ScreenCoverage, key: 'c'}} {
+		model := NewModelWithSnapshot(context.Background(), testSnapshot(), nil)
+		model.stack = []Route{{Screen: ScreenOverview}, {Screen: tt.screen}}
+		model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{tt.key}})
+		if len(model.stack) != 2 {
+			t.Errorf("%q on %s added another route: %+v", tt.key, tt.screen, model.stack)
+		}
+	}
+}
+
 func TestPurgeKeyLaunchesHelperFlowOnlyForRedCatalogueApps(t *testing.T) {
 	model := NewModel(context.Background(), nil)
 	model.snapshot = ptr(testSnapshot())

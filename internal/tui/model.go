@@ -219,8 +219,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter", "right", "l":
 			m.enterSelected()
 		case "/":
-			route.Filter = ""
-			route.Filtering = true
+			if m.canFilter(*route) {
+				route.Filter = ""
+				route.Filtering = true
+			}
 		case "r":
 			if !m.loading {
 				m.loading = true
@@ -234,11 +236,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "n":
-			m.push(Route{Screen: ScreenNetwork})
+			if route.Screen != ScreenNetwork {
+				m.push(Route{Screen: ScreenNetwork})
+			}
 		case "c":
-			m.push(Route{Screen: ScreenCoverage})
+			if route.Screen != ScreenCoverage {
+				m.push(Route{Screen: ScreenCoverage})
+			}
 		case "?":
-			m.push(Route{Screen: ScreenHelp})
+			if route.Screen != ScreenHelp {
+				m.push(Route{Screen: ScreenHelp})
+			}
 		}
 	}
 	return m, nil
@@ -445,7 +453,7 @@ func (m *Model) View() string {
 	}
 	route := m.stack[len(m.stack)-1]
 	header := m.header(route)
-	footer := m.footer()
+	footer := m.footer(route)
 	headerRows := strings.Count(header, "\n")
 	footerRows := strings.Count(footer, "\n") + 1
 	if m.height < headerRows+footerRows+1 {
@@ -468,10 +476,102 @@ func (m *Model) View() string {
 	return out.String()
 }
 
-func (m *Model) footer() string {
-	footer := "↑/↓ move or scroll · PgUp/PgDn page · Enter open · Esc back · q quit\n" +
-		"p purge plan · r refresh · n network · c coverage · ? help"
-	return lipgloss.NewStyle().Width(max(m.width-2, 20)).Render(footer)
+func (m *Model) footer(route Route) string {
+	if route.Filtering {
+		return lipgloss.NewStyle().Width(max(m.width-2, 20)).Render("Type to filter · Enter apply · Esc clear")
+	}
+
+	var navigation, actions []string
+	if scrollableScreen(route.Screen) {
+		navigation = append(navigation, "↑/↓ scroll", "PgUp/PgDn page", "Home/End jump")
+	} else if listScreen(route.Screen) && m.snapshot != nil && len(m.visibleRows(route)) > 0 {
+		navigation = append(navigation, "↑/↓ move")
+		if m.canOpen(route) {
+			navigation = append(navigation, "Enter open")
+		}
+		if m.canFilter(route) {
+			navigation = append(navigation, "/ filter")
+		}
+	}
+	if len(m.stack) > 1 {
+		navigation = append(navigation, "Esc back", "q back")
+	} else {
+		navigation = append(navigation, "q quit")
+	}
+	if !m.loading {
+		actions = append(actions, "r refresh")
+	}
+	if route.Screen != ScreenNetwork {
+		actions = append(actions, "n network")
+	}
+	if route.Screen != ScreenCoverage {
+		actions = append(actions, "c coverage")
+	}
+	if route.Screen != ScreenHelp {
+		actions = append(actions, "? help")
+	}
+	if !m.loading && m.canPurge(route) {
+		actions = append(actions, "p purge plan")
+	}
+	var lines []string
+	if len(navigation) > 0 {
+		lines = append(lines, strings.Join(navigation, " · "))
+	}
+	if len(actions) > 0 {
+		lines = append(lines, strings.Join(actions, " · "))
+	}
+	return lipgloss.NewStyle().Width(max(m.width-2, 20)).Render(strings.Join(lines, "\n"))
+}
+
+func listScreen(screen Screen) bool {
+	switch screen {
+	case ScreenOverview, ScreenCategories, ScreenCategory, ScreenFindings, ScreenUnmatched, ScreenSandbox:
+		return true
+	default:
+		return false
+	}
+}
+
+func (m *Model) canOpen(route Route) bool {
+	rows := m.visibleRows(route)
+	if route.Cursor < 0 || route.Cursor >= len(rows) {
+		return false
+	}
+	selected := rows[route.Cursor]
+	switch route.Screen {
+	case ScreenOverview, ScreenCategories, ScreenFindings:
+		return selected.kind != "note"
+	case ScreenCategory:
+		return selected.kind == "app"
+	case ScreenUnmatched:
+		return selected.kind == "unmatched"
+	case ScreenSandbox:
+		return selected.kind == string(ScreenSandboxApp)
+	default:
+		return false
+	}
+}
+
+func (m *Model) canFilter(route Route) bool {
+	if m.snapshot == nil {
+		return false
+	}
+	switch route.Screen {
+	case ScreenOverview, ScreenCategories, ScreenCategory, ScreenFindings, ScreenUnmatched:
+		return true
+	case ScreenSandbox:
+		return m.snapshot.Sandbox.Applicable && len(m.snapshot.Sandbox.Apps) > 0
+	default:
+		return false
+	}
+}
+
+func (m *Model) canPurge(route Route) bool {
+	if route.Screen != ScreenApp {
+		return false
+	}
+	app := m.app(route.ID)
+	return app != nil && app.ID != "" && app.Grade == catalog.GradeRed
 }
 
 func (m *Model) header(route Route) string {
@@ -608,7 +708,7 @@ func (m *Model) worstKnownResult() (catalog.Grade, string, bool) {
 func (m *Model) contentRows(route Route) int {
 	header := strings.TrimSuffix(m.header(route), "\n")
 	headerRows := strings.Count(header, "\n") + 1
-	footerRows := strings.Count(m.footer(), "\n") + 1
+	footerRows := strings.Count(m.footer(route), "\n") + 1
 	return max(m.height-headerRows-footerRows, 1)
 }
 
@@ -625,7 +725,7 @@ func (m *Model) wrappedContentLines(route Route) []string {
 
 func scrollableScreen(screen Screen) bool {
 	switch screen {
-	case ScreenApp, ScreenFinding, ScreenNetwork, ScreenCoverage, ScreenSandboxApp:
+	case ScreenApp, ScreenFinding, ScreenNetwork, ScreenCoverage, ScreenSandboxApp, ScreenHelp:
 		return true
 	default:
 		return false
@@ -633,6 +733,9 @@ func scrollableScreen(screen Screen) bool {
 }
 
 func (m *Model) screenContent(route Route) string {
+	if route.Screen == ScreenHelp {
+		return m.helpView()
+	}
 	if m.snapshot == nil {
 		if m.loading {
 			return "Waiting for the first audit…"
@@ -654,13 +757,34 @@ func (m *Model) screenContent(route Route) string {
 		return m.sandboxView(route)
 	case ScreenSandboxApp:
 		return m.sandboxAppView(route.ID)
-	case ScreenHelp:
-		return "Grades use colour, shape, and word. Unknown means the check could not judge.\n" +
-			"Findings are evidence with instructions; p on a red app opens a separate reviewed purge flow.\n" +
-			"Use ↑/↓ to move or scroll and PgUp/PgDn to page through details. Press / to filter a list, Enter to inspect, Esc to return."
 	default:
 		return "No screen is available."
 	}
+}
+
+func (m *Model) helpView() string {
+	var out strings.Builder
+	fmt.Fprintln(&out, "Grades")
+	for _, grade := range []catalog.Grade{
+		catalog.GradeGreen, catalog.GradeAmber, catalog.GradeRed, catalog.GradeUnknown,
+	} {
+		fmt.Fprintln(&out, gradeLabel(grade))
+	}
+	fmt.Fprintln(&out, "Unrated means the evidence could not judge the check.")
+	fmt.Fprintln(&out, "\nKeys")
+	fmt.Fprintln(&out, "↑/↓, j/k       Move in lists or scroll views")
+	fmt.Fprintln(&out, "Enter, →, l    Open the selected row")
+	fmt.Fprintln(&out, "Esc, ←, h      Go back")
+	fmt.Fprintln(&out, "q              Go back from a nested screen; quit at Overview")
+	fmt.Fprintln(&out, "/              Filter a list")
+	fmt.Fprintln(&out, "PgUp/PgDn      Page through details")
+	fmt.Fprintln(&out, "Home/End       Jump to the first or last detail page")
+	fmt.Fprintln(&out, "r              Refresh the audit")
+	fmt.Fprintln(&out, "n              Open network checks")
+	fmt.Fprintln(&out, "c              Open coverage")
+	fmt.Fprintln(&out, "?              Open Help from another screen")
+	fmt.Fprintln(&out, "p              Review a purge plan for a red catalogue app")
+	return strings.TrimSuffix(out.String(), "\n")
 }
 
 func (m *Model) listView(route Route) string {
@@ -716,7 +840,7 @@ func gradeLabel(value catalog.Grade) string {
 
 func (m *Model) listRowsHeight(route Route) int {
 	headerRows := strings.Count(m.header(route), "\n")
-	footerRows := strings.Count(m.footer(), "\n") + 1
+	footerRows := strings.Count(m.footer(route), "\n") + 1
 	reservedRows := 2
 	if route.Screen == ScreenSandbox {
 		reservedRows += strings.Count(m.sandboxSummary(), "\n") + 2
