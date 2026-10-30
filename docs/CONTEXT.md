@@ -325,23 +325,23 @@ sysc-shell. The privacy plugin has a user-placeable bar widget and a
 plugin-owned audit panel. The Control Centre shows a compact audit summary and
 opens that panel. Privacybit `v0.1.2`, plugin release `privacy-v0.1.2`, and AUR
 package `0.1.2-1` are published. Catalog PR #275 merged at `2f67de4`, and a
-disposable sysc-shell store install verified plugin `0.1.2`. The last successful
-SSH check on 2026-10-30 found privacybit `dc799e8`,
-privacy plugin code `ce6ffda` with manifest version `0.1.3`, and a sysc-shell
-binary built from module revision `2ed94254`. The shell service and privacy
-plugin process were active, and the privacybit build metadata was clean.
-GitHub reported privacybit main at `28fc591` after PR #112, with implementation
-commit `cb87533`; sysc-plugins main at `e01569e`; and sysc-shell main at
-`0f24b029` after PR #572 cleared a city-defined Weather place. PR #296 changed
-manifest validation and publishing docs, not plugin runtime code. GitHub
-history confirms testbench build `dc799e85` descends from privacybit PR #97
-(`eb45f2a`) and PR #100 (`f8f093e`), so both TUI fixes are in that build. The
-recorded SSH check did not exercise the TUI interactively. Build `dc799e85`
-predates PR #112 (`cb87533`), so it lacks the breadcrumb change. Issue #114
-tracks a rebuild and interactive TUI verification. A fresh SSH attempt during
-this audit returned `No route to host`, so treat the prior testbench check as
-historical and its current state as unconfirmed. See `HANDOVER.md` for revision
-and verification evidence.
+disposable sysc-shell store install verified plugin `0.1.2`. On 2026-10-30, a
+clean privacybit build from main `cffd3dfd83afa8c34088e08c04a8412b1950e135`
+replaced the testbench binary. It reports catalogue revision
+`cat-246d56808b91`, `vcs.modified=false`, and SHA-256
+`4968c5ce75927a0b547bd0966f2cb2eac7d3d99d694ae84d2b937c8787f42fa9`; the prior
+binary is backed up as `~/.local/bin/privacybit.pre-cffd3df`. Before
+replacement, the shell service and privacy plugin process were active, and the
+bar placement was configured. The SSH connection failed before the interactive
+TUI started, so breadcrumbs and sandbox and unknown screens remain unverified
+on the testbench. The local TUI package tests passed. The testbench's
+post-disconnect service and plugin state are unknown; issue #114 remains open.
+
+GitHub reports privacybit main at `cffd3df` after PR #115, with latest code
+commit `cb87533` from PR #112; sysc-plugins main at `e01569e`; and sysc-shell
+main at `0f24b029` after PR #572 cleared a city-defined Weather place. PR #296
+changed manifest validation and publishing docs, not plugin runtime code. See
+`HANDOVER.md` for build details and verification evidence.
 
 ---
 
@@ -378,11 +378,11 @@ or reads the saved report. Its capture activity card remains unchanged.
 
 ## 7. Remaining non-phase work
 
-- **Laptop testbench:** See §4 for the last successful SSH check and recorded
-  revisions. Build `dc799e85` includes TUI fixes from PRs #97 and #100 but
-  predates PR #112's breadcrumbs. Issue #114 tracks a rebuild and interactive
-  check. A fresh SSH attempt during this audit returned `No route to host`, so
-  current reachability and process state are unconfirmed.
+- **Laptop testbench:** See §4 for the clean build from `cffd3df`. The binary
+  is installed with clean VCS metadata and a rollback copy. The SSH connection
+  failed before the interactive TUI started; issue #114 tracks the remaining
+  breadcrumb, sandbox, and unknown-screen check. Current service and plugin
+  state are unconfirmed.
 - **Publication** is complete through privacybit `v0.1.2`, plugin release
   `privacy-v0.1.2`, catalog entry `0.1.2`, and AUR package `0.1.2-1`. A
   disposable sysc-shell store install verified the amd64 release. Coordinated
