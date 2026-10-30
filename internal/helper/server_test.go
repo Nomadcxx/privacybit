@@ -86,6 +86,18 @@ func TestServeRejectsUnknownFieldBeforeExecutingAnything(t *testing.T) {
 	}
 }
 
+func TestParseSizeRejectsNaN(t *testing.T) {
+	if _, err := parseSize("NaN KiB"); err == nil {
+		t.Fatal("parseSize accepted a non-finite installed size")
+	}
+}
+
+func TestParseSizeRejectsValuesOutsideInt64(t *testing.T) {
+	if _, err := parseSize("9223372036854775808 B"); err == nil {
+		t.Fatal("parseSize accepted a value outside the int64 range")
+	}
+}
+
 func TestPlanTokenIsSingleUseAndSessionBound(t *testing.T) {
 	set := testCatalog(t)
 	runner := &fakeRunner{}
