@@ -473,31 +473,7 @@ func (m *Model) footer() string {
 }
 
 func (m *Model) header(route Route) string {
-	title := screenTitle(route.Screen)
-	if route.ID != "" && route.Screen == ScreenCategory {
-		if category := m.category(route.ID); category != nil {
-			title = category.Name
-		}
-	}
-	if route.ID != "" && route.Screen == ScreenApp {
-		if app := m.app(route.ID); app != nil {
-			title = app.Name
-		}
-	}
-	if route.ID != "" && route.Screen == ScreenFinding {
-		if finding := m.finding(route.ID); finding != nil {
-			title = finding.Title
-		}
-	}
-	if route.ID != "" && route.Screen == ScreenSandboxApp {
-		if app := m.sandboxApp(route.ID); app != nil {
-			title = app.ID
-			if app.Scope != "" {
-				title += " (" + app.Scope + ")"
-			}
-		}
-	}
-
+	title := m.breadcrumb()
 	var out strings.Builder
 	brand := lipgloss.NewStyle().Bold(true).Render("privacybit")
 	fmt.Fprintf(&out, "%s  %s\n", brand, title)
@@ -528,6 +504,52 @@ func (m *Model) header(route Route) string {
 
 	header := strings.TrimSuffix(out.String(), "\n")
 	return lipgloss.NewStyle().Width(max(m.width-2, 20)).Render(header) + "\n"
+}
+
+func (m *Model) breadcrumb() string {
+	if len(m.stack) == 0 {
+		return "Privacy audit"
+	}
+
+	parts := make([]string, 0, len(m.stack))
+	for i, route := range m.stack {
+		if route.Screen == ScreenOverview || (route.Screen == ScreenCategories && i < len(m.stack)-1) {
+			continue
+		}
+		parts = append(parts, m.routeTitle(route))
+	}
+	if len(parts) == 0 {
+		return m.routeTitle(m.stack[len(m.stack)-1])
+	}
+	return strings.Join(parts, " › ")
+}
+
+func (m *Model) routeTitle(route Route) string {
+	if route.ID != "" {
+		switch route.Screen {
+		case ScreenCategory:
+			if category := m.category(route.ID); category != nil {
+				return category.Name
+			}
+		case ScreenApp:
+			if app := m.app(route.ID); app != nil {
+				return app.Name
+			}
+		case ScreenFinding:
+			if finding := m.finding(route.ID); finding != nil {
+				return finding.Title
+			}
+		case ScreenSandboxApp:
+			if app := m.sandboxApp(route.ID); app != nil {
+				title := app.ID
+				if app.Scope != "" {
+					return title + " (" + app.Scope + ")"
+				}
+				return title
+			}
+		}
+	}
+	return screenTitle(route.Screen)
 }
 
 func (m *Model) overallContext() string {

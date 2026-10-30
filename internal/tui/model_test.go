@@ -85,6 +85,45 @@ func TestNavigationPushAndPopPreserveParentSelection(t *testing.T) {
 	}
 }
 
+func TestHeaderShowsNavigationBreadcrumb(t *testing.T) {
+	model := NewModel(context.Background(), nil)
+	model.snapshot = ptr(testSnapshot())
+	model.snapshot.Categories[0].Installed = []report.App{{
+		ID: "chrome", Name: "Google Chrome", Grade: catalog.GradeGreen,
+	}}
+	model.stack = []Route{
+		{Screen: ScreenOverview},
+		{Screen: ScreenCategories},
+		{Screen: ScreenCategory, ID: "browser"},
+		{Screen: ScreenApp, ID: "chrome"},
+	}
+
+	header := model.header(model.stack[len(model.stack)-1])
+	if !strings.Contains(header, "Browser › Google Chrome") {
+		t.Fatalf("header does not show the category and app trail: %s", header)
+	}
+	if strings.Contains(header, "Overview") || strings.Contains(header, "Categories") {
+		t.Fatalf("header includes navigation containers in the nested trail: %s", header)
+	}
+}
+
+func TestHeaderKeepsUsefulRootTitles(t *testing.T) {
+	model := NewModel(context.Background(), nil)
+	for _, screen := range []struct {
+		route Route
+		want  string
+	}{
+		{route: Route{Screen: ScreenOverview}, want: "Overview"},
+		{route: Route{Screen: ScreenCategories}, want: "Categories"},
+	} {
+		model.stack = []Route{screen.route}
+		header := model.header(screen.route)
+		if !strings.Contains(header, "privacybit  "+screen.want) {
+			t.Errorf("root header = %q, want title %q", header, screen.want)
+		}
+	}
+}
+
 func TestUnknownAndCoverageRenderAsExplicitStates(t *testing.T) {
 	model := NewModel(context.Background(), nil)
 	model.snapshot = ptr(testSnapshot())
