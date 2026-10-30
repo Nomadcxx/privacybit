@@ -37,6 +37,8 @@ const (
 
 type ScanFunc func(context.Context) (report.Snapshot, error)
 
+const gradeColumnWidth = 9
+
 type Route struct {
 	Screen    Screen
 	ID        string
@@ -486,8 +488,7 @@ func (m *Model) header(route Route) string {
 		fmt.Fprintf(&out, "Action unavailable: %s\n", m.actionErr)
 	}
 	if m.snapshot != nil {
-		grade := report.GradeChannels(m.snapshot.Overall.Grade)
-		fmt.Fprintf(&out, "Overall: %s %s\n", grade.Glyph, grade.Word)
+		fmt.Fprintf(&out, "Overall: %s\n", gradeLabel(m.snapshot.Overall.Grade))
 		if context := m.overallContext(); context != "" {
 			fmt.Fprintln(&out, context)
 		}
@@ -688,13 +689,9 @@ func (m *Model) listView(route Route) string {
 		}
 		label := item.label
 		if item.grade != "" {
-			grade := report.GradeChannels(item.grade)
-			colorIndex := "8"
-			if grade.ANSI > 0 {
-				colorIndex = fmt.Sprint(grade.ANSI - 30)
-			}
-			color := lipgloss.Color(colorIndex)
-			label = lipgloss.NewStyle().Foreground(color).Render(grade.Glyph+" "+grade.Word) + "  " + label
+			grade := gradeLabel(item.grade)
+			padding := max(gradeColumnWidth-lipgloss.Width(grade), 0) + 2
+			label = grade + strings.Repeat(" ", padding) + label
 		}
 		style := lipgloss.NewStyle().MaxWidth(max(m.width-4, 20))
 		if i == route.Cursor {
@@ -706,6 +703,15 @@ func (m *Model) listView(route Route) string {
 		fmt.Fprintf(&out, "… %d more\n", len(rows)-end)
 	}
 	return strings.TrimSuffix(out.String(), "\n")
+}
+
+func gradeLabel(value catalog.Grade) string {
+	grade := report.GradeChannels(value)
+	colorIndex := "8"
+	if grade.ANSI > 0 {
+		colorIndex = fmt.Sprint(grade.ANSI - 30)
+	}
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(colorIndex)).Render(grade.Glyph + " " + grade.Word)
 }
 
 func (m *Model) listRowsHeight(route Route) int {
