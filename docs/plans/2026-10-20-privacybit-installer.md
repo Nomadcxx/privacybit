@@ -4,7 +4,7 @@
 
 **Goal:** Add an unprivileged Bubble Tea installer that builds privacybit offline, installs it under `~/.local/bin`, and can optionally enable the existing user watcher or timer.
 
-**Architecture:** Add safe binary build/install operations to `internal/installer`, reusing its ownership checks and user-service setup. Add a small `cmd/privacybit-install` TUI that reviews the selected mode before running those operations and reports partial failures accurately.
+**Architecture:** Add safe binary build/install operations to `internal/installer`, reusing its ownership checks and user-service setup. Build for the running host regardless of inherited cross-target settings, preserve the configured module cache, and keep both cache lookup and compilation offline. Add a small `cmd/privacybit-install` TUI that reviews the selected mode before running those operations and reports partial failures accurately.
 
 **Tech Stack:** Go 1.26.4, standard library, existing Bubble Tea and Lipgloss dependencies.
 
@@ -51,7 +51,7 @@ Run: `GOTMPDIR=/home/nomadx/.cache/privacybit-gotmp go test ./internal/installer
 
 **Step 3: Implement the build path**
 
-Build `./cmd/privacybit` into a temporary directory using `go build -mod=readonly`, with `GOPROXY=off`, `GOSUMDB=off`, `GOTOOLCHAIN=local`, `GOWORK=off`, and empty `GOFLAGS` in the child environment. Install only after a successful build, then remove temporary output.
+Resolve `GOMODCACHE` with `GOTOOLCHAIN=local`, `GOPROXY=off`, and `GOSUMDB=off`. Build `./cmd/privacybit` into a temporary directory using `go build -mod=readonly`, target the running host's `GOOS` and `GOARCH`, clear architecture tuning and persisted Go environment settings, and pass the resolved module cache explicitly. Install only after a successful build, then remove temporary output.
 
 **Step 4: Run the focused test and confirm it passes**
 

@@ -92,7 +92,7 @@ matters so much.
 
 | Absolute path | What it is | State |
 |---|---|---|
-| `/home/nomadx/privacy-bit` | **This project.** Canonical checkout on branch `main`. | This handover was drafted from privacybit commit `232f2af` after PR #84 and is refreshed through sysc-plugins PR #294. The primary checkout contains unrelated untracked `.commandcode/` data; leave it untouched and use a clean worktree from `origin/main`. Public privacybit `v0.1.2` at `7c63797` remains current; PR #42 updates the AUR recipe for `0.1.3`. Issue #20 is closed. |
+| `/home/nomadx/privacy-bit` | **This project.** Canonical checkout on branch `main`. | This handover is refreshed through privacybit PR #87 and sysc-plugins PR #294. The primary checkout contains unrelated untracked `.commandcode/` data; leave it untouched and use a clean worktree from `origin/main`. Public privacybit `v0.1.2` at `7c63797` remains current. PR #42's AUR metadata update merged; issues #41 and #280 gate the coordinated `0.1.3` publication on owner approval. Issue #20 is closed. |
 | `/home/nomadx/worktrees/privacybit-origin-context` | Historical privacybit issue #22 worktree. | Branch `feat/origin-context` at `54c9fb4`; privacybit PR #23 merged the context-only origin implementation. |
 | `/home/nomadx/sysc-plugins/.worktrees/privacybit-origin-context` | Historical sysc-plugins issue #22 worktree. | Branch `feat/privacybit-origin-context`; sysc-plugins PR #264 merged the panel integration and refreshed screenshot and thumbnail. |
 | `/home/nomadx/privacy-bit/docs/plans/` | Seven original design documents plus follow-on designs and implementation plans. | D1–D7 record the approved design. Phase 3, 4, 8, and 9 plans remain as audit history. |
@@ -143,8 +143,8 @@ sandbox grades, and PR #264 displays origin context. Privacybit `v0.1.2`
 includes both changes. Privacybit PR #38 clarifies that recognized source
 labels are not authenticated; sysc-plugins PR #277 carries that wording into
 the panel. The published `v0.1.2` CLI and plugin assets predate that correction.
-Privacybit PR #42 updates the AUR recipe for `v0.1.3`; sysc-plugins PR #281
-bumps the plugin manifest to `0.1.3`. Both PRs merged, but their release tags
+Privacybit PR #42 merged the AUR recipe update for `v0.1.3`; sysc-plugins
+PR #281 bumps the plugin manifest to `0.1.3`. Both PRs merged, but their release tags
 and AUR publication remain pending owner approval. Plugin release
 `privacy-v0.1.2` fixes the manifest and handshake version at `0.1.2`; catalog
 PR #275 merged its URLs and checksums. Issues #20, #37, #268, and #276 are
@@ -257,7 +257,7 @@ The rest as you reach it.
 | `/home/nomadx/privacy-bit/go.mod` | Module dependencies: Cobra, Bubble Tea, Lipgloss, YAML v3, plus transitive modules |
 | `/home/nomadx/privacy-bit/.gitignore` | Excludes audit output — it fingerprints what a user runs |
 | `/home/nomadx/privacy-bit/cmd/privacybit-install/` | Unprivileged TUI application installer |
-| `/home/nomadx/privacy-bit/internal/installer/binary.go` | Offline build and atomic install to `~/.local/bin` |
+| `/home/nomadx/privacy-bit/internal/installer/binary.go` | Offline build for the host target and atomic install to `~/.local/bin` |
 | `/home/nomadx/privacy-bit/internal/audit/flatpak.go` | Effective permission classification, generic risk bands, and Flatpak coverage roll-up |
 | `/home/nomadx/privacy-bit/packaging/aur/` | `PKGBUILD` and generated `.SRCINFO` for the first Arch package |
 | `/home/nomadx/privacy-bit/.github/workflows/ci.yml` | Pull request and main-branch formatting, test, vet, and build checks |
@@ -537,9 +537,12 @@ categories.
 
 The approved installer design and implementation plan are in §3.4. The
 `privacybit-install` command builds the CLI from the checkout with network
-access disabled, installs it to the current user's `~/.local/bin`, and offers
-no background work, the watcher, or the monthly timer. It refuses root and
-requires confirmation before writing. The no-background choice disables any
+access disabled and targets the running host even when inherited Go settings
+name another platform. It installs to the current user's `~/.local/bin` and
+preserves the configured module cache while preventing toolchain or module
+downloads. The installer offers no background work, the watcher, or the
+monthly timer. It refuses root and requires confirmation before writing.
+The no-background choice disables any
 existing privacybit user units. Ctrl+C cancels the active build or service
 command and keeps the TUI open until it returns. Cancellation before the atomic
 binary replacement preserves the current CLI; cancellation during service
@@ -897,6 +900,14 @@ Recorded because a future reader will trust the docs.
     `TestFlatpakInventoryDoesNotTreatOriginAsVendorOrExplicitEvidence` covers
     the correction.
 
+22. **The checkout installer inherited cross-target Go settings.** It could
+    install a binary for another OS or architecture, and its module-cache
+    lookup could request an automatic toolchain download. PR #87 pins the build
+    to the running host, clears architecture tuning and persisted Go settings,
+    preserves the configured module cache, and performs the lookup offline.
+    Its integration test injects a foreign target and forced toolchain upgrade,
+    then runs the installed CLI.
+
 ### 10.4 Environment traps
 
 - **`: ` inside an unquoted multi-line YAML plain scalar is a parse error** —
@@ -938,6 +949,10 @@ Recorded because a future reader will trust the docs.
 | privacybit | `.github/workflows/ci.yml`: formatting, `go test -race -count=1 -p 2 ./...`, `go vet -p 2 ./...`, and `go build -p 2 ./...`; `.github/workflows/vuln.yml`: pinned `govulncheck` on pull requests, main pushes, weekly schedule, and manual dispatch | PR #51 adds per-source fact coverage; its CI passed and the maintainer merged it at `ef2cd37`. PR #52 records the merge status; its CI passed and the maintainer merged it at `ceaab67`. PR #56 fixes PATH component filtering and merged at `93fd526`; PR #58 checks all verified VPN tunnels and merged at `afe4032`. PR #63 fixes helper status version reporting: AUR builds inject `pkgver`, source builds report `devel`; CI passed and it merged at `1e72529`, closing issue #62. An AUR-configured build reported `0.1.3` and the embedded catalogue revision. CI passed on each. PR #67 excludes PATH symlink aliases whose targets resolve under system scan roots while keeping the Nix-store exclusion lexical; CI passed and it merged at `d19b658`, closing issue #66. PR #42 updates the AUR recipe and `.SRCINFO` for `0.1.3`; its CI passed. `makepkg --printsrcinfo | cmp - .SRCINFO` and Linux amd64/arm64 builds of the CLI, helper, and installer passed. The published `v0.1.2` assets still predate PR #38's source-origin clarification. GitHub passed CI for PR #68 and merged it at `d350596`. PR #70 marks Flatpak vendor and explicit-install facts unavailable; GitHub passed CI and merged it at `c023d60`, closing issue #69. PR #72 aligns D6's coverage example with schema 1; GitHub passed CI and merged it at `a8907ab`, closing issue #71. PR #76 adds the dependency scan; CI and `govulncheck` passed, and it merged at `1c10715`, closing issue #75. The scan found no callable vulnerabilities; it reported GO-2026-5024 in `golang.org/x/sys@v0.36.0`, a Windows-only issue outside the call graph. PR #80 adds race detection to the full CI suite; the race suite and `govulncheck` passed, and it merged at `03a7c4f`, closing issue #79. |
 | sysc-plugins | PR #259 adds the Flatpak sandbox grade; PR #262 fixes contrast; PR #264 shows origin context; PR #273 prepares `privacy-v0.1.2`; PR #275 updates the catalog; PR #277 clarifies origin labels; PR #279 joins Docker workers on shutdown; PR #281 prepares `privacy-v0.1.3`; PR #283 shows first-scan progress; PR #285 fixes stale-result copy during an active refresh; PR #286 shows reduced-coverage source names; PR #288 removes the generic install hint from unavailable audit results; PR #290 synchronizes the fallback plugin identity with manifest version `0.1.3`; PR #291 publishes first-scan status to Control Centre; PR #292 records issue #34 closure; PR #294 singularizes the high-priority finding count. | PR #294's `test`, `govulncheck`, and `verify` checks passed; it merged at `ce6ffda` and closed issue #293. PR #292's CI passed and it merged at `15c2093`. PR #291's checks passed; it merged at `f2cc8b3` and closed issue #34. PR #290's `test`, `govulncheck`, and `verify` checks passed; it merged at `4e6955e` and closed issue #289. PR #288's `test`, `govulncheck`, and `verify` checks passed; it merged at `fb320ec` and closed issue #287. PR #286's checks passed; it merged at `9229030` and closed privacybit issue #50. PR #285's checks passed; it merged at `11f0202`. PR #283's checks passed; it merged at `aa35f65`. PR #281's checks passed; it merged at `4adfa32`. Release rehearsal run `40934309464` passed its gate, vulnerability scan, tests, race checks, validation, and both architecture builds; the manual run skipped release and catalog jobs. PR #279's checks passed; it merged at `890a178` and closed issue #278. PR #277's checks passed and it merged at `3578127`. Release workflow run `40920475913` passed its gate, vulnerability scan, tests, race checks, both architecture builds, and catalog validation. PR #275's checks passed and it merged at `2f67de4`. A disposable store install verified the amd64 asset. |
 | sysc-shell | PR #436 adds the original summary; PR #437 routes it to the plugin panel; PR #559 repairs plugin bar drop and press states; PR #560 distinguishes missing plugin state from unreadable audit data; PR #562 refreshes an open Privacy page after plugin state writes; PR #563 accepts unavailable snapshots without an optional hint. | All six PRs are merged. PRs #560, #562, and #563 passed `test`, coverage, `govulncheck`, Landlock ABI, and verify checks; #563 merged at `3898944`. Beads issues `sysc-2067` and `sysc-2068` are closed. The testbench service still embeds shell revision `ca3c988`, and the privacy plugin last checked there embeds revision `9b44520`. SSH to the testbench returned `No route to host` on 2026-10-30, so the current upstream revisions remain undeployed and unverified there. |
+
+Privacybit PR #87 forces checkout builds to the host target and keeps the
+module-cache lookup offline. CI and `govulncheck` passed; the change merged at
+`579b0fc`.
 
 The live review's evidence is also recorded in sysc-shell issue `sysc-1444`.
 The sysc-plugins and sysc-shell primary checkouts contain independent changes,
