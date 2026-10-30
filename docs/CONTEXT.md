@@ -336,10 +336,12 @@ commit `cb87533`; sysc-plugins main at `e01569e`; and sysc-shell main at
 manifest validation and publishing docs, not plugin runtime code. GitHub
 history confirms testbench build `dc799e85` descends from privacybit PR #97
 (`eb45f2a`) and PR #100 (`f8f093e`), so both TUI fixes are in that build. The
-recorded SSH check did not exercise the TUI interactively. A fresh SSH attempt
-during this audit returned `No route to host`, so treat the prior testbench
-check as historical and its current state as unconfirmed. See `HANDOVER.md` for
-revisions and verification evidence.
+recorded SSH check did not exercise the TUI interactively. Build `dc799e85`
+predates PR #112 (`cb87533`), so it lacks the breadcrumb change. Issue #114
+tracks a rebuild and interactive TUI verification. A fresh SSH attempt during
+this audit returned `No route to host`, so treat the prior testbench check as
+historical and its current state as unconfirmed. See `HANDOVER.md` for revision
+and verification evidence.
 
 ---
 
@@ -377,10 +379,10 @@ or reads the saved report. Its capture activity card remains unchanged.
 ## 7. Remaining non-phase work
 
 - **Laptop testbench:** See §4 for the last successful SSH check and recorded
-  revisions. GitHub history confirms build `dc799e85` includes TUI fixes from
-  PRs #97 and #100, though the check did not open the TUI. A fresh SSH attempt
-  during this audit returned `No route to host`, so current reachability and
-  process state are unconfirmed.
+  revisions. Build `dc799e85` includes TUI fixes from PRs #97 and #100 but
+  predates PR #112's breadcrumbs. Issue #114 tracks a rebuild and interactive
+  check. A fresh SSH attempt during this audit returned `No route to host`, so
+  current reachability and process state are unconfirmed.
 - **Publication** is complete through privacybit `v0.1.2`, plugin release
   `privacy-v0.1.2`, catalog entry `0.1.2`, and AUR package `0.1.2-1`. A
   disposable sysc-shell store install verified the amd64 release. Coordinated
