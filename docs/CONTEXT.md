@@ -326,12 +326,14 @@ plugin-owned audit panel. The Control Centre shows a compact audit summary and
 opens that panel. Privacybit `v0.1.2`, plugin release `privacy-v0.1.2`, and AUR
 package `0.1.2-1` are published. Catalog PR #275 merged at `2f67de4`, and a
 disposable sysc-shell store install verified plugin `0.1.2`. On 2026-10-30,
-SSH verification confirmed the laptop testbench runs privacybit `32c610b`,
-privacy plugin code `ce6ffda` with manifest version `0.1.3`, and sysc-shell
-`2ed94254`. The shell service and privacy plugin process were active. Current
-upstream main is sysc-plugins `e01569e` and sysc-shell `2ed94254`; PR #296
-changed manifest validation and publishing docs, not plugin runtime code. TUI
-changes from privacybit PRs #97 and #100 are not deployed there. See
+SSH verification confirmed the laptop testbench runs privacybit `dc799e8`,
+privacy plugin code `ce6ffda` with manifest version `0.1.3`, and a sysc-shell
+binary built from module revision `2ed94254`. The shell service and privacy
+plugin process were active, and the privacybit build metadata was clean.
+Current upstream main is privacybit `802801b`, sysc-plugins `e01569e`, and
+sysc-shell `38a74e90` after PR #570 removed the reference Weather plugin. PR
+#296 changed manifest validation and publishing docs, not plugin runtime code.
+TUI changes from privacybit PRs #97 and #100 are not deployed there. See
 `HANDOVER.md` for revisions and verification evidence.
 
 ---
@@ -369,12 +371,12 @@ or reads the saved report. Its capture activity card remains unchanged.
 
 ## 7. Remaining non-phase work
 
-- **Live testbench verification** on 2026-10-30 confirmed privacybit `32c610b`,
-  privacy plugin code `ce6ffda` with manifest version `0.1.3`, and sysc-shell
-  `2ed94254`. The shell service and privacy plugin process were active, and the
-  plugin remained enabled. The live audit reported a connected VPN,
-  `dns_contained: true`, and no `vpn.dns-leak` defect. TUI changes from
-  privacybit PRs #97 and #100 are not deployed there.
+- **Live testbench verification** on 2026-10-30 confirmed privacybit `dc799e8`,
+  privacy plugin code `ce6ffda` with manifest version `0.1.3`, and a sysc-shell
+  binary built from module revision `2ed94254`. The shell service and privacy
+  plugin process were active, and the plugin remained enabled. The live audit
+  reported a connected VPN, `dns_contained: true`, and no `vpn.dns-leak` defect.
+  TUI changes from privacybit PRs #97 and #100 are not deployed there.
 - **Publication** is complete through privacybit `v0.1.2`, plugin release
   `privacy-v0.1.2`, catalog entry `0.1.2`, and AUR package `0.1.2-1`. A
   disposable sysc-shell store install verified the amd64 release. Coordinated
