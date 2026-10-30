@@ -282,6 +282,24 @@ func TestSandboxViewExplainsNotApplicableState(t *testing.T) {
 	}
 }
 
+func TestSandboxViewExplainsKnownEmptyInventory(t *testing.T) {
+	model := NewModel(context.Background(), nil)
+	model.snapshot = ptr(testSnapshot())
+	model.snapshot.Sandbox = report.Sandbox{
+		Grade: catalog.GradeUnknown, Reason: "No Flatpak applications are installed.",
+	}
+	model.stack = []Route{{Screen: ScreenSandbox}}
+	model.width, model.height = 80, 24
+
+	view := model.View()
+	if !strings.Contains(view, "not applicable") || !strings.Contains(view, "No Flatpak applications are installed.") {
+		t.Fatalf("known empty inventory is not explicit:\n%s", view)
+	}
+	if strings.Contains(view, "Partial coverage") {
+		t.Fatalf("known empty inventory was presented as incomplete:\n%s", view)
+	}
+}
+
 func TestSandboxViewTreatsMissingApplicabilityAsUnknown(t *testing.T) {
 	model := NewModel(context.Background(), nil)
 	model.snapshot = ptr(testSnapshot())
@@ -292,6 +310,26 @@ func TestSandboxViewTreatsMissingApplicabilityAsUnknown(t *testing.T) {
 		if !strings.Contains(view, want) {
 			t.Errorf("sandbox view missing %q:\n%s", want, view)
 		}
+	}
+}
+
+func TestSandboxViewDoesNotTreatIncompleteInventoryAsEmpty(t *testing.T) {
+	model := NewModel(context.Background(), nil)
+	model.snapshot = ptr(testSnapshot())
+	model.snapshot.Sandbox = report.Sandbox{
+		Applicable: true, Grade: catalog.GradeUnknown, PartialCoverage: true,
+		Reason: "Flatpak inventory could not be checked.",
+	}
+	model.stack = []Route{{Screen: ScreenSandbox}}
+	model.loading = false
+	model.width, model.height = 80, 24
+
+	view := model.View()
+	if !strings.Contains(view, "Flatpak inventory could not be checked.") || !strings.Contains(view, "Partial coverage") {
+		t.Fatalf("incomplete inventory context is missing:\n%s", view)
+	}
+	if strings.Contains(view, "No Flatpak copies were reported.") {
+		t.Fatalf("incomplete inventory was presented as empty:\n%s", view)
 	}
 }
 

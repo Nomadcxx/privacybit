@@ -246,6 +246,8 @@ truncation counts. Unknown evidence stays unknown; a known risky grant remains
 visible even when another permission cannot be classified. Older schema-1
 snapshots without usable sandbox coverage render with unknown sandbox and
 overall grades in memory. Loading a snapshot never rewrites the saved report.
+A partial inventory with no returned copies retains its reason and never reads
+as a confirmed empty installation.
 
 When the overall grade is unknown, the overview names the unrated category or
 sandbox axis and shows the worst grade supported by the available evidence as

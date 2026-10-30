@@ -698,11 +698,8 @@ func (m *Model) listRowsHeight(route Route) int {
 
 func (m *Model) sandboxView(route Route) string {
 	summary := m.sandboxSummary()
-	if !m.snapshot.Sandbox.Applicable {
+	if !m.snapshot.Sandbox.Applicable || len(m.snapshot.Sandbox.Apps) == 0 {
 		return summary
-	}
-	if len(m.snapshot.Sandbox.Apps) == 0 {
-		return summary + "\nNo Flatpak copies were reported."
 	}
 	return summary + "\nInstalled copies:\n" + m.listView(route)
 }
