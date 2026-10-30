@@ -19,7 +19,11 @@ sha256sums=('SKIP')
 build() {
   cd "${srcdir}/${pkgname}"
   export GOFLAGS="-buildmode=pie -trimpath -mod=readonly -modcacherw"
-  go build -buildvcs=false -o privacybit ./cmd/privacybit
+  local build_commit
+  build_commit=$(git rev-parse HEAD)
+  go build -buildvcs=false \
+    -ldflags "-X main.buildVersion=${pkgver} -X main.buildCommit=${build_commit}" \
+    -o privacybit ./cmd/privacybit
   go build -buildvcs=false \
     -ldflags "-X github.com/Nomadcxx/privacybit/internal/helper.buildVersion=${pkgver}" \
     -o privacybit-helper ./cmd/privacybit-helper
