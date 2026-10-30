@@ -541,6 +541,17 @@ than an obviously-off VPN, because it teaches the user the signal is reliable.
 | IPv6 escape | compare IPv6 default route against tunnel | `red` flag: "IPv6 bypasses the tunnel" |
 | Kill switch | absence of an outside default route in the routing table | note |
 
+Use resolver ownership mode to select DNS evidence. In `foreign` mode, use the
+nameservers in `/etc/resolv.conf` and check their routes; `resolvectl dns` may
+report per-link servers that do not own the resolver path used by applications.
+In the recognized `stub`, `uplink`, and `static` modes, use `resolvectl`'s
+active DNS servers and default-route state. If the mode is missing or
+unrecognized, or `resolvectl` is present but its status cannot be read, report
+the DNS check as unknown. When `resolvectl` is unavailable, `/etc/resolv.conf`
+is the only resolver evidence and its nameservers may be checked directly. If
+the active resolver or its route cannot be identified, report the DNS check as
+unknown.
+
 A VPN with DNS leaking and IPv6 escaping reports **red**, not green, with the
 specific defects named. This is the single most valuable finding the tool can
 produce.

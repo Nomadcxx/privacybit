@@ -24,6 +24,7 @@ func TestMultipleVerifiedTunnelsAreCheckedAsASet(t *testing.T) {
 	runner := detect.MapRunner{Output: map[string]string{
 		"ip -o link":                           "1: lo: <LOOPBACK>\n2: tailscale0: <POINTOPOINT,UP>\n3: wg0: <POINTOPOINT,UP>\n",
 		"wg show interfaces":                   "wg0\n",
+		"resolvectl status":                    "Global\n           resolv.conf mode: stub\n",
 		"ip -4 route get 1.1.1.1":              "1.1.1.1 dev tailscale0\n",
 		"resolvectl dns":                       "Global: 100.100.100.100\n",
 		"resolvectl default-route":             "Global: yes\n",
@@ -57,6 +58,7 @@ func TestRouteDNSAndIPv6EscapesBecomeDefects(t *testing.T) {
 	runner := detect.MapRunner{Output: map[string]string{
 		"ip -o link":                           "1: lo: <LOOPBACK>\n2: tailscale0: <POINTOPOINT,UP>\n3: enp7s0: <BROADCAST,UP>\n",
 		"wg show interfaces":                   "",
+		"resolvectl status":                    "Global\n           resolv.conf mode: stub\n",
 		"ip -4 route get 1.1.1.1":              "1.1.1.1 via 192.168.0.2 dev enp7s0 src 192.168.0.10\n",
 		"resolvectl dns":                       "Global: 100.100.100.100\nLink 2 (enp7s0): 192.168.0.15 1.1.1.1\n",
 		"resolvectl default-route":             "Global: no\nLink 2 (enp7s0): yes\nLink 3 (tailscale0): no\n",
@@ -85,7 +87,7 @@ func TestRouteDNSAndIPv6EscapesBecomeDefects(t *testing.T) {
 	}
 }
 
-func TestForeignResolverUsesResolvConfAndRouteEvidence(t *testing.T) {
+func TestResolverWithoutResolvedUsesResolvConfAndRouteEvidence(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "resolv.conf")
 	if err := os.WriteFile(path, []byte("nameserver 100.100.100.100\n"), 0o600); err != nil {
 		t.Fatal(err)
@@ -93,20 +95,80 @@ func TestForeignResolverUsesResolvConfAndRouteEvidence(t *testing.T) {
 	runner := detect.MapRunner{Output: map[string]string{
 		"ip -o link":                           "1: lo: <LOOPBACK>\n2: tailscale0: <POINTOPOINT,UP>\n",
 		"wg show interfaces":                   "",
-		"resolvectl dns":                       "",
-		"resolvectl default-route":             "",
 		"ip route get 100.100.100.100":         "100.100.100.100 dev tailscale0\n",
 		"ip -4 route get 1.1.1.1":              "1.1.1.1 dev tailscale0\n",
 		"ip -6 route get 2606:4700:4700::1111": "2606:4700:4700::1111 dev tailscale0\n",
 		"ip route show default":                "default dev tailscale0\n",
 		"ip -6 route show default":             "",
-	}}
+	}, Missing: map[string]bool{"resolvectl": true}}
 	got := inspect(context.Background(), runner, path, []string{"tailscaled"})
 	if got.DNSContained == nil || !*got.DNSContained {
-		t.Fatalf("foreign resolver DNS result = %v, want contained by route", got.DNSContained)
+		t.Fatalf("resolver DNS result without systemd-resolved = %v, want contained by route", got.DNSContained)
 	}
 	if len(got.Defects) != 0 {
 		t.Fatalf("defects = %+v, want none", got.Defects)
+	}
+}
+
+func TestForeignResolverModePrefersResolvConfOverResolvedDNS(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "resolv.conf")
+	if err := os.WriteFile(path, []byte("nameserver 203.0.113.53\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	runner := detect.MapRunner{Output: map[string]string{
+		"ip -o link":                           "1: lo: <LOOPBACK>\n2: tailscale0: <POINTOPOINT,UP>\n3: enp7s0: <BROADCAST,UP>\n",
+		"wg show interfaces":                   "",
+		"resolvectl status":                    "Global\n           resolv.conf mode: foreign\n",
+		"resolvectl dns":                       "Global: 203.0.113.53\nLink 2 (enp7s0): 198.51.100.15 198.51.100.1\n",
+		"resolvectl default-route":             "Global: no\nLink 2 (enp7s0): yes\nLink 4 (tailscale0): no\n",
+		"ip route get 203.0.113.53":            "203.0.113.53 dev tailscale0\n",
+		"ip -4 route get 1.1.1.1":              "1.1.1.1 dev tailscale0\n",
+		"ip -6 route get 2606:4700:4700::1111": "2606:4700:4700::1111 dev tailscale0\n",
+		"ip route show default":                "default dev tailscale0\n",
+		"ip -6 route show default":             "",
+	}}
+
+	got := inspect(context.Background(), runner, path, []string{"tailscaled"})
+	if got.DNSContained == nil || !*got.DNSContained {
+		t.Fatalf("foreign resolver DNS result = %v, want contained by configured resolver route", got.DNSContained)
+	}
+	if len(got.Defects) != 0 {
+		t.Fatalf("defects = %+v, want no VPN leaks", got.Defects)
+	}
+}
+
+func TestUnknownResolverModeLeavesDNSUnknown(t *testing.T) {
+	for _, status := range []string{
+		"Global\n",
+		"Global\n           resolv.conf mode: future\n",
+	} {
+		path := filepath.Join(t.TempDir(), "resolv.conf")
+		if err := os.WriteFile(path, []byte("nameserver 100.100.100.100\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		runner := detect.MapRunner{Output: map[string]string{
+			"ip -o link":                           "1: lo: <LOOPBACK>\n2: tailscale0: <POINTOPOINT,UP>\n3: enp7s0: <BROADCAST,UP>\n",
+			"wg show interfaces":                   "",
+			"resolvectl status":                    status,
+			"resolvectl dns":                       "Link 2 (enp7s0): 198.51.100.15\n",
+			"resolvectl default-route":             "Link 2 (enp7s0): yes\n",
+			"ip route get 198.51.100.15":           "198.51.100.15 dev enp7s0\n",
+			"ip -4 route get 1.1.1.1":              "1.1.1.1 dev tailscale0\n",
+			"ip -6 route get 2606:4700:4700::1111": "2606:4700:4700::1111 dev tailscale0\n",
+			"ip route show default":                "default dev tailscale0\n",
+			"ip -6 route show default":             "",
+		}}
+
+		got := inspect(context.Background(), runner, path, []string{"tailscaled"})
+		if got.DNSContained != nil {
+			t.Fatalf("status %q DNS containment = %v, want unknown", status, got.DNSContained)
+		}
+		if len(got.Defects) != 0 {
+			t.Fatalf("status %q defects = %+v, want no unsupported DNS finding", status, got.Defects)
+		}
+		if len(got.Coverage) == 0 {
+			t.Fatalf("status %q has no coverage note for ambiguous resolver ownership", status)
+		}
 	}
 }
 
