@@ -201,6 +201,25 @@ func TestBuildAndInstallCLIInstallsRunnableBinaryOffline(t *testing.T) {
 		t.Fatalf("find module cache: %v", err)
 	}
 	t.Setenv("GOMODCACHE", strings.TrimSpace(string(moduleCache)))
+	crossOS := "windows"
+	if runtime.GOOS == "windows" {
+		crossOS = "linux"
+	}
+	crossArch := "arm64"
+	if runtime.GOARCH == "arm64" {
+		crossArch = "amd64"
+	}
+	t.Setenv("GOOS", crossOS)
+	t.Setenv("GOARCH", crossArch)
+	t.Setenv("GOTOOLCHAIN", "go1.99.0+auto")
+	t.Setenv("GOPROXY", "off")
+	t.Setenv("GOSUMDB", "off")
+	switch runtime.GOARCH {
+	case "amd64":
+		t.Setenv("GOAMD64", "invalid")
+	case "arm64":
+		t.Setenv("GOARM64", "invalid")
+	}
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	binDir, err := UserBinDir()
@@ -283,7 +302,20 @@ func TestOfflineBuildEnvDisablesNetworkAndOverridesGoSettings(t *testing.T) {
 		"GOTOOLCHAIN=auto",
 		"GOWORK=/tmp/go.work",
 		"GOFLAGS=-mod=mod",
-	})
+		"GOENV=/tmp/go.env",
+		"GOMODCACHE=/wrong/cache",
+		"GOOS=windows",
+		"GOARCH=arm64",
+		"GO386=softfloat",
+		"GOAMD64=v4",
+		"GOARM=5",
+		"GOARM64=v9.0",
+		"GOMIPS=softfloat",
+		"GOMIPS64=softfloat",
+		"GOPPC64=power10",
+		"GORISCV64=rva23u64",
+		"GOWASM=satconv",
+	}, "/home/user/go/pkg/mod")
 	values := make(map[string]string)
 	for _, entry := range env {
 		key, value, found := strings.Cut(entry, "=")
@@ -297,6 +329,19 @@ func TestOfflineBuildEnvDisablesNetworkAndOverridesGoSettings(t *testing.T) {
 		"GOTOOLCHAIN": "local",
 		"GOWORK":      "off",
 		"GOFLAGS":     "",
+		"GOENV":       "off",
+		"GOMODCACHE":  "/home/user/go/pkg/mod",
+		"GOOS":        runtime.GOOS,
+		"GOARCH":      runtime.GOARCH,
+		"GO386":       "",
+		"GOAMD64":     "",
+		"GOARM":       "",
+		"GOARM64":     "",
+		"GOMIPS":      "",
+		"GOMIPS64":    "",
+		"GOPPC64":     "",
+		"GORISCV64":   "",
+		"GOWASM":      "",
 	} {
 		if got := values[key]; got != want {
 			t.Errorf("%s = %q, want %q", key, got, want)
