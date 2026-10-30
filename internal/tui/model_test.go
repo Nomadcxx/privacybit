@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Nomadcxx/privacybit/internal/audit"
 	"github.com/Nomadcxx/privacybit/internal/catalog"
 	"github.com/Nomadcxx/privacybit/internal/network"
 	"github.com/Nomadcxx/privacybit/internal/report"
@@ -189,6 +190,169 @@ func TestUnmatchedAppDetailsShowOriginContext(t *testing.T) {
 		if !strings.Contains(view, want) {
 			t.Errorf("unmatched app view missing %q:\n%s", want, view)
 		}
+	}
+}
+
+func TestOverviewOpensSandboxDetails(t *testing.T) {
+	model := NewModel(context.Background(), nil)
+	model.snapshot = ptr(testSnapshot())
+	model.stack = []Route{{Screen: ScreenOverview}}
+	rows := model.visibleRows(model.stack[0])
+	for i, item := range rows {
+		if item.kind != "sandbox" {
+			continue
+		}
+		model.stack[0].Cursor = i
+		model.enterSelected()
+		if got := model.stack[len(model.stack)-1].Screen; got != ScreenSandbox {
+			t.Fatalf("sandbox route = %q", got)
+		}
+		return
+	}
+	t.Fatal("overview has no sandbox details route")
+}
+
+func TestSandboxViewShowsScopedEvidenceAndCoverage(t *testing.T) {
+	model := NewModel(context.Background(), nil)
+	model.snapshot = ptr(testSnapshot())
+	model.snapshot.Sandbox = report.Sandbox{
+		Applicable: true, Grade: catalog.GradeUnknown, AppsTotal: 3, AppsShown: 2,
+		AppsTruncated: true, AppsChecked: 1, AppsIncomplete: 1, PartialCoverage: true,
+		Apps: []report.SandboxApp{
+			{
+				ID: "org.example.App", Scope: "system", Grade: catalog.GradeRed,
+				Grants: []string{"host filesystem"}, GrantsShown: 1, GrantsTotal: 2, GrantsTruncated: true,
+			},
+			{
+				ID: "org.example.App", Scope: "user", Grade: catalog.GradeUnknown,
+				Unknown: []string{"unclassified permission"}, UnknownShown: 1, UnknownTotal: 2, UnknownTruncated: true,
+			},
+		},
+	}
+	model.stack = []Route{{Screen: ScreenSandbox}}
+
+	view := model.View()
+	for _, want := range []string{
+		"Flatpak sandbox", "Sandbox grade: ? Unrated", "Permission queries: 1 of 3; 1 incomplete",
+		"Partial coverage", "org.example.App (system)", "org.example.App (user)",
+		"Risky", "Unrated", "Showing 2 of 3 Flatpak copies",
+	} {
+		if !strings.Contains(view, want) {
+			t.Errorf("sandbox view missing %q:\n%s", want, view)
+		}
+	}
+
+	model.stack = []Route{{Screen: ScreenSandbox, Cursor: 0}}
+	model.enterSelected()
+	if route := model.stack[len(model.stack)-1]; route.Screen != ScreenSandboxApp || route.ID != sandboxAppRouteID(model.snapshot.Sandbox.Apps[0]) {
+		t.Fatalf("system copy route = %+v", route)
+	}
+	model.stack = []Route{{Screen: ScreenSandboxApp, ID: sandboxAppRouteID(model.snapshot.Sandbox.Apps[0])}}
+	view = model.View()
+	for _, want := range []string{"Scope: system", "Grants: host filesystem", "Showing 1 of 2 recognized grants"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("system sandbox copy view missing %q:\n%s", want, view)
+		}
+	}
+	model.stack = []Route{{Screen: ScreenSandbox, Cursor: 1}}
+	model.enterSelected()
+	if route := model.stack[len(model.stack)-1]; route.Screen != ScreenSandboxApp || route.ID != sandboxAppRouteID(model.snapshot.Sandbox.Apps[1]) {
+		t.Fatalf("user copy route = %+v", route)
+	}
+	model.stack = []Route{{Screen: ScreenSandboxApp, ID: sandboxAppRouteID(model.snapshot.Sandbox.Apps[1])}}
+	view = model.View()
+	for _, want := range []string{"Scope: user", "Unknown: unclassified permission", "Showing 1 of 2 unclassified items"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("user sandbox copy view missing %q:\n%s", want, view)
+		}
+	}
+}
+
+func TestSandboxViewExplainsNotApplicableState(t *testing.T) {
+	model := NewModel(context.Background(), nil)
+	model.snapshot = ptr(testSnapshot())
+	model.snapshot.Sandbox = report.Sandbox{Grade: catalog.GradeUnknown, Reason: "Flatpak is not installed."}
+	model.stack = []Route{{Screen: ScreenSandbox}}
+
+	view := model.View()
+	for _, want := range []string{"Flatpak sandbox", "not applicable", "Flatpak is not installed."} {
+		if !strings.Contains(view, want) {
+			t.Errorf("sandbox view missing %q:\n%s", want, view)
+		}
+	}
+}
+
+func TestSandboxViewTreatsMissingApplicabilityAsUnknown(t *testing.T) {
+	model := NewModel(context.Background(), nil)
+	model.snapshot = ptr(testSnapshot())
+	model.stack = []Route{{Screen: ScreenSandbox}}
+
+	view := model.View()
+	for _, want := range []string{"Sandbox grade: ? Unrated", "applicability was not recorded"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("sandbox view missing %q:\n%s", want, view)
+		}
+	}
+}
+
+func TestSmallTerminalRequestsResizeInsteadOfClipping(t *testing.T) {
+	model := NewModelWithSnapshot(context.Background(), testSnapshot(), nil)
+	model.width, model.height = 20, 8
+	if view := model.View(); !strings.Contains(view, "Terminal is too small") {
+		t.Fatalf("small terminal view = %q", view)
+	}
+}
+
+func TestUnknownOverallExplainsUnratedAreasAndWorstKnownGrade(t *testing.T) {
+	model := NewModel(context.Background(), nil)
+	snapshot := testSnapshot()
+	snapshot.Overall.Grade = catalog.GradeUnknown
+	snapshot.Categories = []report.Category{
+		{ID: "browser", Name: "Browser", Grade: catalog.GradeUnknown, PartialCoverage: true},
+		{ID: "chat", Name: "Chat", Grade: catalog.GradeAmber},
+	}
+	snapshot.Sandbox = report.Sandbox{Applicable: true, Grade: catalog.GradeUnknown}
+	model.snapshot = ptr(snapshot)
+	model.stack = []Route{{Screen: ScreenOverview}}
+
+	view := model.View()
+	for _, want := range []string{
+		"Overall: ? Unrated", "Unrated areas: Browser, Flatpak sandbox",
+		"Worst known result: ▲ Review (Chat)",
+	} {
+		if !strings.Contains(view, want) {
+			t.Errorf("overview missing %q:\n%s", want, view)
+		}
+	}
+	snapshot.Sandbox.Grade = catalog.GradeRed
+	model.snapshot = ptr(snapshot)
+	if view := model.View(); !strings.Contains(view, "Worst known result: ■ Risky (Flatpak sandbox)") {
+		t.Fatalf("overview omitted the worst known sandbox grade:\n%s", view)
+	}
+}
+
+func TestLongDetailViewWrapsAndScrolls(t *testing.T) {
+	model := NewModel(context.Background(), nil)
+	model.snapshot = ptr(testSnapshot())
+	model.snapshot.Findings = []audit.Finding{{
+		ID: "long", Title: "Long finding",
+		Detail: "BEGIN " + strings.Repeat("evidence ", 120) + "ENDMARKER",
+	}}
+	model.stack = []Route{{Screen: ScreenFinding, ID: "long"}}
+	model.width, model.height = 48, 14
+
+	first := model.View()
+	if !strings.Contains(first, "BEGIN") || strings.Contains(first, "ENDMARKER") {
+		t.Fatalf("first detail viewport = %q", first)
+	}
+	if lines := strings.Split(strings.TrimSuffix(first, "\n"), "\n"); len(lines) > model.height {
+		t.Fatalf("detail view has %d lines for a %d-line terminal: %q", len(lines), model.height, first)
+	}
+	for range 100 {
+		model.Update(tea.KeyMsg{Type: tea.KeyDown})
+	}
+	if last := model.View(); !strings.Contains(last, "ENDMARKER") {
+		t.Fatalf("last detail viewport does not reach the final evidence: %q", last)
 	}
 }
 

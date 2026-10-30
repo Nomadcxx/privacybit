@@ -29,6 +29,8 @@ const (
 	ScreenFinding    Screen = "finding"
 	ScreenNetwork    Screen = "network"
 	ScreenCoverage   Screen = "coverage"
+	ScreenSandbox    Screen = "sandbox"
+	ScreenSandboxApp Screen = "sandbox_app"
 	ScreenUnmatched  Screen = "unmatched"
 	ScreenHelp       Screen = "help"
 )
@@ -39,6 +41,7 @@ type Route struct {
 	Screen    Screen
 	ID        string
 	Cursor    int
+	Scroll    int
 	Filter    string
 	Filtering bool
 }
@@ -115,6 +118,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		m.clampCursor()
 		return m, nil
 	case scanResult:
 		m.loading = false
@@ -178,11 +182,38 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.pop()
 			return m, nil
 		case "up", "k":
-			route.Cursor--
+			if scrollableScreen(route.Screen) {
+				route.Scroll--
+			} else {
+				route.Cursor--
+			}
 			m.clampCursor()
 		case "down", "j":
-			route.Cursor++
+			if scrollableScreen(route.Screen) {
+				route.Scroll++
+			} else {
+				route.Cursor++
+			}
 			m.clampCursor()
+		case "pgup":
+			if scrollableScreen(route.Screen) {
+				route.Scroll -= max(m.height-8, 1)
+				m.clampCursor()
+			}
+		case "pgdown":
+			if scrollableScreen(route.Screen) {
+				route.Scroll += max(m.height-8, 1)
+				m.clampCursor()
+			}
+		case "home":
+			if scrollableScreen(route.Screen) {
+				route.Scroll = 0
+			}
+		case "end":
+			if scrollableScreen(route.Screen) {
+				route.Scroll = m.maxScroll(*route)
+				m.clampCursor()
+			}
 		case "enter", "right", "l":
 			m.enterSelected()
 		case "/":
@@ -246,6 +277,10 @@ func (m *Model) clampCursor() {
 		return
 	}
 	route := &m.stack[len(m.stack)-1]
+	if scrollableScreen(route.Screen) {
+		route.Scroll = min(max(route.Scroll, 0), m.maxScroll(*route))
+		return
+	}
 	max := len(m.visibleRows(*route)) - 1
 	if route.Cursor < 0 {
 		route.Cursor = 0
@@ -278,6 +313,10 @@ func (m *Model) enterSelected() {
 		if selected.kind == "unmatched" {
 			m.push(Route{Screen: ScreenApp, ID: selected.id})
 		}
+	case ScreenSandbox:
+		if selected.kind == string(ScreenSandboxApp) {
+			m.push(Route{Screen: ScreenSandboxApp, ID: selected.id})
+		}
 	case ScreenFindings:
 		m.push(Route{Screen: ScreenFinding, ID: selected.id})
 	}
@@ -294,6 +333,7 @@ func (m *Model) visibleRows(route Route) []row {
 			{id: "categories", label: "Browse categories", kind: string(ScreenCategories)},
 			{id: "findings", label: fmt.Sprintf("Findings (%d)", m.snapshot.Overall.Findings), kind: string(ScreenFindings)},
 			{id: "network", label: "VPN and network", kind: string(ScreenNetwork)},
+			{id: "sandbox", label: "Flatpak sandbox", kind: string(ScreenSandbox)},
 			{id: "coverage", label: "Coverage and reduced checks", kind: string(ScreenCoverage)},
 		}
 		if len(m.snapshot.Unmatched) > 0 {
@@ -329,6 +369,14 @@ func (m *Model) visibleRows(route Route) []row {
 		if m.snapshot.FindingsTruncated {
 			rows = append(rows, row{label: fmt.Sprintf("Showing %d of %d findings", len(m.snapshot.Findings), m.snapshot.FindingsTotal), kind: "note"})
 		}
+	case ScreenSandbox:
+		for _, app := range m.snapshot.Sandbox.Apps {
+			label := app.ID
+			if app.Scope != "" {
+				label += " (" + app.Scope + ")"
+			}
+			rows = append(rows, row{id: sandboxAppRouteID(app), label: label, grade: app.Grade, kind: string(ScreenSandboxApp)})
+		}
 	case ScreenUnmatched:
 		for _, app := range m.snapshot.Unmatched {
 			rows = append(rows, row{id: unmatchedRouteID(app), label: app.Name, grade: catalog.GradeUnknown, kind: "unmatched"})
@@ -362,14 +410,69 @@ func (m *Model) category(id string) *report.Category {
 	return nil
 }
 
+func (m *Model) sandboxApp(id string) *report.SandboxApp {
+	if m.snapshot == nil {
+		return nil
+	}
+	appID, scope, hasScope := strings.Cut(id, "\x00")
+	for i := range m.snapshot.Sandbox.Apps {
+		app := &m.snapshot.Sandbox.Apps[i]
+		if app.ID == appID && ((!hasScope && app.Scope == "") || (hasScope && app.Scope == scope)) {
+			return app
+		}
+	}
+	return nil
+}
+
+func sandboxAppRouteID(app report.SandboxApp) string {
+	if app.Scope != "" {
+		return app.ID + "\x00" + app.Scope
+	}
+	return app.ID
+}
+
 func (m *Model) View() string {
 	if m.height <= 0 {
 		return ""
+	}
+	if (m.width > 0 && m.width < 20) || m.height < 8 {
+		return "privacybit\nTerminal is too small. Resize to at least 20 columns by 8 rows.\n"
 	}
 	if len(m.stack) == 0 {
 		return "privacybit\nNo screen is available.\n"
 	}
 	route := m.stack[len(m.stack)-1]
+	header := m.header(route)
+	footer := m.footer()
+	headerRows := strings.Count(header, "\n")
+	footerRows := strings.Count(footer, "\n") + 1
+	if m.height < headerRows+footerRows+1 {
+		return "privacybit\nTerminal is too small. Resize to see this view.\n"
+	}
+	content := m.screenContent(route)
+	if content != "" && scrollableScreen(route.Screen) {
+		lines := m.wrappedContentLines(route)
+		rows := m.contentRows(route)
+		start := min(max(route.Scroll, 0), max(len(lines)-rows, 0))
+		end := min(start+rows, len(lines))
+		content = strings.Join(lines[start:end], "\n")
+	}
+	var out strings.Builder
+	out.WriteString(header)
+	if content != "" {
+		fmt.Fprintln(&out, content)
+	}
+	fmt.Fprintln(&out, footer)
+	return out.String()
+}
+
+func (m *Model) footer() string {
+	footer := "↑/↓ move or scroll · PgUp/PgDn page · Enter open · Esc back · q quit\n" +
+		"p purge plan · r refresh · n network · c coverage · ? help"
+	return lipgloss.NewStyle().Width(max(m.width-2, 20)).Render(footer)
+}
+
+func (m *Model) header(route Route) string {
 	title := screenTitle(route.Screen)
 	if route.ID != "" && route.Screen == ScreenCategory {
 		if category := m.category(route.ID); category != nil {
@@ -384,6 +487,14 @@ func (m *Model) View() string {
 	if route.ID != "" && route.Screen == ScreenFinding {
 		if finding := m.finding(route.ID); finding != nil {
 			title = finding.Title
+		}
+	}
+	if route.ID != "" && route.Screen == ScreenSandboxApp {
+		if app := m.sandboxApp(route.ID); app != nil {
+			title = app.ID
+			if app.Scope != "" {
+				title += " (" + app.Scope + ")"
+			}
 		}
 	}
 
@@ -401,6 +512,9 @@ func (m *Model) View() string {
 	if m.snapshot != nil {
 		grade := report.GradeChannels(m.snapshot.Overall.Grade)
 		fmt.Fprintf(&out, "Overall: %s %s\n", grade.Glyph, grade.Word)
+		if context := m.overallContext(); context != "" {
+			fmt.Fprintln(&out, context)
+		}
 		fmt.Fprintf(&out, "As of %s\n", m.snapshot.GeneratedAt.Local().Format("15:04:05, 02 Jan 2006"))
 		if m.snapshot.Overall.Score != nil {
 			fmt.Fprintf(&out, "Progress %d/100 (not a quality score)\n", *m.snapshot.Overall.Score)
@@ -412,12 +526,87 @@ func (m *Model) View() string {
 		fmt.Fprintf(&out, "Filter: %s  (/ to edit)\n", route.Filter)
 	}
 
-	content := m.screenContent(route)
-	if content != "" {
-		fmt.Fprintln(&out, content)
+	header := strings.TrimSuffix(out.String(), "\n")
+	return lipgloss.NewStyle().Width(max(m.width-2, 20)).Render(header) + "\n"
+}
+
+func (m *Model) overallContext() string {
+	if m.snapshot == nil || m.snapshot.Overall.Grade != catalog.GradeUnknown {
+		return ""
 	}
-	fmt.Fprintln(&out, lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render("↑/↓ move  Enter open  Esc back  p review purge on a red app  r refresh  n network  c coverage  ? help  q quit"))
-	return out.String()
+	var unrated []string
+	for _, category := range m.snapshot.Categories {
+		if category.Grade == catalog.GradeUnknown {
+			unrated = append(unrated, category.Name)
+		}
+	}
+	if !m.snapshot.Sandbox.Grade.Valid() && (m.snapshot.Sandbox.Applicable || m.snapshot.Sandbox.Reason == "") {
+		unrated = append(unrated, "Flatpak sandbox")
+	}
+	if len(unrated) == 0 {
+		line := "Unrated areas: required checks are unavailable. See Coverage for source details."
+		if grade, label, ok := m.worstKnownResult(); ok {
+			channels := report.GradeChannels(grade)
+			return fmt.Sprintf("%s\nWorst known result: %s %s (%s).", line, channels.Glyph, channels.Word, label)
+		}
+		return line
+	}
+	line := "Unrated areas: " + strings.Join(unrated, ", ") + ". See Coverage for source details."
+	if grade, label, ok := m.worstKnownResult(); ok {
+		channels := report.GradeChannels(grade)
+		line += fmt.Sprintf("\nWorst known result: %s %s (%s).", channels.Glyph, channels.Word, label)
+	}
+	return line
+}
+
+func (m *Model) worstKnownResult() (catalog.Grade, string, bool) {
+	if m.snapshot == nil {
+		return "", "", false
+	}
+	var worst catalog.Grade
+	label := ""
+	consider := func(grade catalog.Grade, name string) {
+		if !grade.Valid() {
+			return
+		}
+		if worst == "" || grade.Risk() > worst.Risk() || (grade == worst && name < label) {
+			worst, label = grade, name
+		}
+	}
+	for _, category := range m.snapshot.Categories {
+		consider(category.Grade, category.Name)
+	}
+	if m.snapshot.Sandbox.Applicable {
+		consider(m.snapshot.Sandbox.Grade, "Flatpak sandbox")
+	}
+	return worst, label, worst != ""
+}
+
+func (m *Model) contentRows(route Route) int {
+	header := strings.TrimSuffix(m.header(route), "\n")
+	headerRows := strings.Count(header, "\n") + 1
+	footerRows := strings.Count(m.footer(), "\n") + 1
+	return max(m.height-headerRows-footerRows, 1)
+}
+
+func (m *Model) maxScroll(route Route) int {
+	return max(len(m.wrappedContentLines(route))-m.contentRows(route), 0)
+}
+
+func (m *Model) wrappedContentLines(route Route) []string {
+	content := m.screenContent(route)
+	width := max(m.width-4, 20)
+	wrapped := lipgloss.NewStyle().Width(width).Render(content)
+	return strings.Split(wrapped, "\n")
+}
+
+func scrollableScreen(screen Screen) bool {
+	switch screen {
+	case ScreenApp, ScreenFinding, ScreenNetwork, ScreenCoverage, ScreenSandboxApp:
+		return true
+	default:
+		return false
+	}
 }
 
 func (m *Model) screenContent(route Route) string {
@@ -438,10 +627,14 @@ func (m *Model) screenContent(route Route) string {
 		return m.networkView()
 	case ScreenCoverage:
 		return m.coverageView()
+	case ScreenSandbox:
+		return m.sandboxView(route)
+	case ScreenSandboxApp:
+		return m.sandboxAppView(route.ID)
 	case ScreenHelp:
 		return "Grades use colour, shape, and word. Unknown means the check could not judge.\n" +
 			"Findings are evidence with instructions; p on a red app opens a separate reviewed purge flow.\n" +
-			"Press / to filter a list, Enter to inspect, Esc to return."
+			"Use ↑/↓ to move or scroll and PgUp/PgDn to page through details. Press / to filter a list, Enter to inspect, Esc to return."
 	default:
 		return "No screen is available."
 	}
@@ -453,9 +646,12 @@ func (m *Model) listView(route Route) string {
 		if route.Screen == ScreenOverview {
 			return "No categories or findings are available. Coverage explains what could be checked."
 		}
+		if route.Screen == ScreenSandbox {
+			return "No Flatpak copies were reported."
+		}
 		return "No rows match this view. Unknown and empty are different states."
 	}
-	maxRows := max(m.height-9, 3)
+	maxRows := m.listRowsHeight(route)
 	start := max(route.Cursor-maxRows+1, 0)
 	end := min(start+maxRows, len(rows))
 	var out strings.Builder
@@ -488,6 +684,103 @@ func (m *Model) listView(route Route) string {
 		fmt.Fprintf(&out, "… %d more\n", len(rows)-end)
 	}
 	return strings.TrimSuffix(out.String(), "\n")
+}
+
+func (m *Model) listRowsHeight(route Route) int {
+	headerRows := strings.Count(m.header(route), "\n")
+	footerRows := strings.Count(m.footer(), "\n") + 1
+	reservedRows := 2
+	if route.Screen == ScreenSandbox {
+		reservedRows += strings.Count(m.sandboxSummary(), "\n") + 2
+	}
+	return max(m.height-headerRows-footerRows-reservedRows, 1)
+}
+
+func (m *Model) sandboxView(route Route) string {
+	summary := m.sandboxSummary()
+	if !m.snapshot.Sandbox.Applicable {
+		return summary
+	}
+	if len(m.snapshot.Sandbox.Apps) == 0 {
+		return summary + "\nNo Flatpak copies were reported."
+	}
+	return summary + "\nInstalled copies:\n" + m.listView(route)
+}
+
+func (m *Model) sandboxSummary() string {
+	sandbox := m.snapshot.Sandbox
+	if !sandbox.Applicable {
+		if sandbox.Reason == "" {
+			return "Sandbox grade: ? Unrated\nSandbox applicability was not recorded. See Coverage."
+		}
+		var out strings.Builder
+		fmt.Fprintln(&out, "Sandbox grade: not applicable")
+		fmt.Fprintln(&out, sandbox.Reason)
+		return strings.TrimSpace(out.String())
+	}
+
+	grade := report.GradeChannels(sandbox.Grade)
+	var out strings.Builder
+	fmt.Fprintf(&out, "Sandbox grade: %s %s\n", grade.Glyph, grade.Word)
+	if sandbox.Reason != "" {
+		fmt.Fprintf(&out, "Reason: %s\n", sandbox.Reason)
+	}
+	if sandbox.AppsTotal > 0 {
+		fmt.Fprintf(&out, "Permission queries: %d of %d; %d incomplete\n", sandbox.AppsChecked, sandbox.AppsTotal, sandbox.AppsIncomplete)
+	}
+	if sandbox.PartialCoverage {
+		fmt.Fprintln(&out, "Partial coverage: some permission evidence is unknown or unclassified.")
+	}
+	if sandbox.AppsTruncated {
+		shown := sandbox.AppsShown
+		if shown == 0 {
+			shown = len(sandbox.Apps)
+		}
+		fmt.Fprintf(&out, "Showing %d of %d Flatpak copies.\n", shown, sandbox.AppsTotal)
+	}
+	return strings.TrimSuffix(out.String(), "\n")
+}
+
+func (m *Model) sandboxAppView(id string) string {
+	app := m.sandboxApp(id)
+	if app == nil {
+		return "Flatpak copy details are unavailable."
+	}
+	grade := report.GradeChannels(app.Grade)
+	var out strings.Builder
+	fmt.Fprintf(&out, "%s %s\n", grade.Glyph, grade.Word)
+	if app.Scope != "" {
+		fmt.Fprintf(&out, "Scope: %s\n", app.Scope)
+	}
+	if len(app.Grants) == 0 {
+		fmt.Fprintln(&out, "Recognized grants: none")
+	} else {
+		fmt.Fprintf(&out, "Grants: %s\n", strings.Join(app.Grants, "; "))
+	}
+	if app.GrantsTruncated {
+		shown, total := evidenceCounts(app.GrantsShown, app.GrantsTotal, len(app.Grants))
+		fmt.Fprintf(&out, "Showing %d of %d recognized grants.\n", shown, total)
+	}
+	if len(app.Unknown) == 0 {
+		fmt.Fprintln(&out, "Unclassified permissions: none")
+	} else {
+		fmt.Fprintf(&out, "Unknown: %s\n", strings.Join(app.Unknown, "; "))
+	}
+	if app.UnknownTruncated {
+		shown, total := evidenceCounts(app.UnknownShown, app.UnknownTotal, len(app.Unknown))
+		fmt.Fprintf(&out, "Showing %d of %d unclassified items.\n", shown, total)
+	}
+	return strings.TrimSuffix(out.String(), "\n")
+}
+
+func evidenceCounts(shown, total, available int) (int, int) {
+	if shown == 0 {
+		shown = available
+	}
+	if total < shown {
+		total = shown
+	}
+	return shown, total
 }
 
 func (m *Model) appView(id string) string {
@@ -687,6 +980,10 @@ func screenTitle(screen Screen) string {
 		return "VPN and network"
 	case ScreenCoverage:
 		return "Coverage"
+	case ScreenSandbox:
+		return "Flatpak sandbox"
+	case ScreenSandboxApp:
+		return "Flatpak application"
 	case ScreenUnmatched:
 		return "Unmatched applications"
 	case ScreenHelp:

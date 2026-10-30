@@ -344,3 +344,74 @@ func TestParseSnapshotRejectsFutureMajorAndAcceptsAdditiveFields(t *testing.T) {
 		t.Fatal("future major schema accepted")
 	}
 }
+
+func TestParseSnapshotDowngradesIncompleteSandboxCoverage(t *testing.T) {
+	cases := []struct {
+		name string
+		data string
+	}{
+		{
+			name: "legacy snapshot without sandbox data",
+			data: `{"schema":1,"available":true,"generated_at":"2026-10-20T00:00:00Z","overall":{"grade":"green"}}`,
+		},
+		{
+			name: "applicable sandbox without a grade",
+			data: `{"schema":1,"available":true,"generated_at":"2026-10-20T00:00:00Z","overall":{"grade":"green"},"sandbox":{"applicable":true}}`,
+		},
+		{
+			name: "unknown sandbox grade with green overall",
+			data: `{"schema":1,"available":true,"generated_at":"2026-10-20T00:00:00Z","overall":{"grade":"green"},"sandbox":{"applicable":true,"grade":"unknown"}}`,
+		},
+		{
+			name: "partial sandbox evidence with green grade",
+			data: `{"schema":1,"available":true,"generated_at":"2026-10-20T00:00:00Z","overall":{"grade":"green"},"sandbox":{"applicable":true,"grade":"green","partial_coverage":true,"apps_total":1,"apps_checked":1}}`,
+		},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := ParseSnapshot([]byte(test.data))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.Overall.Grade != catalog.GradeUnknown {
+				t.Fatalf("overall grade = %q, want unknown", got.Overall.Grade)
+			}
+			if !got.Sandbox.Applicable || got.Sandbox.Grade != catalog.GradeUnknown || !got.Sandbox.PartialCoverage || got.Sandbox.Reason == "" {
+				t.Fatalf("sandbox coverage = %+v, want explicit unknown coverage", got.Sandbox)
+			}
+		})
+	}
+}
+
+func TestParseSnapshotPreservesKnownSandboxEvidenceWhenCoverageIsIncomplete(t *testing.T) {
+	data, err := json.Marshal(Snapshot{
+		Schema: Schema, Available: true, GeneratedAt: time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC),
+		Overall: Overall{Grade: catalog.GradeGreen},
+		Sandbox: Sandbox{
+			Applicable: true, Grade: catalog.GradeGreen, AppsShown: 1, AppsTotal: 2,
+			AppsChecked: 1, AppsIncomplete: 1, PartialCoverage: true,
+			Apps: []SandboxApp{{
+				ID: "org.example.App", Scope: "system", Grade: catalog.GradeRed,
+				Grants: []string{"host filesystem"}, GrantsShown: 1, GrantsTotal: 1,
+			}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := ParseSnapshot(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Overall.Grade != catalog.GradeUnknown || got.Sandbox.Grade != catalog.GradeUnknown {
+		t.Fatalf("grades = overall %q, sandbox %q; want unknown", got.Overall.Grade, got.Sandbox.Grade)
+	}
+	if got.Sandbox.AppsTotal != 2 || got.Sandbox.AppsChecked != 1 || got.Sandbox.AppsIncomplete != 1 || len(got.Sandbox.Apps) != 1 {
+		t.Fatalf("sandbox coverage evidence was lost: %+v", got.Sandbox)
+	}
+	app := got.Sandbox.Apps[0]
+	if app.ID != "org.example.App" || app.Scope != "system" || app.Grade != catalog.GradeRed || len(app.Grants) != 1 || app.Grants[0] != "host filesystem" {
+		t.Fatalf("known sandbox result was lost: %+v", app)
+	}
+}

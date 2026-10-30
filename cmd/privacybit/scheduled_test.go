@@ -20,6 +20,7 @@ func scheduledSnapshot(at time.Time, grade catalog.Grade) report.Snapshot {
 	return report.Snapshot{
 		Schema: report.Schema, Available: true, GeneratedAt: at,
 		Overall:  report.Overall{Grade: grade},
+		Sandbox:  report.Sandbox{Grade: catalog.GradeUnknown, Reason: "Flatpak is not installed."},
 		Coverage: []report.Coverage{{Name: "test", Type: "package", Ready: true}},
 	}
 }

@@ -513,7 +513,8 @@ func progressScore(categories []Category) *int {
 	return &value
 }
 
-// ParseSnapshot rejects unsupported major schemas and refuses partial data.
+// ParseSnapshot rejects unsupported major schemas and marks incomplete sandbox
+// evidence unknown before a caller displays the saved overall grade.
 func ParseSnapshot(data []byte) (*Snapshot, error) {
 	var snapshot Snapshot
 	decoder := json.NewDecoder(bytes.NewReader(data))
@@ -532,6 +533,20 @@ func ParseSnapshot(data []byte) (*Snapshot, error) {
 	}
 	if !snapshot.Available || snapshot.GeneratedAt.IsZero() {
 		return nil, errors.New("snapshot is unavailable or has no timestamp")
+	}
+	sandbox := snapshot.Sandbox
+	sandboxUnusable := !sandbox.Applicable && sandbox.Reason == "" ||
+		sandbox.Applicable && (!sandbox.Grade.Valid() || sandbox.PartialCoverage || sandbox.AppsIncomplete > 0 || sandbox.AppsChecked < sandbox.AppsTotal || sandbox.AppsTotal == 0)
+	if sandboxUnusable {
+		reason := sandbox.Reason
+		if reason == "" {
+			reason = "Saved report lacks complete Flatpak sandbox coverage; run a fresh audit."
+		}
+		snapshot.Sandbox.Applicable = true
+		snapshot.Sandbox.Grade = catalog.GradeUnknown
+		snapshot.Sandbox.PartialCoverage = true
+		snapshot.Sandbox.Reason = reason
+		snapshot.Overall.Grade = catalog.GradeUnknown
 	}
 	return &snapshot, nil
 }
