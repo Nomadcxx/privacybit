@@ -520,10 +520,15 @@ func parseSize(value string) (int64, error) {
 	multiplier := map[string]float64{
 		"B": 1, "KiB": 1 << 10, "MiB": 1 << 20, "GiB": 1 << 30, "TiB": 1 << 40,
 	}[fields[1]]
-	if multiplier == 0 || amount > float64(math.MaxInt64)/multiplier {
+	if multiplier == 0 {
 		return 0, fmt.Errorf("unsupported installed size %q", value)
 	}
-	return int64(math.Round(amount * multiplier)), nil
+	bytes := amount * multiplier
+	// int64's upper bound is exclusive; float64(math.MaxInt64) rounds up to 2^63.
+	if math.IsInf(bytes, 0) || bytes >= 0x1p63 {
+		return 0, fmt.Errorf("unsupported installed size %q", value)
+	}
+	return int64(math.Round(bytes)), nil
 }
 
 func runMutation(ctx context.Context, request Request, opts Options, packages []string, command string, args ...string) (Event, error) {
