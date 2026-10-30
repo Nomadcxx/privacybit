@@ -930,8 +930,8 @@ Recorded because a future reader will trust the docs.
 25. **Pacman size parsing could produce invalid reclaim estimates.**
     `strconv.ParseFloat` accepts `NaN`, and `float64(math.MaxInt64)` rounds up
     to the exclusive `2^63` limit. PR #120 rejects non-finite input and scaled
-    byte values at or above that limit. Tests cover both cases; the merge
-    closed issue #119.
+    byte values at or above that limit. Tests cover both cases. PR #120 merged
+    at `2d356e8` and closed issue #119.
 
 ### 10.4 Environment traps
 
