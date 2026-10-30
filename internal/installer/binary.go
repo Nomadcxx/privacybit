@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -63,10 +64,23 @@ func BuildAndInstallCLI(ctx context.Context, checkout, binDir string) (string, e
 		return "", fmt.Errorf("create temporary build directory: %w", err)
 	}
 	defer os.RemoveAll(buildDir)
+	moduleCacheCommand := exec.CommandContext(ctx, "go", "env", "GOMODCACHE")
+	moduleCacheCommand.Dir = checkout
+	moduleCacheCommand.Env = setEnv(os.Environ(), "GOTOOLCHAIN", "local")
+	moduleCacheCommand.Env = setEnv(moduleCacheCommand.Env, "GOPROXY", "off")
+	moduleCacheCommand.Env = setEnv(moduleCacheCommand.Env, "GOSUMDB", "off")
+	moduleCacheOutput, err := moduleCacheCommand.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("find Go module cache for offline build: %w: %s", err, strings.TrimSpace(string(moduleCacheOutput)))
+	}
+	moduleCache := strings.TrimRight(string(moduleCacheOutput), "\r\n")
+	if moduleCache == "" {
+		return "", errors.New("Go module cache path is empty")
+	}
 	binary := filepath.Join(buildDir, "privacybit")
 	command := exec.CommandContext(ctx, "go", "build", "-mod=readonly", "-o", binary, "./cmd/privacybit")
 	command.Dir = checkout
-	command.Env = offlineBuildEnv(os.Environ())
+	command.Env = offlineBuildEnv(os.Environ(), moduleCache)
 	output, err := command.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("build privacybit offline: %w: %s", err, strings.TrimSpace(string(output)))
@@ -194,16 +208,39 @@ func ensureUserBinDir(binDir string) error {
 	return nil
 }
 
-func offlineBuildEnv(env []string) []string {
-	for _, setting := range []string{"GOPROXY=off", "GOSUMDB=off", "GOTOOLCHAIN=local", "GOWORK=off", "GOFLAGS="} {
-		key := strings.SplitN(setting, "=", 2)[0] + "="
-		filtered := env[:0]
-		for _, entry := range env {
-			if !strings.HasPrefix(entry, key) {
-				filtered = append(filtered, entry)
-			}
-		}
-		env = append(filtered, setting)
+func offlineBuildEnv(env []string, moduleCache string) []string {
+	for _, setting := range []struct{ key, value string }{
+		{"GOPROXY", "off"},
+		{"GOSUMDB", "off"},
+		{"GOTOOLCHAIN", "local"},
+		{"GOWORK", "off"},
+		{"GOFLAGS", ""},
+		{"GOENV", "off"},
+		{"GOMODCACHE", moduleCache},
+		{"GOOS", runtime.GOOS},
+		{"GOARCH", runtime.GOARCH},
+		{"GO386", ""},
+		{"GOAMD64", ""},
+		{"GOARM", ""},
+		{"GOARM64", ""},
+		{"GOMIPS", ""},
+		{"GOMIPS64", ""},
+		{"GOPPC64", ""},
+		{"GORISCV64", ""},
+		{"GOWASM", ""},
+	} {
+		env = setEnv(env, setting.key, setting.value)
 	}
 	return env
+}
+
+func setEnv(env []string, key, value string) []string {
+	prefix := key + "="
+	filtered := env[:0]
+	for _, entry := range env {
+		if !strings.HasPrefix(entry, prefix) {
+			filtered = append(filtered, entry)
+		}
+	}
+	return append(filtered, prefix+value)
 }
