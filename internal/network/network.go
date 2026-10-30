@@ -254,32 +254,44 @@ type resolver struct {
 }
 
 func checkDNS(ctx context.Context, runner detect.Runner, resolvConf string, tunnels map[string]string, result *Result) *bool {
-	serversOut, serversErr := runner.Run(ctx, "resolvectl", "dns")
-	defaultsOut, defaultsErr := runner.Run(ctx, "resolvectl", "default-route")
 	var resolvers []resolver
-	if serversErr == nil && defaultsErr == nil {
-		resolvers = activeResolvers(serversOut, defaultsOut)
-	}
-	if len(resolvers) == 0 {
-		// systemd-resolved may be absent or may not own resolv.conf. In that
-		// case the active nameservers are the only evidence we can use.
+	statusOut, statusErr := runner.Run(ctx, "resolvectl", "status")
+	if statusErr != nil {
+		_, pathErr := runner.LookPath("resolvectl")
+		if !errors.Is(pathErr, exec.ErrNotFound) {
+			result.Coverage = append(result.Coverage, "resolver ownership mode could not be determined: "+statusErr.Error())
+			return nil
+		}
 		var err error
 		resolvers, err = resolvConfResolvers(resolvConf)
 		if err != nil {
 			result.Coverage = append(result.Coverage, "resolver configuration could not be read: "+err.Error())
 			return nil
 		}
-		for i := range resolvers {
-			if resolvers[i].address.IsLoopback() {
-				result.Coverage = append(result.Coverage, "the local DNS stub's upstream could not be read")
-				return nil
-			}
-			out, err := runner.Run(ctx, "ip", "route", "get", resolvers[i].address.String())
+	} else {
+		mode, found := resolvConfMode(statusOut)
+		if !found {
+			result.Coverage = append(result.Coverage, "resolver ownership mode could not be determined")
+			return nil
+		}
+		if strings.EqualFold(mode, "foreign") {
+			var err error
+			resolvers, err = resolvConfResolvers(resolvConf)
 			if err != nil {
-				result.Coverage = append(result.Coverage, "DNS resolver route could not be judged: "+err.Error())
+				result.Coverage = append(result.Coverage, "resolver configuration could not be read: "+err.Error())
 				return nil
 			}
-			resolvers[i].iface = routeDev(out)
+		} else if resolvedOwnsResolvConf(mode) {
+			serversOut, serversErr := runner.Run(ctx, "resolvectl", "dns")
+			defaultsOut, defaultsErr := runner.Run(ctx, "resolvectl", "default-route")
+			if serversErr != nil || defaultsErr != nil {
+				result.Coverage = append(result.Coverage, "active DNS resolvers could not be identified")
+				return nil
+			}
+			resolvers = activeResolvers(serversOut, defaultsOut)
+		} else {
+			result.Coverage = append(result.Coverage, "resolver ownership mode is unsupported: "+mode)
+			return nil
 		}
 	}
 	if len(resolvers) == 0 {
@@ -310,6 +322,25 @@ func checkDNS(ctx context.Context, runner detect.Runner, resolvConf string, tunn
 		}
 	}
 	return boolPointer(contained)
+}
+
+func resolvConfMode(output string) (string, bool) {
+	for _, line := range strings.Split(output, "\n") {
+		name, value, found := strings.Cut(strings.TrimSpace(line), ":")
+		if found && strings.EqualFold(strings.TrimSpace(name), "resolv.conf mode") {
+			return strings.TrimSpace(value), true
+		}
+	}
+	return "", false
+}
+
+func resolvedOwnsResolvConf(mode string) bool {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "stub", "uplink", "static":
+		return true
+	default:
+		return false
+	}
 }
 
 func activeResolvers(serversOutput, defaultsOutput string) []resolver {
