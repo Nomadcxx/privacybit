@@ -73,6 +73,7 @@ privacybit audit       # run an audit
 privacybit tui         # browse a fresh audit
 privacybit scan        # save a report for later
 privacybit report      # open the saved report; press r to refresh
+privacybit version     # show version, source commit and catalogue revision
 privacybit catalog validate
 ```
 

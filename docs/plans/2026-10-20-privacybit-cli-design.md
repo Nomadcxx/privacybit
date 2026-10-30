@@ -63,6 +63,11 @@ privacybit
   completion             Shell completions.
 ```
 
+`version` is read-only. A source build reports `devel` and its Go-recorded
+source commit. A packaged build reports the package version and commit injected
+by its build recipe. The command loads the effective catalogue, honoring
+`--user-catalog`, and reports its revision without running a scan.
+
 `audit` is the verb rather than moonbit's `scan`, because it does more than
 scan: it grades, matches a catalogue, and derives signals.
 

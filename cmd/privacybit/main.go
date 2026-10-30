@@ -73,6 +73,7 @@ func newRootCommand() *cobra.Command {
 	root.AddCommand(newListCommand(&userFragments))
 	root.AddCommand(newExplainCommand(&userFragments))
 	root.AddCommand(newAuditCommand(&userFragments, engine.Run))
+	root.AddCommand(newVersionCommand(&userFragments))
 	root.AddCommand(newTUICommand(&userFragments))
 	root.AddCommand(newDaemonCommand(&userFragments))
 	root.AddCommand(newScanCommand(&userFragments, engine.Run, report.UserStore))
