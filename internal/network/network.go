@@ -258,7 +258,8 @@ func checkDNS(ctx context.Context, runner detect.Runner, resolvConf string, tunn
 	statusOut, statusErr := runner.Run(ctx, "resolvectl", "status")
 	if statusErr != nil {
 		_, pathErr := runner.LookPath("resolvectl")
-		if !errors.Is(pathErr, exec.ErrNotFound) {
+		resolvedUnavailable := errors.Is(pathErr, exec.ErrNotFound) || pathErr == nil && resolvedSocketMissing(statusErr)
+		if !resolvedUnavailable {
 			result.Coverage = append(result.Coverage, "resolver ownership mode could not be determined: "+statusErr.Error())
 			return nil
 		}
@@ -322,6 +323,16 @@ func checkDNS(ctx context.Context, runner detect.Runner, resolvConf string, tunn
 		}
 	}
 	return boolPointer(contained)
+}
+
+const resolvedSocketMissingDiagnostic = "Failed to connect to service /run/systemd/resolve/io.systemd.Resolve: No such file or directory"
+
+func resolvedSocketMissing(err error) bool {
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(string(exitErr.Stderr)), resolvedSocketMissingDiagnostic)
 }
 
 func resolvConfMode(output string) (string, bool) {
