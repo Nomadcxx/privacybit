@@ -260,6 +260,18 @@ func TestBuildFindingsIncludesNonGreenEntriesAndTierThreeAlternatives(t *testing
 	}
 }
 
+func TestBuildFindingsUseSharedAmberGradeWord(t *testing.T) {
+	set := loadCatalogue(t)
+	result := Evaluate(set, []detect.Observation{{
+		Name: "brave-origin", Kind: detect.KindPackage,
+		Facts: detect.Facts{Licence: detect.Contradicted("Proprietary", "package metadata contradicts the catalogue")},
+	}}, completeCoverage())
+	finding := findingByID(t, BuildFindings(set, result, "arch"), "entry.brave-origin.installed")
+	if finding.Grade != catalog.GradeAmber || finding.Title != "Brave Origin is rated Review" {
+		t.Fatalf("Brave Origin finding = %+v, want amber grade with shared Review word", finding)
+	}
+}
+
 func TestBuildFindingsUsesJudgedExpectationSeverityAndOmitsUnknowns(t *testing.T) {
 	set := loadCatalogue(t)
 	result := Evaluate(set, nil, completeCoverage())
