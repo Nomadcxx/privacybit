@@ -514,7 +514,7 @@ func parseSize(value string) (int64, error) {
 		return 0, fmt.Errorf("invalid installed size %q", value)
 	}
 	amount, err := strconv.ParseFloat(fields[0], 64)
-	if err != nil || amount < 0 {
+	if err != nil || math.IsNaN(amount) || math.IsInf(amount, 0) || amount < 0 {
 		return 0, fmt.Errorf("invalid installed size %q", value)
 	}
 	multiplier := map[string]float64{
