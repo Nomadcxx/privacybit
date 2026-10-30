@@ -29,8 +29,8 @@ jobs:
             exit 1
           fi
 
-      - name: Test
-        run: go test -count=1 -p 2 ./...
+      - name: Race test
+        run: go test -race -count=1 -p 2 ./...
 
       - name: Vet
         run: go vet -p 2 ./...
