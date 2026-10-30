@@ -28,6 +28,12 @@ The command must be started from the privacybit source checkout. It builds
 or a missing local Go toolchain fail with a clear message; the installer never
 fetches them or edits `go.mod` and `go.sum`.
 
+The build targets the running host's OS and architecture. It ignores inherited
+cross-target settings and persisted Go environment settings, clears
+architecture-specific tuning, and retains the active module cache explicitly.
+The module-cache lookup also uses the local toolchain with module proxies
+disabled, so it cannot download a toolchain before the offline build starts.
+
 Only after a successful build does it atomically replace
 `~/.local/bin/privacybit`. The destination directory and any existing target
 must be owned by the current user; a symlink or non-regular target is an error.
