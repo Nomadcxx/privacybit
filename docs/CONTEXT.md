@@ -331,9 +331,10 @@ privacy plugin code `ce6ffda` with manifest version `0.1.3`, and a sysc-shell
 binary built from module revision `2ed94254`. The shell service and privacy
 plugin process were active, and the privacybit build metadata was clean.
 Current upstream main is privacybit `802801b`, sysc-plugins `e01569e`, and
-sysc-shell `f109afa8`. PR #296 changed manifest validation and publishing docs,
-not plugin runtime code. TUI changes from privacybit PRs #97 and #100 are not
-deployed there. See `HANDOVER.md` for revisions and verification evidence.
+sysc-shell `38a74e90` after PR #570 removed the reference Weather plugin. PR
+#296 changed manifest validation and publishing docs, not plugin runtime code.
+TUI changes from privacybit PRs #97 and #100 are not deployed there. See
+`HANDOVER.md` for revisions and verification evidence.
 
 ---
 
