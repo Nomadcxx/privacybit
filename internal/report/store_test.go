@@ -1,6 +1,7 @@
 package report
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -15,6 +16,7 @@ func TestStoreRoundTripsPrivateUnreadSnapshot(t *testing.T) {
 	want := Snapshot{
 		Schema: Schema, Available: true, GeneratedAt: time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC),
 		CatalogRev: "catalog-test", Overall: Overall{Grade: catalog.GradeUnknown},
+		Sandbox: Sandbox{Grade: catalog.GradeUnknown, Reason: "Flatpak is not installed."},
 	}
 	if err := store.Save(want, true); err != nil {
 		t.Fatal(err)
@@ -43,6 +45,30 @@ func TestStoreRoundTripsPrivateUnreadSnapshot(t *testing.T) {
 	unread, err = store.IsUnread()
 	if err != nil || unread {
 		t.Fatalf("unread after mark-read = %v, error = %v; want false", unread, err)
+	}
+}
+
+func TestStoreLoadNormalizesLegacySnapshotWithoutRewritingIt(t *testing.T) {
+	store := Store{Dir: t.TempDir()}
+	path := filepath.Join(store.Dir, reportName)
+	data := []byte(`{"schema":1,"available":true,"generated_at":"2026-10-20T00:00:00Z","overall":{"grade":"green"}}`)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := store.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Overall.Grade != catalog.GradeUnknown || !got.Sandbox.Applicable || got.Sandbox.Grade != catalog.GradeUnknown {
+		t.Fatalf("loaded legacy snapshot = overall %q, sandbox %+v; want in-memory unknown grades", got.Overall.Grade, got.Sandbox)
+	}
+	stored, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(stored, data) {
+		t.Fatalf("Load rewrote the legacy report:\n got %s\nwant %s", stored, data)
 	}
 }
 

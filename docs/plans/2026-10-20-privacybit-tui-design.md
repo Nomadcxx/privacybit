@@ -114,6 +114,8 @@ const (
     ScreenFinding   Screen = "finding"
     ScreenNetwork   Screen = "network"
     ScreenCoverage  Screen = "coverage"
+    ScreenSandbox   Screen = "sandbox"
+    ScreenSandboxApp Screen = "sandbox_app"
     ScreenFindings  Screen = "findings"
     ScreenUnmatched Screen = "unmatched"
     ScreenHelp      Screen = "help"
@@ -122,7 +124,7 @@ const (
 
 | Screen | Shows |
 |---|---|
-| `Overview` | Overall grade, score, finding count, and routes into categories, network, coverage, and unmatched apps. |
+| `Overview` | Overall grade, score, finding count, unrated-area context, and routes into categories, network, sandbox, coverage, and unmatched apps. |
 | `Scanning` | Initial scan or refresh status. |
 | `Categories` | Every category with its grade. The main index. |
 | `Category` | One category: installed apps with grades, expectations met, expectations missing. |
@@ -130,6 +132,7 @@ const (
 | `Findings` / `Finding` | The bounded finding list and one finding's evidence and instructions. |
 | `Unmatched` | Installed applications absent from the catalogue, shown as unknown. |
 | `Network` | Point-in-time VPN state and defects; live telemetry attribution is unavailable. |
+| `Sandbox` / `SandboxApp` | Flatpak sandbox grade and coverage, then each installed copy's scope, grade, recognized grants, and unclassified permissions. |
 | `Coverage` | What was scanned, what was not, what was truncated, and every `unknown` in the result. |
 | `Help` | Keybindings and the grade legend. |
 
@@ -235,6 +238,19 @@ different claims and the user cannot tell them apart otherwise.
 `green`. It is not a finding and it must not sit in the grade counts looking
 like one.
 
+**Flatpak sandbox evidence.** The overview links to a sandbox screen that shows
+applicability, the aggregate grade, permission-query counts, and partial
+coverage. Each installed copy remains separate by user or system scope. Its
+detail view lists recognized grants and unclassified permissions, including
+truncation counts. Unknown evidence stays unknown; a known risky grant remains
+visible even when another permission cannot be classified. Older schema-1
+snapshots without usable sandbox coverage render with unknown sandbox and
+overall grades in memory. Loading a snapshot never rewrites the saved report.
+
+When the overall grade is unknown, the overview names the unrated category or
+sandbox axis and shows the worst grade supported by the available evidence as
+context.
+
 `ScreenCoverage` is the single place all three are enumerated. It exists because
 the alternative is each of them being quietly absent, and an audit that hides
 its own gaps is the failure mode D1 §0 was written to prevent.
@@ -253,6 +269,9 @@ The focused checks cover:
 | Stored report | `TestStoredSnapshotOpensWithoutScanningAndRefreshesOnRequest` checks stored startup and explicit refresh. |
 | **Rendering is pure** | `TestViewDoesNotRunScan` verifies `View()` does not touch a detection source. |
 | Coverage states render | `TestUnknownAndCoverageRenderAsExplicitStates` checks unavailable, unknown, and reduced coverage output. |
+| Sandbox evidence | `TestSandboxViewShowsScopedEvidenceAndCoverage` checks duplicate scopes, grades, grants, unknown permissions, and truncation. |
+| Legacy reports | `TestStoreLoadNormalizesLegacySnapshotWithoutRewritingIt` checks conservative in-memory grades and byte-for-byte preservation. |
+| Long details | `TestLongDetailViewWrapsAndScrolls` checks wrapping, viewport bounds, and access to the final line. |
 | Flatpak scope is retained | `TestAppRouteKeepsFlatpakScope` checks duplicate installation scopes remain addressable. |
 | Purge delegates narrowly | `TestPurgeKeyLaunchesHelperFlowOnlyForRedCatalogueApps` checks only a known red app invokes the CLI flow. |
 
