@@ -325,17 +325,21 @@ sysc-shell. The privacy plugin has a user-placeable bar widget and a
 plugin-owned audit panel. The Control Centre shows a compact audit summary and
 opens that panel. Privacybit `v0.1.2`, plugin release `privacy-v0.1.2`, and AUR
 package `0.1.2-1` are published. Catalog PR #275 merged at `2f67de4`, and a
-disposable sysc-shell store install verified plugin `0.1.2`. On 2026-10-30,
-SSH verification confirmed the laptop testbench runs privacybit `dc799e8`,
+disposable sysc-shell store install verified plugin `0.1.2`. The last successful
+SSH check on 2026-10-30 found privacybit `dc799e8`,
 privacy plugin code `ce6ffda` with manifest version `0.1.3`, and a sysc-shell
 binary built from module revision `2ed94254`. The shell service and privacy
 plugin process were active, and the privacybit build metadata was clean.
-At the 2026-10-30 revision check, privacybit main was `255a33f` after
-documentation-only PR #109, with code through `802801b`; sysc-plugins main was
-`e01569e`, and sysc-shell main was `38a74e90` after PR #570 removed the reference
-Weather plugin. PR #296 changed manifest validation and publishing docs, not
-plugin runtime code. TUI changes from privacybit PRs #97 and #100 are not
-deployed there. See `HANDOVER.md` for revisions and verification evidence.
+GitHub reported privacybit main at `28fc591` after PR #112, with implementation
+commit `cb87533`; sysc-plugins main at `e01569e`; and sysc-shell main at
+`0f24b029` after PR #572 cleared a city-defined Weather place. PR #296 changed
+manifest validation and publishing docs, not plugin runtime code. GitHub
+history confirms testbench build `dc799e85` descends from privacybit PR #97
+(`eb45f2a`) and PR #100 (`f8f093e`), so both TUI fixes are in that build. The
+recorded SSH check did not exercise the TUI interactively. A fresh SSH attempt
+during this audit returned `No route to host`, so treat the prior testbench
+check as historical and its current state as unconfirmed. See `HANDOVER.md` for
+revisions and verification evidence.
 
 ---
 
@@ -372,12 +376,11 @@ or reads the saved report. Its capture activity card remains unchanged.
 
 ## 7. Remaining non-phase work
 
-- **Live testbench verification** on 2026-10-30 confirmed privacybit `dc799e8`,
-  privacy plugin code `ce6ffda` with manifest version `0.1.3`, and a sysc-shell
-  binary built from module revision `2ed94254`. The shell service and privacy
-  plugin process were active, and the plugin remained enabled. The live audit
-  reported a connected VPN, `dns_contained: true`, and no `vpn.dns-leak` defect.
-  TUI changes from privacybit PRs #97 and #100 are not deployed there.
+- **Laptop testbench:** See §4 for the last successful SSH check and recorded
+  revisions. GitHub history confirms build `dc799e85` includes TUI fixes from
+  PRs #97 and #100, though the check did not open the TUI. A fresh SSH attempt
+  during this audit returned `No route to host`, so current reachability and
+  process state are unconfirmed.
 - **Publication** is complete through privacybit `v0.1.2`, plugin release
   `privacy-v0.1.2`, catalog entry `0.1.2`, and AUR package `0.1.2-1`. A
   disposable sysc-shell store install verified the amd64 release. Coordinated
