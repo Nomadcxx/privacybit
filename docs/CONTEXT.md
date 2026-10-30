@@ -325,9 +325,13 @@ sysc-shell. The privacy plugin has a user-placeable bar widget and a
 plugin-owned audit panel. The Control Centre shows a compact audit summary and
 opens that panel. Privacybit `v0.1.2`, plugin release `privacy-v0.1.2`, and AUR
 package `0.1.2-1` are published. Catalog PR #275 merged at `2f67de4`, and a
-disposable sysc-shell store install verified plugin `0.1.2`. The laptop
-testbench was last checked on 2026-10-29; SSH returned `No route to host` on
-2026-10-30, so deployment of the new releases remains unverified. See
+disposable sysc-shell store install verified plugin `0.1.2`. On 2026-10-30,
+SSH verification confirmed the laptop testbench runs privacybit `32c610b`,
+privacy plugin code `ce6ffda` with manifest version `0.1.3`, and sysc-shell
+`2ed94254`. The shell service and privacy plugin process were active. Current
+upstream main is sysc-plugins `e01569e` and sysc-shell `2ed94254`; PR #296
+changed manifest validation and publishing docs, not plugin runtime code. TUI
+changes from privacybit PRs #97 and #100 are not deployed there. See
 `HANDOVER.md` for revisions and verification evidence.
 
 ---
@@ -365,14 +369,16 @@ or reads the saved report. Its capture activity card remains unchanged.
 
 ## 7. Remaining non-phase work
 
-- **Live testbench verification** confirmed the merged plugin and shell, an
-  active plugin process, installed privacybit, and bar placement on 2026-10-29.
-  The laptop could not be reached on 2026-10-30, so the `0.1.2` releases still
-  need deployment there.
+- **Live testbench verification** on 2026-10-30 confirmed privacybit `32c610b`,
+  privacy plugin code `ce6ffda` with manifest version `0.1.3`, and sysc-shell
+  `2ed94254`. The shell service and privacy plugin process were active, and the
+  plugin remained enabled. The live audit reported a connected VPN,
+  `dns_contained: true`, and no `vpn.dns-leak` defect. TUI changes from
+  privacybit PRs #97 and #100 are not deployed there.
 - **Publication** is complete through privacybit `v0.1.2`, plugin release
   `privacy-v0.1.2`, catalog entry `0.1.2`, and AUR package `0.1.2-1`. A
-  disposable sysc-shell store install verified the amd64 release. The laptop
-  testbench still needs redeployment.
+  disposable sysc-shell store install verified the amd64 release. Coordinated
+  v0.1.3 publication remains gated on owner approval in issues #41 and #280.
 - Additional package-manager backends remain deferred under D6. Flatpak's
   resolved permissions are graded per installed copy; unsupported permission
   groups and missing coverage remain unknown.
