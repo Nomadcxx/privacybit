@@ -92,13 +92,13 @@ matters so much.
 
 | Absolute path | What it is | State |
 |---|---|---|
-| `/home/nomadx/privacy-bit` | **This project.** Canonical checkout on branch `main`. | This handover is refreshed through privacybit PR #98 and sysc-plugins PR #294. The primary checkout contains unrelated untracked `.commandcode/` and `docs/audits/` data; leave them untouched and use a clean worktree from `origin/main`. Public privacybit `v0.1.2` at `7c63797` remains current. PR #42's AUR metadata update merged; issues #41 and #280 gate the coordinated `0.1.3` publication on owner approval. Issue #20 is closed. |
+| `/home/nomadx/privacy-bit` | **This project.** Canonical checkout on branch `main`. | This handover is refreshed through privacybit PR #101 and sysc-plugins PR #294. The primary checkout contains unrelated untracked `.commandcode/` and `docs/audits/` data; leave them untouched and use a clean worktree from `origin/main`. Public privacybit `v0.1.2` at `7c63797` remains current. PR #42's AUR metadata update merged; issues #41 and #280 gate the coordinated `0.1.3` publication on owner approval. Issue #20 is closed. |
 | `/home/nomadx/worktrees/privacybit-origin-context` | Historical privacybit issue #22 worktree. | Branch `feat/origin-context` at `54c9fb4`; privacybit PR #23 merged the context-only origin implementation. |
 | `/home/nomadx/sysc-plugins/.worktrees/privacybit-origin-context` | Historical sysc-plugins issue #22 worktree. | Branch `feat/privacybit-origin-context`; sysc-plugins PR #264 merged the panel integration and refreshed screenshot and thumbnail. |
 | `/home/nomadx/privacy-bit/docs/plans/` | Seven original design documents plus follow-on designs and implementation plans. | D1–D7 record the approved design. Phase 3, 4, 8, and 9 plans remain as audit history. |
 | `Nomadcxx/sysc-plugins` `main` | Upstream revision `ce6ffda` after PR #294. | PR #277 updated the privacy panel's origin wording; PR #279 makes the plugin wait for Docker workers on shutdown; PR #281 prepares manifest version `0.1.3`; PR #283 adds explicit first-scan progress; PR #285 aligns stale-result copy with an active refresh; PR #286 shows reduced-coverage sources; PR #288 removes the generic install hint from unavailable audit results; PR #290 synchronizes the fallback plugin identity with manifest version `0.1.3`; PR #291 publishes an unknown-grade Control Centre snapshot during the first audit; PR #292 records the closed first-scan issue in the tracked Beads export; PR #294 fixes singular wording for one high-priority finding. Issues #276, #278, #284, #287, #289, #34, and #293 are closed. Release `privacy-v0.1.2` still points to tested commit `21b4944`. Catalog PR #275 merged at `2f67de4`; its amd64 and arm64 assets have verified SHA-256 digests, and issue #268 is closed. Release rehearsal run `40934309464` passed both architecture builds; its manual run skipped publication and catalog changes. |
 | `Nomadcxx/sysc-shell` `main` | Upstream revision `3898944` after PR #563. | PR #560 distinguishes missing plugin state from unreadable audit state; PR #562 refreshes an open Control Centre Privacy page after plugin state writes; PR #563 accepts unavailable audit snapshots without the optional hint. All three merged with their checks passing. |
-| `nomadx@192.168.0.64:7777` laptop testbench | Plugin worktree `/home/nomadx/worktrees/privacybit-plugin-testbench-20261023`. | Verified over SSH on 2026-10-30 after deployment. `privacybit` embeds privacybit `32c610b`; the plugin worktree and binary embed sysc-plugins `ce6ffda` with manifest version `0.1.3`; the shell embeds sysc-shell `38989442`. `sysc-shell.service` is active, the privacy plugin process is running, and `org.sysc.privacy` remains in the user's plugin configuration. A live audit reported a connected VPN, `dns_contained: true`, and no `vpn.dns-leak` defect. |
+| `nomadx@192.168.0.64:7777` laptop testbench | Plugin worktree `/home/nomadx/worktrees/privacybit-plugin-testbench-20261023`. | Verified over SSH on 2026-10-30 after deployment. `privacybit` embeds privacybit `32c610b`; the plugin worktree and binary embed sysc-plugins `ce6ffda` with manifest version `0.1.3`; the shell embeds sysc-shell `38989442`. `sysc-shell.service` is active, the privacy plugin process is running, and `org.sysc.privacy` remains in the user's plugin configuration. A live audit reported a connected VPN, `dns_contained: true`, and no `vpn.dns-leak` defect. TUI changes from privacybit PRs #97 and #100 have not been deployed there. |
 | `/home/nomadx/sysc-plugins` | Primary plugin checkout. | Branch `fix/kdeconnect-pairing-card-routing` has independent dirty changes, including an untracked `plugins/privacy`. Do not clean or repurpose it; upstream `main` is the source of truth for the published plugin. |
 | `/home/nomadx/sysc-shell` | Primary shell checkout. | Branch `audit/toasthost-wayland-crash` is behind upstream and has independent dirty changes and Beads state. Do not clean or deploy it; upstream `main` is the source of truth for the merged integration. |
 | `/home/nomadx/sysc-plugins/cmd/sysc-plugin-calendar/main.go` | The precedent to copy for the plugin. | Reference only. |
@@ -647,6 +647,7 @@ Specific, falsifiable claims. Each is checkable.
 | 20 | **PATH exclusions match directory boundaries and symlink aliases.** | `TestUserPathDirsUsePathComponentBoundaries` and `TestUserPathDirsIgnoreSymlinkAliasesOfSystemRoots` in `internal/detect/detect_test.go` cover adjacent paths, lexical Nix-store exclusions, and a symlink alias to `/usr/bin`. |
 | 21 | **VPN checks treat every verified tunnel interface consistently.** | `TestMultipleVerifiedTunnelsAreCheckedAsASet` in `internal/network/network_test.go` covers stable client reporting and route, DNS, IPv6, and default-route checks with Tailscale and WireGuard. |
 | 22 | **The TUI exposes sandbox evidence, preserves known grants when coverage is incomplete, and leaves saved reports unchanged.** | `TestSandboxViewShowsScopedEvidenceAndCoverage`, `TestParseSnapshotPreservesKnownSandboxEvidenceWhenCoverageIsIncomplete`, and `TestStoreLoadNormalizesLegacySnapshotWithoutRewritingIt`. |
+| 23 | **The TUI distinguishes incomplete Flatpak inventory from a known empty result.** | `TestSandboxViewDoesNotTreatIncompleteInventoryAsEmpty`, `TestSandboxViewExplainsKnownEmptyInventory`, and `TestSandboxViewExplainsNotApplicableState`. |
 
 §11 records the latest gate results. Earlier phase checkpoints are historical;
 use the current results when judging the tree.
@@ -697,7 +698,7 @@ two do not collide.)
 | Item | State |
 |---|---|
 | v0.1.3 release preparation | Privacybit PR #42 updates the AUR metadata; sysc-plugins PR #281 bumps the plugin manifest. Both merged after their checks passed. Local builds succeeded for the privacybit CLI, helper, and installer on amd64 and arm64. Release rehearsal run `40934309464` passed the gate, vulnerability scan, tests, race checks, manifest/catalog validation, and both plugin builds. Downloaded archives contain version `0.1.3` and protocol `1.8`; their SHA-256 digests are `ec05b2d53a631992077082a9ad80329d2db8675da0697150f58dc4aeb76808e2` (amd64) and `4800b42d450e7d624cb405f69dc6d89ae3ce9d45c0be565336af94de83dd752d` (arm64). The manual run skipped release publication and catalog changes. Issues #41 and #280 track the coordinated release; wait for owner approval before tagging. |
-| Laptop testbench integration | Verified over SSH on 2026-10-30 after deployment. `/home/nomadx/.local/bin/privacybit` embeds `32c610b`; the privacy plugin embeds sysc-plugins `ce6ffda`; the shell embeds sysc-shell `38989442`. `sysc-shell.service` and the privacy plugin process are active, and the bar placement is enabled. A live audit reported a connected VPN, `dns_contained: true`, and no `vpn.dns-leak` defect. The deployed privacybit predates PR #97, so the new TUI sandbox screen is not on the testbench. |
+| Laptop testbench integration | Verified over SSH on 2026-10-30 after deployment. `/home/nomadx/.local/bin/privacybit` embeds `32c610b`; the privacy plugin embeds sysc-plugins `ce6ffda`; the shell embeds sysc-shell `38989442`. `sysc-shell.service` and the privacy plugin process are active, and the bar placement is enabled. A live audit reported a connected VPN, `dns_contained: true`, and no `vpn.dns-leak` defect. TUI changes from privacybit PRs #97 and #100 have not been deployed there. |
 | Latest SYSC integration changes | Privacybit PR #51 exposes per-source fact coverage and merged at `ef2cd37`; PR #52 refreshed the handover and merged at `ceaab67` after CI passed. PR #67 excludes PATH symlink aliases whose targets resolve under system scan roots while keeping the Nix-store exclusion lexical; its CI passed and it merged at `d19b658`, closing issue #66. `sysc-plugins` main is `ce6ffda` after PR #294; PR #292 records the closed first-scan issue in the tracked Beads export, and PR #294 fixes singular wording for one high-priority finding. All required `test`, `govulncheck`, and `verify` checks passed; issues #34 and #293 are closed. `sysc-shell` main is `3898944` after PRs #560, #562, and #563. All passed `test`, coverage, `govulncheck`, Landlock ABI, and verify checks. PR #563 accepts unavailable privacy snapshots without an optional hint and closes Beads issue `sysc-2068`; PRs #560 and #562 close the missing-versus-unreadable state gap and refresh an open Privacy page after plugin state writes. Beads issue `sysc-2067` is closed. These upstream revisions were also deployed and verified on the laptop testbench on 2026-10-30 (§2.1). |
 | First-scan Control Centre status | Implemented by sysc-plugins PR #291. The plugin publishes a schema-valid unavailable snapshot with reason `First audit in progress` while its first audit runs; a failed pending-state write does not stop the audit. CI passed and Beads issue `sysc-plugins-34` is closed. |
 | Live telemetry endpoint attribution | Deferred by D7 §5.2: no reviewed endpoint dataset or reliable PID attribution. Snapshots report this signal as unknown. |
@@ -916,6 +917,13 @@ Recorded because a future reader will trust the docs.
     unchanged. CI and `govulncheck` passed; PR #97 merged at `eb45f2a` and
     closed issue #96.
 
+24. **The TUI called incomplete Flatpak inventory empty.** With zero returned
+    copies, the sandbox view said no copies were reported even when inventory
+    coverage was partial. PR #100 keeps the reason and unknown grade visible;
+    separate tests cover incomplete, known-empty, and not-installed states.
+    CI and `govulncheck` passed; PR #100 merged at `f8f093e` and closed issue
+    #99.
+
 ### 10.4 Environment traps
 
 - **`: ` inside an unquoted multi-line YAML plain scalar is a parse error** —
@@ -960,7 +968,9 @@ Recorded because a future reader will trust the docs.
 
 Privacybit PR #97 adds TUI sandbox evidence and conservative handling of legacy
 snapshots; CI and `govulncheck` passed, and it merged at `eb45f2a`, closing issue
-#96. PR #87 forces checkout builds to the host target and keeps the
+#96. PR #100 keeps incomplete Flatpak inventory distinct from a confirmed empty
+result; CI and `govulncheck` passed, and it merged at `f8f093e`, closing issue
+#99. PR #87 forces checkout builds to the host target and keeps the
 module-cache lookup offline. CI and `govulncheck` passed; the change merged at
 `579b0fc`.
 
