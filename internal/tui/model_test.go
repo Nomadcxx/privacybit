@@ -619,4 +619,84 @@ func TestPurgeKeyLaunchesHelperFlowOnlyForRedCatalogueApps(t *testing.T) {
 	}
 }
 
+func TestExpectationRowsOpenTheirFullExplanation(t *testing.T) {
+	model := NewModel(context.Background(), nil)
+	snapshot := testSnapshot()
+	why := "A content blocker keeps trackers out of every page you open " + strings.Repeat("and more ", 20) + "ENDMARKER"
+	snapshot.Categories[1].Expectations = []report.Expectation{{
+		ID: "blocker", Severity: "warn", Judged: true, Met: false, Grade: catalog.GradeAmber, Why: why,
+	}}
+	model.snapshot = ptr(snapshot)
+	model.stack = []Route{{Screen: ScreenCategory, ID: "vpn"}}
+	model.width, model.height = 60, 40
+
+	if !model.canOpen(model.stack[0]) {
+		t.Fatal("expectation row cannot be opened")
+	}
+	model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	route := model.stack[len(model.stack)-1]
+	if route.Screen != ScreenExpectation {
+		t.Fatalf("Enter on an expectation opened %q", route.Screen)
+	}
+	view := model.View()
+	for _, want := range []string{"VPN › Expectation missing", "▲ Review", "Severity: warn", "ENDMARKER"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("expectation view missing %q:\n%s", want, view)
+		}
+	}
+}
+
+func TestFindingActionsUsePlainLabels(t *testing.T) {
+	model := NewModel(context.Background(), nil)
+	model.snapshot = ptr(testSnapshot())
+	model.snapshot.Findings = []audit.Finding{{
+		ID: "brave", Title: "Brave needs review", Detail: "Detail.",
+		Actions: []audit.Action{
+			{Tier: 0, Kind: audit.ActionInform, Label: "Read why", Target: "brave"},
+			{Tier: 3, Kind: audit.ActionLaunch, Label: "Open browser settings", Command: "brave://settings/shields"},
+		},
+	}}
+	view := model.findingView("brave")
+	for _, avoid := range []string{"Tier", "inform", "launch", "Read why"} {
+		if strings.Contains(view, avoid) {
+			t.Errorf("finding view shows %q:\n%s", avoid, view)
+		}
+	}
+	for _, want := range []string{"What you can do", "Open browser settings", "brave://settings/shields"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("finding view missing %q:\n%s", want, view)
+		}
+	}
+}
+
+func TestOverallBlockStaysOnTheOverview(t *testing.T) {
+	model := NewModel(context.Background(), nil)
+	snapshot := testSnapshot()
+	snapshot.Overall.Score = ptr(30)
+	model.snapshot = ptr(snapshot)
+	overview, nested := Route{Screen: ScreenOverview}, Route{Screen: ScreenCoverage}
+
+	model.stack = []Route{overview}
+	full := model.header(overview)
+	if !strings.Contains(full, "Unrated areas") || !strings.Contains(full, "not a quality score") {
+		t.Fatalf("overview header lost the overall block:\n%s", full)
+	}
+	model.stack = []Route{overview, nested}
+	compact := model.header(nested)
+	if got := strings.Count(compact, "\n"); got != 2 {
+		t.Fatalf("nested header has %d lines, want title and one overall line:\n%s", got, compact)
+	}
+	if !strings.Contains(compact, "Overall: ? Unrated") || !strings.Contains(compact, "as of") {
+		t.Fatalf("nested header lost the overall grade or its time:\n%s", compact)
+	}
+	model.loading = true
+	if scanning := model.header(nested); strings.Count(scanning, "\n") != 2 || !strings.Contains(scanning, "Scanning…") {
+		t.Fatalf("a refresh shifted the nested header:\n%s", scanning)
+	}
+	model.stack = []Route{overview}
+	if got, want := strings.Count(model.header(overview), "\n"), strings.Count(full, "\n"); got != want {
+		t.Fatalf("a refresh moved the overview from %d to %d header lines", want, got)
+	}
+}
+
 func ptr[T any](value T) *T { return &value }

@@ -20,19 +20,20 @@ import (
 type Screen string
 
 const (
-	ScreenScanning   Screen = "scanning"
-	ScreenOverview   Screen = "overview"
-	ScreenCategories Screen = "categories"
-	ScreenCategory   Screen = "category"
-	ScreenApp        Screen = "app"
-	ScreenFindings   Screen = "findings"
-	ScreenFinding    Screen = "finding"
-	ScreenNetwork    Screen = "network"
-	ScreenCoverage   Screen = "coverage"
-	ScreenSandbox    Screen = "sandbox"
-	ScreenSandboxApp Screen = "sandbox_app"
-	ScreenUnmatched  Screen = "unmatched"
-	ScreenHelp       Screen = "help"
+	ScreenScanning    Screen = "scanning"
+	ScreenOverview    Screen = "overview"
+	ScreenCategories  Screen = "categories"
+	ScreenCategory    Screen = "category"
+	ScreenExpectation Screen = "expectation"
+	ScreenApp         Screen = "app"
+	ScreenFindings    Screen = "findings"
+	ScreenFinding     Screen = "finding"
+	ScreenNetwork     Screen = "network"
+	ScreenCoverage    Screen = "coverage"
+	ScreenSandbox     Screen = "sandbox"
+	ScreenSandboxApp  Screen = "sandbox_app"
+	ScreenUnmatched   Screen = "unmatched"
+	ScreenHelp        Screen = "help"
 )
 
 type ScanFunc func(context.Context) (report.Snapshot, error)
@@ -316,8 +317,11 @@ func (m *Model) enterSelected() {
 	case ScreenCategories:
 		m.push(Route{Screen: ScreenCategory, ID: selected.id})
 	case ScreenCategory:
-		if selected.kind == "app" {
+		switch selected.kind {
+		case "app":
 			m.push(Route{Screen: ScreenApp, ID: selected.id})
+		case "expectation":
+			m.push(Route{Screen: ScreenExpectation, ID: selected.id})
 		}
 	case ScreenUnmatched:
 		if selected.kind == "unmatched" {
@@ -360,13 +364,7 @@ func (m *Model) visibleRows(route Route) []row {
 				rows = append(rows, row{id: appRouteID(app), label: app.Name, grade: app.Grade, kind: "app"})
 			}
 			for _, expectation := range category.Expectations {
-				state := "met"
-				if !expectation.Judged {
-					state = "unknown"
-				} else if !expectation.Met {
-					state = "missing"
-				}
-				rows = append(rows, row{id: expectation.ID, label: "Expectation " + state + ": " + expectation.Why, grade: expectation.Grade, kind: "expectation"})
+				rows = append(rows, row{id: expectationRouteID(category.ID, expectation.ID), label: expectationTitle(expectation) + ": " + expectation.Why, grade: expectation.Grade, kind: "expectation"})
 			}
 			if category.InstalledTruncated {
 				rows = append(rows, row{label: fmt.Sprintf("Showing %d of %d installed items", category.InstalledShown, category.InstalledTotal), kind: "note"})
@@ -542,7 +540,7 @@ func (m *Model) canOpen(route Route) bool {
 	case ScreenOverview, ScreenCategories, ScreenFindings:
 		return selected.kind != "note"
 	case ScreenCategory:
-		return selected.kind == "app"
+		return selected.kind == "app" || selected.kind == "expectation"
 	case ScreenUnmatched:
 		return selected.kind == "unmatched"
 	case ScreenSandbox:
@@ -579,8 +577,14 @@ func (m *Model) header(route Route) string {
 	var out strings.Builder
 	brand := lipgloss.NewStyle().Bold(true).Render("privacybit")
 	fmt.Fprintf(&out, "%s  %s\n", brand, title)
+	// A refresh joins an existing line rather than adding one, so the screen
+	// below does not shift while it runs.
+	scanning := ""
 	if m.loading {
-		fmt.Fprintln(&out, "Scanning…")
+		scanning = " · Scanning…"
+		if m.snapshot == nil {
+			fmt.Fprintln(&out, "Scanning…")
+		}
 	} else if m.scanErr != "" {
 		fmt.Fprintf(&out, "Scan unavailable: %s\n", m.scanErr)
 	}
@@ -588,13 +592,20 @@ func (m *Model) header(route Route) string {
 		fmt.Fprintf(&out, "Action unavailable: %s\n", m.actionErr)
 	}
 	if m.snapshot != nil {
-		fmt.Fprintf(&out, "Overall: %s\n", gradeLabel(m.snapshot.Overall.Grade))
-		if context := m.overallContext(); context != "" {
-			fmt.Fprintln(&out, context)
-		}
-		fmt.Fprintf(&out, "As of %s\n", m.snapshot.GeneratedAt.Local().Format("15:04:05, 02 Jan 2006"))
-		if m.snapshot.Overall.Score != nil {
-			fmt.Fprintf(&out, "Progress %d/100 (not a quality score)\n", *m.snapshot.Overall.Score)
+		asOf := m.snapshot.GeneratedAt.Local().Format("15:04:05, 02 Jan 2006")
+		// The full overall block belongs to the overview; deeper screens keep
+		// one line so their content starts near the top.
+		if route.Screen == ScreenOverview {
+			fmt.Fprintf(&out, "Overall: %s\n", gradeLabel(m.snapshot.Overall.Grade))
+			if context := m.overallContext(); context != "" {
+				fmt.Fprintln(&out, context)
+			}
+			fmt.Fprintf(&out, "As of %s%s\n", asOf, scanning)
+			if m.snapshot.Overall.Score != nil {
+				fmt.Fprintf(&out, "Progress %d/100 (not a quality score)\n", *m.snapshot.Overall.Score)
+			}
+		} else {
+			fmt.Fprintf(&out, "Overall: %s · as of %s%s\n", gradeLabel(m.snapshot.Overall.Grade), asOf, scanning)
 		}
 	}
 	if route.Filtering {
@@ -635,6 +646,10 @@ func (m *Model) routeTitle(route Route) string {
 		case ScreenApp:
 			if app := m.app(route.ID); app != nil {
 				return app.Name
+			}
+		case ScreenExpectation:
+			if _, expectation := m.expectation(route.ID); expectation != nil {
+				return expectationTitle(*expectation)
 			}
 		case ScreenFinding:
 			if finding := m.finding(route.ID); finding != nil {
@@ -725,7 +740,7 @@ func (m *Model) wrappedContentLines(route Route) []string {
 
 func scrollableScreen(screen Screen) bool {
 	switch screen {
-	case ScreenApp, ScreenFinding, ScreenNetwork, ScreenCoverage, ScreenSandboxApp, ScreenHelp:
+	case ScreenApp, ScreenExpectation, ScreenFinding, ScreenNetwork, ScreenCoverage, ScreenSandboxApp, ScreenHelp:
 		return true
 	default:
 		return false
@@ -747,6 +762,8 @@ func (m *Model) screenContent(route Route) string {
 		return m.listView(route)
 	case ScreenApp:
 		return m.appView(route.ID)
+	case ScreenExpectation:
+		return m.expectationView(route.ID)
 	case ScreenFinding:
 		return m.findingView(route.ID)
 	case ScreenNetwork:
@@ -1030,16 +1047,74 @@ func (m *Model) findingView(id string) string {
 	}
 	var out strings.Builder
 	fmt.Fprintf(&out, "Severity: %s\n\n%s\n", finding.Severity, finding.Detail)
+	heading := false
 	for _, action := range finding.Actions {
-		fmt.Fprintf(&out, "\nTier %d · %s: %s", action.Tier, action.Kind, action.Label)
-		if action.Command != "" {
-			fmt.Fprintf(&out, "\n  %s", action.Command)
+		// Reading why is this screen; listing it here would point to itself.
+		if action.Kind == audit.ActionInform && action.Target == finding.ID {
+			continue
 		}
-		if action.URL != "" {
-			fmt.Fprintf(&out, "\n  %s", action.URL)
+		if !heading {
+			out.WriteString("\nWhat you can do:")
+			heading = true
+		}
+		fmt.Fprintf(&out, "\n• %s", action.Label)
+		for _, extra := range []string{action.Detail, action.Command, action.URL} {
+			if extra != "" {
+				fmt.Fprintf(&out, "\n  %s", extra)
+			}
 		}
 	}
 	return strings.TrimSpace(out.String())
+}
+
+func expectationRouteID(categoryID, expectationID string) string {
+	return categoryID + "/" + expectationID
+}
+
+// expectation finds an expectation by its category-scoped route ID, since
+// expectation IDs are only unique within their category.
+func (m *Model) expectation(id string) (*report.Category, *report.Expectation) {
+	categoryID, expectationID, ok := strings.Cut(id, "/")
+	if !ok {
+		return nil, nil
+	}
+	category := m.category(categoryID)
+	if category == nil {
+		return nil, nil
+	}
+	for i := range category.Expectations {
+		if category.Expectations[i].ID == expectationID {
+			return category, &category.Expectations[i]
+		}
+	}
+	return category, nil
+}
+
+func expectationTitle(expectation report.Expectation) string {
+	switch {
+	case !expectation.Judged:
+		return "Expectation unknown"
+	case !expectation.Met:
+		return "Expectation missing"
+	default:
+		return "Expectation met"
+	}
+}
+
+func (m *Model) expectationView(id string) string {
+	category, expectation := m.expectation(id)
+	if expectation == nil {
+		return "Expectation details are unavailable."
+	}
+	grade := report.GradeChannels(expectation.Grade)
+	var out strings.Builder
+	fmt.Fprintf(&out, "%s %s\n", grade.Glyph, grade.Word)
+	fmt.Fprintf(&out, "Category: %s\n", category.Name)
+	if expectation.Severity != "" {
+		fmt.Fprintf(&out, "Severity: %s\n", expectation.Severity)
+	}
+	fmt.Fprintf(&out, "\n%s", expectation.Why)
+	return out.String()
 }
 
 func (m *Model) networkView() string {
@@ -1119,6 +1194,8 @@ func screenTitle(screen Screen) string {
 		return "Categories"
 	case ScreenCategory:
 		return "Category"
+	case ScreenExpectation:
+		return "Expectation"
 	case ScreenApp:
 		return "Application"
 	case ScreenFindings:
