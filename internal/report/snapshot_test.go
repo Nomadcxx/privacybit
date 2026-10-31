@@ -151,6 +151,39 @@ func TestBuildPreservesOriginContextForUnmatchedApps(t *testing.T) {
 	}
 }
 
+func TestBuildListsUnmatchedLaunchersBeforeCommandLineTools(t *testing.T) {
+	set, err := catalog.Load(catalog.LoadOptions{UserFragments: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := audit.Result{Overall: catalog.GradeUnknown}
+	add := func(name string, kind detect.Kind) {
+		result.Inventory = append(result.Inventory, audit.InstalledEntry{
+			Observation: detect.Observation{Name: name, Kind: kind},
+			Grade:       catalog.GradeUnknown,
+		})
+	}
+	for i := range ListLimit {
+		add(fmt.Sprintf("aa-tool-%03d", i), detect.KindBinary)
+	}
+	add("Zed", detect.KindDesktop)
+	add("org.example.Notes", detect.KindFlatpak)
+	add("mystery-player", detect.KindPackage)
+
+	snapshot := Build(set, result, nil, network.UnknownResult("not checked"), nil, time.Now(), 0, BuildOptions{})
+	if snapshot.UnmatchedTotal != ListLimit+3 || !snapshot.UnmatchedTruncated {
+		t.Fatalf("unmatched bounds = %d total, truncated=%t", snapshot.UnmatchedTotal, snapshot.UnmatchedTruncated)
+	}
+	var got []string
+	for _, app := range snapshot.Unmatched[:4] {
+		got = append(got, app.Name)
+	}
+	want := []string{"org.example.Notes", "Zed", "mystery-player", "aa-tool-000"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("first unmatched apps = %v, want %v", got, want)
+	}
+}
+
 func TestBuildSanitizesAndBoundsOriginContext(t *testing.T) {
 	set, err := catalog.Load(catalog.LoadOptions{UserFragments: false})
 	if err != nil {
