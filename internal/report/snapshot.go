@@ -240,6 +240,15 @@ func Build(set *catalog.Set, result audit.Result, findings []audit.Finding, netR
 			appsByCategory[app.Category] = append(appsByCategory[app.Category], app)
 		}
 	}
+	// Packages and PATH hold thousands of libraries and command-line tools; the
+	// bounded list should show apps someone can launch before them.
+	sort.SliceStable(snapshot.Unmatched, func(i, j int) bool {
+		a, b := snapshot.Unmatched[i], snapshot.Unmatched[j]
+		if ra, rb := unmatchedRank(a), unmatchedRank(b); ra != rb {
+			return ra < rb
+		}
+		return strings.ToLower(a.Name) < strings.ToLower(b.Name)
+	})
 	for _, category := range result.Categories {
 		out := Category{
 			ID: category.ID, Name: category.Name, Grade: category.Grade,
@@ -454,6 +463,21 @@ func groupedApps(set *catalog.Set, inventory []audit.InstalledEntry) []App {
 		out = append(out, *app)
 	}
 	return out
+}
+
+// unmatchedRank orders launchable apps (desktop entries, Flatpaks) first,
+// then packages, then PATH binaries.
+func unmatchedRank(app App) int {
+	rank := 2
+	for _, source := range app.Sources {
+		switch source {
+		case detect.KindDesktop.String(), detect.KindFlatpak.String():
+			return 0
+		case detect.KindPackage.String():
+			rank = 1
+		}
+	}
+	return rank
 }
 
 func sanitizeOriginSource(source string) string {
